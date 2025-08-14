@@ -1,12 +1,51 @@
-/**
- * Shared code between client and server
- * Useful to share types between client and server
- * and/or small pure JS functions that can be used on both client and server
- */
+export interface Dokumen {
+  id?: number;
+  kegiatanId?: number;
+  tipe: 'persiapan' | 'pasca-pelatihan' | 'pasca-pendataan';
+  nama: string;
+  link: string;
+  jenis: 'file' | 'link';
+  status?: 'Pending' | 'Reviewed' | 'Approved';
+  uploadedAt?: string;
+}
 
-/**
- * Example response type for /api/demo
- */
-export interface DemoResponse {
-  message: string;
+export interface PPL {
+  id?: number; // ID dari database akan berupa number
+  kegiatanId?: number;
+  namaPPL: string;
+  namaPML: string;
+  bebanKerja: string;
+  satuanBebanKerja: string;
+  besaranHonor: string;
+  // Kolom progress ditambahkan di sini untuk konsistensi
+  progressOpen?: number;
+  progressSubmit?: number;
+  progressDiperiksa?: number;
+  progressApproved?: number;
+}
+
+export interface Kegiatan {
+  id: number;
+  namaKegiatan: string;
+  ketuaTim: string;
+  timKerja: string;
+  tipeKegiatan: string;
+  status: 'Persiapan' | 'Pelatihan' | 'Pendataan' | 'Selesai';
+  progressKeseluruhan: number;
+  tanggalMulaiPelatihan?: string;
+  tanggalSelesaiPelatihan?: string;
+  tanggalMulaiPendataan?: string;
+  tanggalSelesaiPendataan?: string;
+  lastUpdated: string;
+  dokumen: Dokumen[];
+  ppl: PPL[];
+}
+
+// Tipe BARU yang hilang sebelumnya, sekarang sudah diekspor
+export interface PPLHonorData {
+  id: string;
+  nama: string;
+  honorBulanIni: number;
+  activitiesCount: number;
+  honorPerBulan: number[]; 
 }

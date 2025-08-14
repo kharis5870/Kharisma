@@ -1,0 +1,89 @@
+import { Router } from 'express';
+import {
+  getAllKegiatan,
+  getKegiatanById,
+  createKegiatan,
+  updateKegiatan,
+  updatePplProgress,
+  deleteKegiatan // <-- Pastikan ini diimpor
+} from '../services/kegiatanService';
+
+const router = Router();
+
+// GET all
+router.get('/', async (_req, res) => {
+  try {
+    const kegiatan = await getAllKegiatan();
+    res.json(kegiatan);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching kegiatan' });
+  }
+});
+
+// GET by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const kegiatan = await getKegiatanById(parseInt(req.params.id));
+    if (kegiatan) {
+      res.json(kegiatan);
+    } else {
+      res.status(404).json({ message: 'Kegiatan not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching kegiatan details' });
+  }
+});
+
+// POST new
+router.post('/', async (req, res) => {
+  try {
+    const newKegiatan = await createKegiatan(req.body);
+    res.status(201).json(newKegiatan);
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating kegiatan' });
+  }
+});
+
+// PUT update (untuk detail kegiatan)
+router.put('/:id', async (req, res) => {
+    try {
+        const updatedKegiatan = await updateKegiatan(parseInt(req.params.id), req.body);
+        res.json(updatedKegiatan);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error updating kegiatan' });
+    }
+});
+
+// PUT update (untuk progress PPL)
+router.put('/ppl/:pplId/progress', async (req, res) => {
+    try {
+        const { pplId } = req.params;
+        const progressData = req.body;
+        const updatedPpl = await updatePplProgress(parseInt(pplId), progressData);
+        res.json(updatedPpl);
+    } catch (error) {
+        console.error("Error updating PPL progress:", error);
+        res.status(500).json({ message: 'Gagal memperbarui progress PPL' });
+    }
+});
+
+
+// --- PERBAIKAN UTAMA ADA DI SINI ---
+// DELETE kegiatan
+router.delete('/:id', async (req, res) => {
+    try {
+        const success = await deleteKegiatan(parseInt(req.params.id));
+        if (success) {
+            res.status(204).send(); // 204 No Content adalah respons standar untuk delete yang berhasil
+        } else {
+            res.status(404).json({ message: 'Kegiatan tidak ditemukan untuk dihapus' });
+        }
+    } catch (error) {
+        console.error("Error deleting kegiatan:", error);
+        res.status(500).json({ message: 'Gagal menghapus kegiatan' });
+    }
+});
+
+
+export default router;
