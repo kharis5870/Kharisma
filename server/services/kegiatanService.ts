@@ -4,7 +4,7 @@ import { Kegiatan, Dokumen, PPL } from '@shared/api';
 
 interface KegiatanPacket extends Kegiatan, RowDataPacket {}
 
-// Fungsi getAllKegiatan dan getKegiatanById tidak perlu diubah
+// ... (fungsi getAllKegiatan dan getKegiatanById tidak berubah)
 export const getAllKegiatan = async (): Promise<Kegiatan[]> => {
     const [kegiatanRows] = await db.query<KegiatanPacket[]>('SELECT * FROM kegiatan ORDER BY id DESC');
     for (const kegiatan of kegiatanRows) {
@@ -27,6 +27,7 @@ export const getKegiatanById = async (id: number): Promise<Kegiatan | null> => {
     return kegiatan;
 };
 
+
 export const createKegiatan = async (data: any): Promise<Kegiatan> => {
     const connection = await db.getConnection();
     try {
@@ -39,7 +40,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             pplAllocations, documents
         } = data;
 
-        // 1. Simpan data utama kegiatan, TERMASUK tanggalMulai dan tanggalSelesai
+        // 1. Simpan data utama kegiatan
         const kegiatanQuery = `
             INSERT INTO kegiatan 
             (namaKegiatan, ketuaTim, timKerja, tipeKegiatan, 
@@ -51,8 +52,8 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
             namaKegiatan, ketuaTim, timKerja, tipeKegiatan,
-            tanggalMulaiPelatihan || null, // Mengisi tanggalMulai
-            tanggalSelesaiPendataan || null, // Mengisi tanggalSelesai
+            tanggalMulaiPelatihan || null,
+            tanggalSelesaiPendataan || null,
             tanggalMulaiPelatihan || null,
             tanggalSelesaiPelatihan || null,
             tanggalMulaiPendataan || null,
@@ -60,23 +61,32 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         ]);
         const kegiatanId = kegiatanResult.insertId;
 
-        // 2. Simpan alokasi PPL (tidak berubah)
+        // 2. Simpan alokasi PPL dengan inisialisasi progres
         if (pplAllocations && pplAllocations.length > 0) {
-            const pplQuery = 'INSERT INTO ppl (kegiatanId, namaPPL, namaPML, bebanKerja, besaranHonor, satuanBebanKerja) VALUES ?';
-            const pplValues = pplAllocations.map((ppl: PPL) => [
-                kegiatanId, ppl.namaPPL, ppl.namaPML,
-                parseInt(ppl.bebanKerja) || 0,
-                parseInt(ppl.besaranHonor) || 0,
-                ppl.satuanBebanKerja
-            ]);
+            const pplQuery = 'INSERT INTO ppl (kegiatanId, namaPPL, namaPML, bebanKerja, besaranHonor, satuanBebanKerja, progressOpen, progressSubmit, progressDiperiksa, progressApproved) VALUES ?';
+            const pplValues = pplAllocations.map((ppl: PPL) => {
+                const bebanKerja = parseInt(ppl.bebanKerja) || 0;
+                return [
+                    kegiatanId,
+                    ppl.namaPPL,
+                    ppl.namaPML,
+                    bebanKerja,
+                    parseInt(ppl.besaranHonor) || 0,
+                    ppl.satuanBebanKerja,
+                    bebanKerja, // Inisialisasi progressOpen dengan bebanKerja
+                    0,         // Inisialisasi progressSubmit ke 0
+                    0,         // Inisialisasi progressDiperiksa ke 0
+                    0          // Inisialisasi progressApproved ke 0
+                ];
+            });
             await connection.query(pplQuery, [pplValues]);
         }
         
-        // 3. Simpan dokumen (tidak berubah)
+        // 3. Simpan dokumen
         if (documents && documents.length > 0) {
             const docQuery = 'INSERT INTO dokumen (kegiatanId, tipe, nama, link, jenis) VALUES ?';
-            const docValues = documents.map((doc: any) => [
-                kegiatanId, 'persiapan', doc.nama, doc.link || doc.url, doc.jenis
+            const docValues = documents.map((doc: Dokumen) => [
+                kegiatanId, doc.tipe, doc.nama, doc.link, doc.jenis
             ]);
             await connection.query(docQuery, [docValues]);
         }

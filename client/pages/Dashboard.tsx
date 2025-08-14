@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import AlertModal from "@/components/AlertModal"; // Import AlertModal
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,12 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Calendar, Activity, FileText, AlertTriangle, Clock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL } from "@shared/api";
 import { cn } from "@/lib/utils";
-import { differenceInDays, isAfter, isWithinInterval, toDate, format } from "date-fns";
+import { toDate, format } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
 
 // --- Tipe Data Frontend ---
@@ -106,10 +106,22 @@ export default function Dashboard() {
   const [updateModalActivity, setUpdateModalActivity] = useState<KegiatanWithRelations | null>(null);
   const [activityToDelete, setActivityToDelete] = useState<Kegiatan | null>(null);
   const [showProgressSuccessModal, setShowProgressSuccessModal] = useState(false);
+  const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
+  const [deletedActivityName, setDeletedActivityName] = useState("");
   const [localPplProgress, setLocalPplProgress] = useState<PPLWithProgress[]>([]);
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
 
   const { data: activities = [], isLoading } = useQuery<KegiatanWithRelations[]>({ queryKey: ['kegiatan'], queryFn: fetchActivities });
-  const deleteMutation = useMutation({ mutationFn: deleteActivity, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); setActivityToDelete(null); } });
+  
+  const deleteMutation = useMutation({
+    mutationFn: deleteActivity,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
+      setShowDeleteSuccessModal(true);
+      setActivityToDelete(null);
+    },
+  });
+
   const progressMutation = useMutation({ mutationFn: updatePplProgress, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); } });
 
   const stats = useMemo(() => {
@@ -120,8 +132,65 @@ export default function Dashboard() {
   }, [activities]);
 
   const handleOpenUpdateModal = (activity: KegiatanWithRelations) => { setLocalPplProgress(JSON.parse(JSON.stringify(activity.ppl || []))); setUpdateModalActivity(activity); };
-  const handleUpdatePPL = (pplId: number, field: keyof PPLWithProgress, value: string) => { setLocalPplProgress(prev => prev.map(p => p.id === pplId ? { ...p, [field]: parseInt(value) || 0 } : p)); };
+
+  const handleUpdatePPL = (pplId: number, field: keyof PPLWithProgress, value: string) => {
+    setLocalPplProgress(prev =>
+        prev.map(p => {
+            if (p.id === pplId) {
+                const newValue = parseInt(value) || 0;
+                const oldValue = p[field] as number;
+                const diff = newValue - oldValue;
+                const bebanKerja = parseInt(p.bebanKerja) || 0;
+
+                if (newValue > bebanKerja) {
+                    setAlertModal({ isOpen: true, title: "Validasi Gagal", message: `Nilai tidak boleh melebihi total beban kerja (${bebanKerja}).` });
+                    return p;
+                }
+
+                const updatedPpl = { ...p, [field]: newValue };
+
+                if (diff !== 0) {
+                    switch (field) {
+                        case 'progressSubmit':
+                            if (diff > 0 && p.progressOpen - diff < 0) {
+                                setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Submit tidak bisa lebih besar dari Open!" });
+                                return p;
+                            }
+                            updatedPpl.progressOpen -= diff;
+                            break;
+                        case 'progressDiperiksa':
+                            if (diff > 0 && p.progressSubmit - diff < 0) {
+                                setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Diperiksa tidak bisa lebih besar dari Submit!" });
+                                return p;
+                            }
+                            updatedPpl.progressSubmit -= diff;
+                            break;
+                        case 'progressApproved':
+                            if (diff > 0 && p.progressDiperiksa - diff < 0) {
+                                setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Approved tidak bisa lebih besar dari Diperiksa!" });
+                                return p;
+                            }
+                            updatedPpl.progressDiperiksa -= diff;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                return updatedPpl;
+            }
+            return p;
+        })
+    );
+  };
+  
   const handleSaveProgress = () => { localPplProgress.forEach(ppl => { progressMutation.mutate({ pplId: ppl.id!, progressData: { open: ppl.progressOpen, submit: ppl.progressSubmit, diperiksa: ppl.progressDiperiksa, approved: ppl.progressApproved } }); }); setUpdateModalActivity(null); setShowProgressSuccessModal(true); };
+
+  const handleDeleteConfirm = () => {
+    if (activityToDelete) {
+        setDeletedActivityName(activityToDelete.namaKegiatan);
+        deleteMutation.mutate(activityToDelete.id);
+    }
+  };
 
   if (isLoading) return <Layout><div className="text-center p-8">Memuat...</div></Layout>;
 
@@ -162,14 +231,235 @@ export default function Dashboard() {
             )})}
         </div>
         
-        {/* MODAL LIHAT */}
-        <Dialog open={!!selectedActivity} onOpenChange={(isOpen) => !isOpen && setSelectedActivity(null)}><DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto"><DialogHeader><DialogTitle>Detail Kegiatan: {selectedActivity?.namaKegiatan}</DialogTitle></DialogHeader>{selectedActivity && <div className="space-y-6 p-4"> {/* ... Konten ... */} </div>}</DialogContent></Dialog>
+        <Dialog open={!!selectedActivity} onOpenChange={(isOpen) => !isOpen && setSelectedActivity(null)}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Detail Kegiatan: {selectedActivity?.namaKegiatan}</DialogTitle>
+                </DialogHeader>
+                {selectedActivity && (
+                    <div className="space-y-6 p-4">
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <h4 className="font-semibold text-gray-900 mb-3">Informasi Kegiatan</h4>
+                            <div className="space-y-3 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Nama Kegiatan:</span>
+                                <span className="font-medium text-right max-w-xs">{selectedActivity.namaKegiatan}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Ketua Tim:</span>
+                                <span className="font-medium">{selectedActivity.ketuaTim}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Tipe Kegiatan:</span>
+                                <span className="font-medium">{selectedActivity.tipeKegiatan}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-500">Status:</span>
+                                <Badge className={cn(getDynamicStatus(selectedActivity).color)}>
+                                  {getDynamicStatus(selectedActivity).status}
+                                </Badge>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Terakhir Update:</span>
+                                <span className="font-medium text-bps-blue-600">{getRelativeTime(selectedActivity.lastUpdated)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <h4 className="font-semibold text-gray-900 mb-3">Jadwal Kegiatan</h4>
+                            <div className="space-y-3 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Pelatihan:</span>
+                                <span className="font-medium">
+                                  {format(new Date(selectedActivity.tanggalMulaiPelatihan!), 'dd MMM yyyy', { locale: localeID })} - {format(new Date(selectedActivity.tanggalSelesaiPelatihan!), 'dd MMM yyyy', { locale: localeID })}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Pendataan:</span>
+                                <span className="font-medium">
+                                  {format(new Date(selectedActivity.tanggalMulaiPendataan!), 'dd MMM yyyy', { locale: localeID })} - {format(new Date(selectedActivity.tanggalSelesaiPendataan!), 'dd MMM yyyy', { locale: localeID })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-2">Tim Kerja</h4>
+                          <p className="text-sm text-gray-600 leading-relaxed">{selectedActivity.timKerja}</p>
+                        </div>
+                        
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-4">Progress PPL</h4>
+                          <div className="space-y-4">
+                            {selectedActivity.ppl.map((ppl) => (
+                              <Card key={ppl.id} className="p-4 bg-gray-50">
+                                <div className="space-y-4">
+                                  <div className="flex justify-between items-center">
+                                    <div>
+                                      <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
+                                      <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
+                                      <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
+                                      <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-lg font-bold text-bps-blue-600">
+                                        {getProgressBarValue(ppl).toFixed(1)}%
+                                      </div>
+                                      <div className="text-xs text-gray-500">Progress Approved</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-4 gap-4">
+                                    <div className="text-center">
+                                      <Label className="text-xs text-gray-600">Open</Label>
+                                      <div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">
+                                        {ppl.progressOpen || 0}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">{ppl.progressOpen || 0} {ppl.satuanBebanKerja}</div>
+                                    </div>
+
+                                    <div className="text-center">
+                                      <Label className="text-xs text-gray-600">Submit</Label>
+                                      <div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">
+                                        {ppl.progressSubmit || 0}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">{ppl.progressSubmit || 0} {ppl.satuanBebanKerja}</div>
+                                    </div>
+
+                                    <div className="text-center">
+                                      <Label className="text-xs text-gray-600">Diperiksa</Label>
+                                      <div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">
+                                        {ppl.progressDiperiksa || 0}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">{ppl.progressDiperiksa || 0} {ppl.satuanBebanKerja}</div>
+                                    </div>
+
+                                    <div className="text-center">
+                                      <Label className="text-xs text-gray-600">Approved</Label>
+                                      <div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">
+                                        {ppl.progressApproved || 0}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">{ppl.progressApproved || 0} {ppl.satuanBebanKerja}</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div
+                                      className="bg-bps-green-600 h-2 rounded-full transition-all duration-300"
+                                      style={{ width: `${getProgressBarValue(ppl)}%` }}
+                                    ></div>
+                                  </div>
+
+                                  <div className="text-xs text-gray-500 text-center">
+                                    Total: {(ppl.progressOpen ?? 0) + (ppl.progressSubmit ?? 0) + (ppl.progressDiperiksa ?? 0) + (ppl.progressApproved ?? 0)} / {ppl.bebanKerja} {ppl.satuanBebanKerja}
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <FileCheck className="w-5 h-5 text-blue-600 mt-0.5" />
+                            <div>
+                              <h4 className="font-medium text-blue-900">Informasi Akses</h4>
+                              <p className="text-blue-700 text-sm mt-1">
+                                Gunakan tombol <strong>Edit</strong> untuk mengakses dan mengupload dokumen semua fase (persiapan, pelatihan, pendataan).
+                                Tombol <strong>View Docs</strong> untuk melihat semua dokumen.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!updateModalActivity} onOpenChange={(isOpen) => !isOpen && setUpdateModalActivity(null)}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Update Progress: {updateModalActivity?.namaKegiatan}</DialogTitle>
+                </DialogHeader>
+                <div className="p-4">
+                    {localPplProgress.map(ppl => (
+                        <Card key={ppl.id} className="p-4 mb-4">
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
+                                        <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
+                                        <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
+                                        <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-lg font-bold text-bps-blue-600">
+                                            {getProgressBarValue(ppl).toFixed(1)}%
+                                        </div>
+                                        <div className="text-xs text-gray-500">Progress Approved</div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 gap-4">
+                                    {['open', 'submit', 'diperiksa', 'approved'].map(field => (
+                                        <div key={field} className="text-center">
+                                            <Label className="text-xs text-gray-600 capitalize">{field}</Label>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                value={(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]}
+                                                onChange={e => handleUpdatePPL(ppl.id!, `progress${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof PPLWithProgress, e.target.value)}
+                                                className="mt-1 text-center"
+                                            />
+                                            <div className="text-xs text-gray-500 mt-1">{(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]} {ppl.satuanBebanKerja}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <Progress value={getProgressBarValue(ppl)} className="h-2" />
+                                <div className="text-xs text-gray-500 text-center">
+                                    Total: {(ppl.progressOpen ?? 0) + (ppl.progressSubmit ?? 0) + (ppl.progressDiperiksa ?? 0) + (ppl.progressApproved ?? 0)} / {ppl.bebanKerja} {ppl.satuanBebanKerja}
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+                <div className="flex justify-end p-4 border-t">
+                    <Button onClick={handleSaveProgress}>Simpan Progress</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
         
-        {/* MODAL UPDATE */}
-        <Dialog open={!!updateModalActivity} onOpenChange={(isOpen) => !isOpen && setUpdateModalActivity(null)}><DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Update Progress: {updateModalActivity?.namaKegiatan}</DialogTitle></DialogHeader><div className="p-4">{localPplProgress.map(ppl => (<Card key={ppl.id} className="p-4 mb-4"><p className="font-semibold mb-2">{ppl.namaPPL}</p><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{['open', 'submit', 'diperiksa', 'approved'].map(field => (<div key={field} className="space-y-1"><Label className="capitalize text-xs">{field}</Label><Input type="number" value={(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]} onChange={e => handleUpdatePPL(ppl.id!, `progress${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof PPLWithProgress, e.target.value)}/></div>))}</div></Card>))}</div><div className="flex justify-end p-4 border-t"><Button onClick={handleSaveProgress}>Simpan Progress</Button></div></DialogContent></Dialog>
+        <ConfirmationModal 
+            isOpen={!!activityToDelete} 
+            onConfirm={handleDeleteConfirm} 
+            onClose={() => setActivityToDelete(null)} 
+            title="Konfirmasi Hapus" 
+            description={`Yakin ingin menghapus "${activityToDelete?.namaKegiatan}"?`} 
+        />
         
-        <ConfirmationModal isOpen={!!activityToDelete} onClose={() => setActivityToDelete(null)} onConfirm={() => activityToDelete && deleteMutation.mutate(activityToDelete.id)} title="Konfirmasi Hapus" description={`Yakin ingin menghapus "${activityToDelete?.namaKegiatan}"?`} />
-        <SuccessModal isOpen={showProgressSuccessModal} onClose={() => setShowProgressSuccessModal(false)} title="Progress Berhasil Diperbarui!" autoCloseDelay={2000} />
+        <SuccessModal 
+            isOpen={showProgressSuccessModal} 
+            onClose={() => setShowProgressSuccessModal(false)} 
+            title="Progress Berhasil Diperbarui!" 
+            autoCloseDelay={2000} 
+        />
+
+        <SuccessModal
+            isOpen={showDeleteSuccessModal}
+            onClose={() => setShowDeleteSuccessModal(false)}
+            title="Kegiatan Berhasil Dihapus!"
+            description={`Kegiatan "${deletedActivityName}" telah berhasil dihapus dari sistem.`}
+            autoCloseDelay={2000}
+        />
+        
+        <AlertModal
+            isOpen={alertModal.isOpen}
+            onClose={() => setAlertModal({ isOpen: false, title: "", message: "" })}
+            title={alertModal.title}
+            description={alertModal.message}
+        />
       </div>
     </Layout>
   );

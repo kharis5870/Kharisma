@@ -10,38 +10,46 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Trash2, Upload, Download, FileSpreadsheet, Link2, X } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Download, FileSpreadsheet, Link2, X } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dokumen, PPL } from "@shared/api";
 
-// Tipe Data untuk State Frontend
+// --- (Tipe Data tetap sama) ---
 interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId'> {
   id: string; 
 }
-
 interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'uploadedAt'> {
   id: string; 
-  file?: File;
-  url?: string;
 }
-
 type DateFieldName = 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan';
 
-// Fungsi API
 const createActivity = async (data: any) => {
-    const sanitizedData = { ...data, documents: data.documents.map(({ id, file, url, ...rest }: DocumentItem) => ({...rest, link: url || ''})), pplAllocations: data.pplAllocations.map(({ id, ...rest }: PPLItem) => rest), };
+    const sanitizedData = { 
+        ...data, 
+        documents: data.documents.map(({ id, ...rest }: DocumentItem) => rest), 
+        pplAllocations: data.pplAllocations.map(({ id, ...rest }: PPLItem) => ({
+            ...rest,
+            progressOpen: parseInt(rest.bebanKerja) || 0, // Set progressOpen
+            progressSubmit: 0,
+            progressDiperiksa: 0,
+            progressApproved: 0,
+        })), 
+    };
     const res = await fetch('/api/kegiatan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sanitizedData), });
     if (!res.ok) throw new Error('Gagal membuat kegiatan');
     return res.json();
 }
 
-// Komponen Utama
+
 export default function InputKegiatan() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showExcelSuccessModal, setShowExcelSuccessModal] = useState(false);
+  const [importedPplCount, setImportedPplCount] = useState(0);
+
   const [formData, setFormData] = useState({
     namaKegiatan: "", ketuaTim: "", timKerja: "", tipeKegiatan: "",
     pplAllocations: [{ id: "1", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }] as PPLItem[],
@@ -56,12 +64,44 @@ export default function InputKegiatan() {
   const addPPL = () => { setFormData(prev => ({ ...prev, pplAllocations: [...prev.pplAllocations, { id: Date.now().toString(), namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }]})); };
   const removePPL = (id: string) => { setFormData(prev => ({...prev, pplAllocations: prev.pplAllocations.filter(ppl => ppl.id !== id)})); };
   const updatePPL = (id: string, field: keyof Omit<PPLItem, 'id'>, value: string) => { setFormData(prev => ({...prev, pplAllocations: prev.pplAllocations.map(ppl => ppl.id === id ? { ...ppl, [field]: value } : ppl)})); };
-  const addDocumentLink = () => { const newDoc: DocumentItem = { id: Date.now().toString(), nama: "", jenis: 'link', url: "", tipe: 'persiapan', link: ''}; setFormData(prev => ({...prev, documents: [...prev.documents, newDoc]})); };
-  const addDocumentFile = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file) { const newDoc: DocumentItem = { id: Date.now().toString(), nama: file.name, jenis: 'file', file, tipe: 'persiapan', link: '' }; setFormData(prev => ({...prev, documents: [...prev.documents, newDoc]})); } event.target.value = ''; };
-  const updateDocument = (id: string, field: 'nama' | 'url', value: string) => { setFormData(prev => ({...prev, documents: prev.documents.map(doc => doc.id === id ? { ...doc, [field]: value } : doc)})); };
+  const addDocumentLink = () => { const newDoc: DocumentItem = { id: Date.now().toString(), nama: "", jenis: 'link', tipe: 'persiapan', link: ''}; setFormData(prev => ({...prev, documents: [...prev.documents, newDoc]})); };
+  const updateDocument = (id: string, field: 'nama' | 'link', value: string) => { setFormData(prev => ({...prev, documents: prev.documents.map(doc => doc.id === id ? { ...doc, [field]: value } : doc)})); };
   const removeDocument = (id: string) => { setFormData(prev => ({ ...prev, documents: prev.documents.filter(doc => doc.id !== id)})); };
   const downloadTemplate = () => { const headers = ['Nama PPL', 'Beban Kerja', 'Satuan Beban Kerja', 'Besaran Honor (Rp)', 'Nama PML']; const csvContent = headers.join(',') + '\n' + 'Contoh PPL 1,120,Hari,2400000,Contoh PML 1\n'; const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'Template_PPL.csv'; link.click(); };
-  const parseExcelFile = (file: File) => { const reader = new FileReader(); reader.onload = (e) => { const text = e.target?.result as string; const lines = text.split('\n').slice(1); const newPPLItems: PPLItem[] = lines.map((line, i) => { const data = line.split(','); return data.length >= 5 && data[0].trim() ? { id: Date.now().toString() + i, namaPPL: data[0].trim(), bebanKerja: data[1].trim(), satuanBebanKerja: data[2].trim(), besaranHonor: data[3].trim(), namaPML: data[4].trim()} : null }).filter((item): item is PPLItem => item !== null); if (newPPLItems.length > 0) { setFormData(prev => ({...prev, pplAllocations: newPPLItems})); alert(`Berhasil memuat ${newPPLItems.length} data PPL/PML.`); } else { alert('Tidak ada data valid.'); } }; reader.readAsText(file); };
+  
+  const parseExcelFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').slice(1);
+        const newPPLItems: PPLItem[] = lines
+            .map((line, i) => {
+                const data = line.split(',');
+                if (data.length >= 5 && data[0].trim()) {
+                    return {
+                        id: Date.now().toString() + i,
+                        namaPPL: data[0].trim(),
+                        bebanKerja: data[1].trim(),
+                        satuanBebanKerja: data[2].trim(),
+                        besaranHonor: data[3].trim(),
+                        namaPML: data[4].trim()
+                    };
+                }
+                return null;
+            })
+            .filter((item): item is PPLItem => item !== null);
+
+        if (newPPLItems.length > 0) {
+            setFormData(prev => ({ ...prev, pplAllocations: newPPLItems }));
+            setImportedPplCount(newPPLItems.length);
+            setShowExcelSuccessModal(true);
+        } else {
+            alert('Tidak ada data valid yang ditemukan dalam file.');
+        }
+    };
+    reader.readAsText(file);
+  };
+
   const handleExcelUpload = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file) parseExcelFile(file); event.target.value = ''; };
   const validateForm = () => formData.namaKegiatan && formData.ketuaTim && formData.tipeKegiatan && formData.tanggalMulaiPelatihan && formData.tanggalSelesaiPelatihan && formData.tanggalMulaiPendataan && formData.tanggalSelesaiPendataan && formData.pplAllocations.every(ppl => ppl.namaPPL && ppl.besaranHonor);
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!validateForm()) { alert("Harap lengkapi semua field bertanda *"); return; } mutation.mutate({ ...formData, tanggalMulaiPelatihan: format(formData.tanggalMulaiPelatihan!, 'yyyy-MM-dd'), tanggalSelesaiPelatihan: format(formData.tanggalSelesaiPelatihan!, 'yyyy-MM-dd'), tanggalMulaiPendataan: format(formData.tanggalMulaiPendataan!, 'yyyy-MM-dd'), tanggalSelesaiPendataan: format(formData.tanggalSelesaiPendataan!, 'yyyy-MM-dd') }); };
@@ -111,19 +151,14 @@ export default function InputKegiatan() {
             <CardHeader>
                 <CardTitle className="flex justify-between items-center">
                     Dokumen Persiapan
-                    <div className="flex gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={addDocumentLink}><Link2 className="w-4 h-4 mr-2"/>Tambah Link</Button>
-                        <Input type="file" id="doc-upload" className="hidden" onChange={addDocumentFile}/>
-                        <Button type="button" variant="outline" size="sm" asChild><label htmlFor="doc-upload" className="cursor-pointer"><Upload className="w-4 h-4 mr-2"/>Upload File</label></Button>
-                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addDocumentLink}><Link2 className="w-4 h-4 mr-2"/>Tambah Link</Button>
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
                 {formData.documents.map(doc => (
                     <div key={doc.id} className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50/50">
                         <div className="flex-grow space-y-2"><Label>Nama Dokumen</Label><Input value={doc.nama} onChange={e => updateDocument(doc.id, 'nama', e.target.value)}/></div>
-                        {doc.jenis === 'link' && <div className="flex-grow space-y-2"><Label>Link Google Drive</Label><Input value={doc.url} onChange={e => updateDocument(doc.id, 'url', e.target.value)}/></div>}
-                        {doc.jenis === 'file' && <div className="flex-grow text-sm self-end pb-2">File: {doc.file?.name}</div>}
+                        <div className="flex-grow space-y-2"><Label>Link Google Drive</Label><Input value={doc.link} onChange={e => updateDocument(doc.id, 'link', e.target.value)}/></div>
                         <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.id)} className="self-end"><X className="w-4 h-4 text-gray-500"/></Button>
                     </div>
                 ))}
@@ -172,6 +207,13 @@ export default function InputKegiatan() {
             title="Kegiatan Berhasil Disimpan!" 
             description={`Kegiatan "${formData.namaKegiatan}" telah berhasil dibuat.`} 
             actionLabel="Ke Dashboard" 
+        />
+        <SuccessModal
+            isOpen={showExcelSuccessModal}
+            onClose={() => setShowExcelSuccessModal(false)}
+            title="Data PPL Berhasil Diimpor!"
+            description={`${importedPplCount} data PPL/PML telah berhasil dimuat dari file.`}
+            autoCloseDelay={2000}
         />
       </div>
     </Layout>
