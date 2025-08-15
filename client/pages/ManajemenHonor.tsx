@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, Edit, Save, X, DollarSign, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, Edit, Save, X, DollarSign, TrendingUp, Users, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLHonorData } from "@shared/api";
 import { cn } from "@/lib/utils";
@@ -26,11 +26,76 @@ export default function ManajemenHonor() {
   const [globalSettings, setGlobalSettings] = useState({ batasHonorBulananGlobal: 3000000, selectedMonth: getCurrentMonth() });
   const [isEditingGlobalLimit, setIsEditingGlobalLimit] = useState(false);
   const [tempGlobalLimit, setTempGlobalLimit] = useState(globalSettings.batasHonorBulananGlobal);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const { data: pplData = [], isLoading } = useQuery({
       queryKey: ['honor', globalSettings.selectedMonth, currentYear],
       queryFn: () => fetchHonorData(globalSettings.selectedMonth, currentYear),
   });
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (columnKey: string) => {
+    if (!sortConfig || sortConfig.key !== columnKey) {
+      return <ChevronUp className="w-4 h-4 text-gray-300" />;
+    }
+    return sortConfig.direction === 'asc' ? 
+      <ChevronUp className="w-4 h-4 text-blue-600" /> : 
+      <ChevronDown className="w-4 h-4 text-blue-600" />;
+  };
+
+  const filteredAndSortedData = useMemo(() => {
+    let sortedData = [...pplData]
+        .filter(ppl => ppl.nama.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    if (sortConfig !== null) {
+      sortedData.sort((a, b) => {
+        const { key, direction } = sortConfig;
+        let aValue, bValue;
+
+        switch (key) {
+          case 'nama':
+            aValue = a.nama.toLowerCase();
+            bValue = b.nama.toLowerCase();
+            break;
+          case 'honorBulanIni':
+            aValue = a.honorBulanIni;
+            bValue = b.honorBulanIni;
+            break;
+          case 'activitiesCount':
+            aValue = a.activitiesCount;
+            bValue = b.activitiesCount;
+            break;
+          case 'selisih':
+            aValue = a.honorBulanIni - globalSettings.batasHonorBulananGlobal;
+            bValue = b.honorBulanIni - globalSettings.batasHonorBulananGlobal;
+            break;
+          case 'status':
+            aValue = a.honorBulanIni > globalSettings.batasHonorBulananGlobal ? 1 : 0;
+            bValue = b.honorBulanIni > globalSettings.batasHonorBulananGlobal ? 1 : 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) {
+          return direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortedData;
+  }, [pplData, searchTerm, sortConfig, globalSettings.batasHonorBulananGlobal]);
 
   const stats = useMemo(() => {
     const totalHonor = pplData.reduce((sum, p) => sum + p.honorBulanIni, 0);
@@ -59,9 +124,55 @@ export default function ManajemenHonor() {
           <Card className="border-l-4 border-l-bps-orange-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Rata-rata Honor Bulanan</p><p className="text-2xl font-bold text-gray-900">Rp {stats.rataRataHonorBulanan.toLocaleString('id-ID')}</p></div><TrendingUp className="w-8 h-8 text-bps-orange-500" /></div></CardContent></Card>
         </div>
         <Card>
-          <CardHeader><CardTitle>Akumulasi Honor PPL - {months[globalSettings.selectedMonth]} {currentYear}</CardTitle></CardHeader>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle>Akumulasi Honor PPL - {months[globalSettings.selectedMonth]} {currentYear}</CardTitle>
+                <div className="text-sm text-gray-600 mt-2">Batas Global: <strong>Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</strong> per PPL per bulan</div>
+              </div>
+              <div className="sm:w-64">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input type="text" placeholder="Cari nama PPL..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
           <CardContent>
-             {isLoading ? <p>Memuat...</p> : <Table><TableHeader><TableRow><TableHead>Nama PPL</TableHead><TableHead>Honor Bulan Terpilih</TableHead><TableHead>Kegiatan Bulan Ini</TableHead><TableHead>Selisih dengan Batas</TableHead><TableHead>Status</TableHead></TableRow></TableHeader><TableBody>{pplData.map((ppl) => { const overLimit = ppl.honorBulanIni > globalSettings.batasHonorBulananGlobal; const difference = ppl.honorBulanIni - globalSettings.batasHonorBulananGlobal; return ( <TableRow key={ppl.id} className={overLimit ? "bg-red-50" : ""}><TableCell className="font-medium">{ppl.nama}</TableCell><TableCell className={cn("font-semibold", overLimit && "text-red-600")}>Rp {ppl.honorBulanIni.toLocaleString('id-ID')}</TableCell><TableCell><Badge variant="outline">{ppl.activitiesCount} Kegiatan</Badge></TableCell><TableCell>{difference === 0 ? <span className="text-gray-600">Tepat batas</span> : difference > 0 ? <span className="text-red-600 font-semibold">+Rp {difference.toLocaleString('id-ID')}</span> : <span className="text-green-600">-Rp {Math.abs(difference).toLocaleString('id-ID')}</span>}</TableCell><TableCell>{overLimit ? <Badge variant="destructive">Melebihi Batas</Badge> : <Badge className="bg-green-600">Normal</Badge>}</TableCell></TableRow> )})}</TableBody></Table>}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-40"><button onClick={() => handleSort('nama')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama PPL{getSortIcon('nama')}</button></TableHead>
+                    <TableHead className="min-w-40"><button onClick={() => handleSort('honorBulanIni')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Honor Bulan Terpilih{getSortIcon('honorBulanIni')}</button></TableHead>
+                    <TableHead className="min-w-48"><button onClick={() => handleSort('activitiesCount')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Kegiatan Bulan Ini{getSortIcon('activitiesCount')}</button></TableHead>
+                    <TableHead className="min-w-32"><button onClick={() => handleSort('selisih')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Selisih dengan Batas{getSortIcon('selisih')}</button></TableHead>
+                    <TableHead className="min-w-20"><button onClick={() => handleSort('status')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Status{getSortIcon('status')}</button></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                  ) : filteredAndSortedData.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{searchTerm ? `Tidak ada PPL yang cocok dengan "${searchTerm}"` : 'Tidak ada data PPL'}</TableCell></TableRow>
+                  ) : (
+                    filteredAndSortedData.map((ppl) => {
+                      const overLimit = ppl.honorBulanIni > globalSettings.batasHonorBulananGlobal;
+                      const difference = ppl.honorBulanIni - globalSettings.batasHonorBulananGlobal;
+                      return (
+                        <TableRow key={ppl.id} className={overLimit ? "bg-red-50" : ""}>
+                          <TableCell className="font-medium">{ppl.nama}</TableCell>
+                          <TableCell className={cn("font-semibold", overLimit && "text-red-600")}>Rp {ppl.honorBulanIni.toLocaleString('id-ID')}</TableCell>
+                          <TableCell><Badge variant="outline">{ppl.activitiesCount} Kegiatan</Badge></TableCell>
+                          <TableCell>{difference === 0 ? <span className="text-gray-600">Tepat batas</span> : difference > 0 ? <span className="text-red-600 font-semibold">+Rp {difference.toLocaleString('id-ID')}</span> : <span className="text-green-600">-Rp {Math.abs(difference).toLocaleString('id-ID')}</span>}</TableCell>
+                          <TableCell>{overLimit ? <Badge variant="destructive">Melebihi Batas</Badge> : <Badge className="bg-green-600">Normal</Badge>}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

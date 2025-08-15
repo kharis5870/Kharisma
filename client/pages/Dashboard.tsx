@@ -3,15 +3,16 @@ import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import AlertModal from "@/components/AlertModal"; // Import AlertModal
+import AlertModal from "@/components/AlertModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Calendar, Activity, FileText, AlertTriangle, Clock } from "lucide-react";
+import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Calendar, Activity, FileText, AlertTriangle, Clock, Search, Filter } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL } from "@shared/api";
 import { cn } from "@/lib/utils";
@@ -27,13 +28,26 @@ type PPLWithProgress = PPL & {
 };
 type KegiatanWithRelations = Kegiatan & {
   ppl: PPLWithProgress[];
+  warnings: string[];
 };
 
 // --- API Functions ---
 const fetchActivities = async (): Promise<KegiatanWithRelations[]> => {
   const res = await fetch("/api/kegiatan");
   if (!res.ok) throw new Error("Gagal memuat kegiatan");
-  return res.json();
+  const activities: Kegiatan[] = await res.json();
+  // PERBAIKAN: Memastikan semua PPL memiliki nilai default untuk progres
+  return activities.map(activity => ({
+      ...activity,
+      ppl: (activity.ppl || []).map(p => ({
+          ...p,
+          progressOpen: p.progressOpen || 0,
+          progressSubmit: p.progressSubmit || 0,
+          progressDiperiksa: p.progressDiperiksa || 0,
+          progressApproved: p.progressApproved || 0,
+      })) as PPLWithProgress[],
+      warnings: getDynamicStatus(activity).warnings,
+  }));
 };
 
 const deleteActivity = async (id: number): Promise<void> => {
@@ -61,7 +75,9 @@ const getDynamicStatus = (kegiatan: Kegiatan): { status: string; color: string; 
     const selesaiPelatihan = kegiatan.tanggalSelesaiPelatihan ? toDate(new Date(kegiatan.tanggalSelesaiPelatihan)) : null;
     const mulaiPendataan = kegiatan.tanggalMulaiPendataan ? toDate(new Date(kegiatan.tanggalMulaiPendataan)) : null;
     
-    if (mulaiPendataan && today >= mulaiPendataan) {
+    if (kegiatan.dokumen.some(d => d.tipe === 'pasca-pendataan')) {
+        status = 'Selesai';
+    } else if (mulaiPendataan && today >= mulaiPendataan) {
         status = 'Pendataan';
         const deadlineLaporan = new Date(mulaiPendataan); deadlineLaporan.setDate(deadlineLaporan.getDate() + 7);
         if (today > deadlineLaporan && !kegiatan.dokumen.some(d => d.tipe === 'pasca-pendataan')) {
@@ -77,7 +93,14 @@ const getDynamicStatus = (kegiatan: Kegiatan): { status: string; color: string; 
         }
     }
     
-    const color = status === 'Pendataan' ? 'bg-green-100 text-green-700' : status === 'Pelatihan' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700';
+    let color = 'bg-gray-100 text-gray-700';
+    switch (status) {
+        case 'Persiapan': color = 'bg-blue-100 text-blue-700'; break;
+        case 'Pelatihan': color = 'bg-yellow-100 text-yellow-700'; break;
+        case 'Pendataan': color = 'bg-green-100 text-green-700'; break;
+        case 'Selesai': color = 'bg-purple-100 text-purple-700'; break;
+    }
+
     return { status, warnings, color };
 };
 
@@ -99,7 +122,6 @@ const getRelativeTime = (dateString: string) => {
     return `${diffInDays} hari yang lalu`;
 };
 
-// --- Main Dashboard Component ---
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const [selectedActivity, setSelectedActivity] = useState<KegiatanWithRelations | null>(null);
@@ -110,6 +132,10 @@ export default function Dashboard() {
   const [deletedActivityName, setDeletedActivityName] = useState("");
   const [localPplProgress, setLocalPplProgress] = useState<PPLWithProgress[]>([]);
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [pplSearchView, setPplSearchView] = useState("");
+  const [pplSearchUpdate, setPplSearchUpdate] = useState("");
 
   const { data: activities = [], isLoading } = useQuery<KegiatanWithRelations[]>({ queryKey: ['kegiatan'], queryFn: fetchActivities });
   
@@ -124,11 +150,31 @@ export default function Dashboard() {
 
   const progressMutation = useMutation({ mutationFn: updatePplProgress, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); } });
 
+  const filteredActivities = useMemo(() => {
+    return activities.filter(activity => {
+        const { status } = getDynamicStatus(activity);
+        const matchesSearch = activity.namaKegiatan.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === "all" ||
+                              (statusFilter === "warning" ? activity.warnings.length > 0 : status === statusFilter);
+        return matchesSearch && matchesStatus;
+    });
+  }, [activities, searchTerm, statusFilter]);
+
   const stats = useMemo(() => {
-    if (!activities) return { totalKegiatan: 0, persiapan: 0, pelatihan: 0, pendataan: 0, rataRataProgress: 0 };
-    const statusCounts = activities.reduce((acc, act) => { const status = getDynamicStatus(act).status; acc[status] = (acc[status] || 0) + 1; return acc; }, {} as Record<string, number>);
-    const totalProgress = activities.reduce((acc, act) => acc + (act.progressKeseluruhan || 0), 0);
-    return { totalKegiatan: activities.length, persiapan: statusCounts['Persiapan'] || 0, pelatihan: statusCounts['Pelatihan'] || 0, pendataan: statusCounts['Pendataan'] || 0, rataRataProgress: activities.length > 0 ? Math.round(totalProgress / activities.length) : 0 };
+    const statusCounts = activities.reduce((acc, act) => {
+        const { status } = getDynamicStatus(act);
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    return {
+        totalKegiatan: activities.length,
+        persiapan: statusCounts['Persiapan'] || 0,
+        pelatihan: statusCounts['Pelatihan'] || 0,
+        pendataan: statusCounts['Pendataan'] || 0,
+        selesai: statusCounts['Selesai'] || 0,
+        jumlahWarning: activities.filter(a => getDynamicStatus(a).warnings.length > 0).length,
+    };
   }, [activities]);
 
   const handleOpenUpdateModal = (activity: KegiatanWithRelations) => { setLocalPplProgress(JSON.parse(JSON.stringify(activity.ppl || []))); setUpdateModalActivity(activity); };
@@ -198,15 +244,51 @@ export default function Dashboard() {
     <Layout>
       <div className="space-y-8">
         <div><h1 className="text-3xl font-bold">Dashboard Monitoring</h1><p className="text-gray-600 mt-1">Pantau progress dan kelola semua kegiatan</p></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
           <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Total Kegiatan</p><p className="text-2xl font-bold">{stats.totalKegiatan}</p></div><Activity className="w-8 h-8 text-bps-blue-500"/></div></CardContent></Card>
           <Card className="border-l-4 border-l-blue-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Persiapan</p><p className="text-2xl font-bold">{stats.persiapan}</p></div><Clock className="w-8 h-8 text-blue-500"/></div></CardContent></Card>
           <Card className="border-l-4 border-l-yellow-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Pelatihan</p><p className="text-2xl font-bold">{stats.pelatihan}</p></div><Users className="w-8 h-8 text-yellow-500"/></div></CardContent></Card>
           <Card className="border-l-4 border-l-green-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Pendataan</p><p className="text-2xl font-bold">{stats.pendataan}</p></div><FileCheck className="w-8 h-8 text-green-500"/></div></CardContent></Card>
-          <Card className="border-l-4 border-l-purple-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Rata-rata Progress</p><p className="text-2xl font-bold">{stats.rataRataProgress}%</p></div><Calendar className="w-8 h-8 text-purple-500"/></div></CardContent></Card>
+          <Card className="border-l-4 border-l-purple-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Selesai</p><p className="text-2xl font-bold">{stats.selesai}</p></div><Calendar className="w-8 h-8 text-purple-500"/></div></CardContent></Card>
+          <Card className="border-l-4 border-l-red-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Jumlah Warning</p><p className="text-2xl font-bold">{stats.jumlahWarning}</p></div><AlertTriangle className="w-8 h-8 text-red-500"/></div></CardContent></Card>
         </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 bg-white p-6 rounded-lg border">
+          <div className="flex-1">
+            <Label htmlFor="search" className="text-sm font-medium text-gray-700 mb-2 block">Cari Kegiatan</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input id="search" type="text" placeholder="Cari nama kegiatan..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+            </div>
+          </div>
+          <div className="sm:w-64">
+            <Label htmlFor="status-filter" className="text-sm font-medium text-gray-700 mb-2 block">Filter Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Semua Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Status</SelectItem>
+                <SelectItem value="Persiapan">Persiapan</SelectItem>
+                <SelectItem value="Pelatihan">Pelatihan</SelectItem>
+                <SelectItem value="Pendataan">Pendataan</SelectItem>
+                <SelectItem value="Selesai">Selesai</SelectItem>
+                <SelectItem value="warning">Ada Warning</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {activities.map((activity) => {
+          {filteredActivities.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <div className="text-gray-400 mb-4"><Activity className="w-16 h-16 mx-auto" /></div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Tidak ada kegiatan ditemukan</h3>
+              <p className="text-gray-500">{searchTerm ? `Tidak ada kegiatan yang cocok dengan "${searchTerm}"` : 'Tidak ada kegiatan dengan filter yang dipilih'}</p>
+            </div>
+          ) : (
+            filteredActivities.map((activity) => {
               const { status, warnings, color } = getDynamicStatus(activity);
               return (
                 <Card key={activity.id} className="hover:shadow-lg transition-shadow flex flex-col">
@@ -220,18 +302,19 @@ export default function Dashboard() {
                             {warnings.length > 0 && (<div className="space-y-1 mt-2">{warnings.map((warning, index) => (<div key={index} className="flex items-center gap-2 p-2 bg-red-50 border rounded text-xs"><AlertTriangle className="w-3 h-3 text-red-600" /><span className="text-red-700">{warning}</span></div>))}</div>)}
                         </div>
                         <div className="grid grid-cols-2 gap-2 pt-4 border-t mt-4">
-                            <Button variant="outline" size="sm" onClick={() => setSelectedActivity(activity)}><Eye className="w-4 h-4 mr-1" />Lihat</Button>
+                            <Button variant="outline" size="sm" onClick={() => { setSelectedActivity(activity); setPplSearchView(""); }}><Eye className="w-4 h-4 mr-1" />Lihat</Button>
                             <Button variant="outline" size="sm" asChild><Link to={`/edit-activity/${activity.id}`}><Edit className="w-4 h-4 mr-1" />Edit</Link></Button>
-                            <Button variant="outline" size="sm" onClick={() => handleOpenUpdateModal(activity)}><RefreshCw className="w-4 h-4 mr-1" />Update</Button>
+                            <Button variant="outline" size="sm" onClick={() => { handleOpenUpdateModal(activity); setPplSearchUpdate(""); }}><RefreshCw className="w-4 h-4 mr-1" />Update</Button>
                             <Button variant="outline" size="sm" asChild><Link to={`/view-documents/${activity.id}`}><FileText className="w-4 h-4 mr-1" />View Docs</Link></Button>
                             <Button variant="destructive" size="sm" onClick={() => setActivityToDelete(activity)} className="col-span-2"><Trash2 className="w-4 h-4 mr-1" />Hapus</Button>
                         </div>
                     </CardContent>
                 </Card>
-            )})}
+            )})
+          )}
         </div>
         
-        <Dialog open={!!selectedActivity} onOpenChange={(isOpen) => !isOpen && setSelectedActivity(null)}>
+        <Dialog open={!!selectedActivity} onOpenChange={(isOpen) => { if (!isOpen) setSelectedActivity(null); }}>
             <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Detail Kegiatan: {selectedActivity?.namaKegiatan}</DialogTitle>
@@ -292,9 +375,17 @@ export default function Dashboard() {
                         </div>
                         
                         <div>
-                          <h4 className="font-semibold text-gray-900 mb-4">Progress PPL</h4>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-semibold text-gray-900">Progress PPL</h4>
+                            <div className="w-64">
+                              <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <Input type="text" placeholder="Cari nama PPL..." value={pplSearchView} onChange={(e) => setPplSearchView(e.target.value)} className="pl-10 h-8 text-sm" />
+                              </div>
+                            </div>
+                          </div>
                           <div className="space-y-4">
-                            {selectedActivity.ppl.map((ppl) => (
+                            {selectedActivity.ppl.filter(p => p.namaPPL.toLowerCase().includes(pplSearchView.toLowerCase())).map((ppl) => (
                               <Card key={ppl.id} className="p-4 bg-gray-50">
                                 <div className="space-y-4">
                                   <div className="flex justify-between items-center">
@@ -379,13 +470,22 @@ export default function Dashboard() {
             </DialogContent>
         </Dialog>
 
-        <Dialog open={!!updateModalActivity} onOpenChange={(isOpen) => !isOpen && setUpdateModalActivity(null)}>
+        <Dialog open={!!updateModalActivity} onOpenChange={(isOpen) => { if (!isOpen) setUpdateModalActivity(null); }}>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Update Progress: {updateModalActivity?.namaKegiatan}</DialogTitle>
                 </DialogHeader>
                 <div className="p-4">
-                    {localPplProgress.map(ppl => (
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-gray-900">Update Progress PPL</h4>
+                    <div className="w-64">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <Input type="text" placeholder="Cari nama PPL..." value={pplSearchUpdate} onChange={(e) => setPplSearchUpdate(e.target.value)} className="pl-10 h-8 text-sm"/>
+                      </div>
+                    </div>
+                  </div>
+                    {localPplProgress.filter(p => p.namaPPL.toLowerCase().includes(pplSearchUpdate.toLowerCase())).map(ppl => (
                         <Card key={ppl.id} className="p-4 mb-4">
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
@@ -403,16 +503,15 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-4 gap-4">
-                                    {['open', 'submit', 'diperiksa', 'approved'].map(field => (
+                                    <div className="text-center">
+                                        <Label className="text-xs text-gray-600">Open</Label>
+                                        <Input type="number" value={ppl.progressOpen || 0} disabled className="mt-1 text-center"/>
+                                        <div className="text-xs text-gray-500 mt-1">{ppl.progressOpen || 0} {ppl.satuanBebanKerja}</div>
+                                    </div>
+                                    {['submit', 'diperiksa', 'approved'].map(field => (
                                         <div key={field} className="text-center">
                                             <Label className="text-xs text-gray-600 capitalize">{field}</Label>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                value={(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]}
-                                                onChange={e => handleUpdatePPL(ppl.id!, `progress${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof PPLWithProgress, e.target.value)}
-                                                className="mt-1 text-center"
-                                            />
+                                            <Input type="number" min="0" value={(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]} onChange={e => handleUpdatePPL(ppl.id!, `progress${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof PPLWithProgress, e.target.value)} className="mt-1 text-center" />
                                             <div className="text-xs text-gray-500 mt-1">{(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]} {ppl.satuanBebanKerja}</div>
                                         </div>
                                     ))}
