@@ -5,7 +5,7 @@ import {
   createKegiatan,
   updateKegiatan,
   updatePplProgress,
-  deleteKegiatan // <-- Pastikan ini diimpor
+  deleteKegiatan
 } from '../services/kegiatanService';
 
 const router = Router();
@@ -40,6 +40,7 @@ router.post('/', async (req, res) => {
     const newKegiatan = await createKegiatan(req.body);
     res.status(201).json(newKegiatan);
   } catch (error) {
+    console.error("CREATE KEGIATAN ERROR:", error);
     res.status(500).json({ message: 'Error creating kegiatan' });
   }
 });
@@ -69,13 +70,12 @@ router.put('/ppl/:pplId/progress', async (req, res) => {
 });
 
 
-// --- PERBAIKAN UTAMA ADA DI SINI ---
 // DELETE kegiatan
 router.delete('/:id', async (req, res) => {
     try {
         const success = await deleteKegiatan(parseInt(req.params.id));
         if (success) {
-            res.status(204).send(); // 204 No Content adalah respons standar untuk delete yang berhasil
+            res.status(204).send();
         } else {
             res.status(404).json({ message: 'Kegiatan tidak ditemukan untuk dihapus' });
         }

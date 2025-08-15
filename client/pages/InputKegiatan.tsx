@@ -16,33 +16,34 @@ import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dokumen, PPL } from "@shared/api";
 
-// --- (Tipe Data tetap sama) ---
+// --- Tipe Data Frontend ---
 interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId'> {
   id: string; 
 }
+
 interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'uploadedAt'> {
   id: string; 
 }
+
 type DateFieldName = 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan';
 
+// --- Fungsi API ---
 const createActivity = async (data: any) => {
     const sanitizedData = { 
         ...data, 
         documents: data.documents.map(({ id, ...rest }: DocumentItem) => rest), 
-        pplAllocations: data.pplAllocations.map(({ id, ...rest }: PPLItem) => ({
-            ...rest,
-            progressOpen: parseInt(rest.bebanKerja) || 0, // Set progressOpen
-            progressSubmit: 0,
-            progressDiperiksa: 0,
-            progressApproved: 0,
-        })), 
+        pplAllocations: data.pplAllocations.map(({ id, ...rest }: PPLItem) => rest), 
     };
-    const res = await fetch('/api/kegiatan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sanitizedData), });
+    const res = await fetch('/api/kegiatan', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(sanitizedData), 
+    });
     if (!res.ok) throw new Error('Gagal membuat kegiatan');
     return res.json();
 }
 
-
+// Komponen Utama
 export default function InputKegiatan() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -104,7 +105,22 @@ export default function InputKegiatan() {
 
   const handleExcelUpload = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file) parseExcelFile(file); event.target.value = ''; };
   const validateForm = () => formData.namaKegiatan && formData.ketuaTim && formData.tipeKegiatan && formData.tanggalMulaiPelatihan && formData.tanggalSelesaiPelatihan && formData.tanggalMulaiPendataan && formData.tanggalSelesaiPendataan && formData.pplAllocations.every(ppl => ppl.namaPPL && ppl.besaranHonor);
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!validateForm()) { alert("Harap lengkapi semua field bertanda *"); return; } mutation.mutate({ ...formData, tanggalMulaiPelatihan: format(formData.tanggalMulaiPelatihan!, 'yyyy-MM-dd'), tanggalSelesaiPelatihan: format(formData.tanggalSelesaiPelatihan!, 'yyyy-MM-dd'), tanggalMulaiPendataan: format(formData.tanggalMulaiPendataan!, 'yyyy-MM-dd'), tanggalSelesaiPendataan: format(formData.tanggalSelesaiPendataan!, 'yyyy-MM-dd') }); };
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) {
+        alert("Harap lengkapi semua field bertanda *");
+        return;
+    }
+    mutation.mutate({
+        ...formData,
+        tanggalMulaiPelatihan: format(formData.tanggalMulaiPelatihan!, 'yyyy-MM-dd'),
+        tanggalSelesaiPelatihan: format(formData.tanggalSelesaiPelatihan!, 'yyyy-MM-dd'),
+        tanggalMulaiPendataan: format(formData.tanggalMulaiPendataan!, 'yyyy-MM-dd'),
+        tanggalSelesaiPendataan: format(formData.tanggalSelesaiPendataan!, 'yyyy-MM-dd')
+    });
+  };
+
   const handleSuccessAction = () => { navigate('/dashboard'); };
   const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
   const tipeKegiatanOptions = ["Sensus Penduduk", "Survei Ekonomi", "Survei Pertanian"];
