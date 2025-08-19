@@ -37,22 +37,19 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             namaKegiatan, ketuaTim, timKerja, tipeKegiatan,
             tanggalMulaiPelatihan, tanggalSelesaiPelatihan,
             tanggalMulaiPendataan, tanggalSelesaiPendataan,
-            pplAllocations, documents // PERBAIKAN: Langsung gunakan data ini tanpa parsing
+            pplAllocations, documents
         } = data;
 
         const kegiatanQuery = `
             INSERT INTO kegiatan 
             (namaKegiatan, ketuaTim, timKerja, tipeKegiatan, 
-             tanggalMulai, tanggalSelesai, 
              tanggalMulaiPelatihan, tanggalSelesaiPelatihan, 
              tanggalMulaiPendataan, tanggalSelesaiPendataan, 
              status, progressKeseluruhan) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
             namaKegiatan, ketuaTim, timKerja, tipeKegiatan,
-            tanggalMulaiPelatihan || null,
-            tanggalSelesaiPendataan || null,
             tanggalMulaiPelatihan || null,
             tanggalSelesaiPelatihan || null,
             tanggalMulaiPendataan || null,
@@ -79,9 +76,10 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         }
         
         if (documents && documents.length > 0) {
+            // FIX: Corrected the SQL query to match the database schema
             const docQuery = 'INSERT INTO dokumen (kegiatanId, tipe, nama, link, jenis) VALUES ?';
             const docValues = documents.map((doc: Dokumen) => [
-                kegiatanId, 'persiapan', doc.nama, doc.link, doc.jenis
+                kegiatanId, doc.tipe, doc.nama, doc.link, doc.jenis
             ]);
             await connection.query(docQuery, [docValues]);
         }
@@ -139,7 +137,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             namaKegiatan, ketuaTim, timKerja, tipeKegiatan,
             tanggalMulaiPelatihan, tanggalSelesaiPelatihan,
             tanggalMulaiPendataan, tanggalSelesaiPendataan,
-            pplAllocations, documents
+            ppl, dokumen // Renamed for clarity
         } = data;
 
         const kegiatanQuery = `
@@ -157,23 +155,27 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             id
         ]);
 
+        // Clear existing related data
         await connection.execute('DELETE FROM ppl WHERE kegiatanId = ?', [id]);
         await connection.execute('DELETE FROM dokumen WHERE kegiatanId = ?', [id]);
 
-        if (pplAllocations && pplAllocations.length > 0) {
+        // Re-insert PPL data
+        if (ppl && ppl.length > 0) {
             const pplQuery = 'INSERT INTO ppl (kegiatanId, namaPPL, namaPML, bebanKerja, besaranHonor, satuanBebanKerja) VALUES ?';
-            const pplValues = pplAllocations.map((ppl: PPL) => [
-                id, ppl.namaPPL, ppl.namaPML,
-                parseInt(ppl.bebanKerja) || 0,
-                parseInt(ppl.besaranHonor) || 0,
-                ppl.satuanBebanKerja
+            const pplValues = ppl.map((p: PPL) => [
+                id, p.namaPPL, p.namaPML,
+                parseInt(p.bebanKerja) || 0,
+                parseInt(p.besaranHonor) || 0,
+                p.satuanBebanKerja
             ]);
             await connection.query(pplQuery, [pplValues]);
         }
         
-        if (documents && documents.length > 0) {
+        // Re-insert document data
+        if (dokumen && dokumen.length > 0) {
+            // FIX: Corrected the SQL query to match the database schema
             const docQuery = 'INSERT INTO dokumen (kegiatanId, tipe, nama, link, jenis) VALUES ?';
-            const docValues = documents.map((doc: any) => [
+            const docValues = dokumen.map((doc: any) => [
                 id, doc.tipe, doc.nama, doc.link, doc.jenis
             ]);
             await connection.query(docQuery, [docValues]);
