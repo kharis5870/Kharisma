@@ -1,3 +1,5 @@
+// client/pages/EditActivity.tsx
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -5,21 +7,26 @@ import SuccessModal from "@/components/SuccessModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, Plus, Trash2, ArrowLeft, Save, Upload, Link2, X, FileText } from "lucide-react";
+import { ArrowLeft, Save, Link2, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
-import { cn } from "@/lib/utils";
 
 // --- Tipe Data Frontend ---
 type ClientPPL = PPL & { clientId: string };
 type ClientDokumen = Dokumen & { clientId: string };
+
+// Definisikan tipe data state yang lebih spesifik untuk frontend
+type FormState = Omit<Kegiatan, 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan'> & {
+    tanggalMulaiPelatihan?: Date;
+    tanggalSelesaiPelatihan?: Date;
+    tanggalMulaiPendataan?: Date;
+    tanggalSelesaiPendataan?: Date;
+    ppl: ClientPPL[];
+    dokumen: ClientDokumen[];
+};
 
 // --- API Functions ---
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
@@ -44,7 +51,7 @@ export default function EditActivity() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState("persiapan");
-    const [formData, setFormData] = useState<Partial<Kegiatan & { ppl: ClientPPL[], dokumen: ClientDokumen[] }>>({ dokumen: [], ppl: [] });
+    const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     const { data: initialData, isLoading } = useQuery({
@@ -76,10 +83,10 @@ export default function EditActivity() {
     const handleSubmit = () => {
         const dataToSubmit = {
             ...formData,
-            tanggalMulaiPelatihan: formData.tanggalMulaiPelatihan ? format(formData.tanggalMulaiPelatihan as Date, 'yyyy-MM-dd') : null,
-            tanggalSelesaiPelatihan: formData.tanggalSelesaiPelatihan ? format(formData.tanggalSelesaiPelatihan as Date, 'yyyy-MM-dd') : null,
-            tanggalMulaiPendataan: formData.tanggalMulaiPendataan ? format(formData.tanggalMulaiPendataan as Date, 'yyyy-MM-dd') : null,
-            tanggalSelesaiPendataan: formData.tanggalSelesaiPendataan ? format(formData.tanggalSelesaiPendataan as Date, 'yyyy-MM-dd') : null,
+            tanggalMulaiPelatihan: formData.tanggalMulaiPelatihan ? format(formData.tanggalMulaiPelatihan, 'yyyy-MM-dd') : null,
+            tanggalSelesaiPelatihan: formData.tanggalSelesaiPelatihan ? format(formData.tanggalSelesaiPelatihan, 'yyyy-MM-dd') : null,
+            tanggalMulaiPendataan: formData.tanggalMulaiPendataan ? format(formData.tanggalMulaiPendataan, 'yyyy-MM-dd') : null,
+            tanggalSelesaiPendataan: formData.tanggalSelesaiPendataan ? format(formData.tanggalSelesaiPendataan, 'yyyy-MM-dd') : null,
         };
         mutation.mutate(dataToSubmit as Partial<Kegiatan> & {id: number});
     };
@@ -87,13 +94,13 @@ export default function EditActivity() {
     // Document Management
     const addDocument = (tipe: Dokumen['tipe']) => {
         const newDoc: ClientDokumen = { clientId: Date.now().toString(), tipe, nama: "", link: "", jenis: 'link' };
-        setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
+        setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] as ClientDokumen[] }));
     };
     const updateDocument = (clientId: string, field: 'nama' | 'link', value: string) => {
-        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.map(d => (d.clientId === clientId ? { ...d, [field]: value } : d)) }));
+        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.map(d => (d.clientId === clientId ? { ...d, [field]: value } : d)) as ClientDokumen[] }));
     };
     const removeDocument = (clientId: string) => {
-        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) }));
+        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) as ClientDokumen[] }));
     };
 
     const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
