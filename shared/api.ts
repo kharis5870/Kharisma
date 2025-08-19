@@ -10,14 +10,13 @@ export interface Dokumen {
 }
 
 export interface PPL {
-  id?: number; // ID dari database akan berupa number
+  id?: number; 
   kegiatanId?: number;
   namaPPL: string;
   namaPML: string;
   bebanKerja: string;
   satuanBebanKerja: string;
   besaranHonor: string;
-  // Kolom progress ditambahkan di sini untuk konsistensi
   progressOpen?: number;
   progressSubmit?: number;
   progressDiperiksa?: number;
@@ -41,11 +40,11 @@ export interface Kegiatan {
   ppl: PPL[];
 }
 
-// Tipe BARU yang hilang sebelumnya, sekarang sudah diekspor
 export interface PPLHonorData {
   id: string;
   nama: string;
   honorBulanIni: number;
   activitiesCount: number;
+  kegiatanNames: string[];
   honorPerBulan: number[]; 
 }

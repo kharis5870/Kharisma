@@ -7,6 +7,7 @@ interface HonorQueryResult extends RowDataPacket {
     nama: string;
     totalHonor: number;
     kegiatanCount: number;
+    kegiatanNames: string | null;
 }
 
 export const getHonorBulanan = async (bulan: number, tahun: number): Promise<PPLHonorData[]> => {
@@ -17,7 +18,8 @@ export const getHonorBulanan = async (bulan: number, tahun: number): Promise<PPL
             p.namaPPL AS nama,
             SUM(p.besaranHonor) AS totalHonor,
             COUNT(DISTINCT k.id) AS kegiatanCount,
-            MIN(p.id) AS id
+            MIN(p.id) AS id,
+            GROUP_CONCAT(DISTINCT k.namaKegiatan SEPARATOR ';;') as kegiatanNames
         FROM ppl p
         JOIN kegiatan k ON p.kegiatanId = k.id
         WHERE
@@ -31,9 +33,9 @@ export const getHonorBulanan = async (bulan: number, tahun: number): Promise<PPL
     return rows.map(row => ({
         id: String(row.id),
         nama: row.nama,
-        // PERBAIKAN: Mengubah hasil query menjadi Number
         honorBulanIni: Number(row.totalHonor),
         activitiesCount: row.kegiatanCount,
+        kegiatanNames: row.kegiatanNames ? row.kegiatanNames.split(';;') : [],
         honorPerBulan: [], 
     }));
 };

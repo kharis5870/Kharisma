@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, Edit, Save, X, DollarSign, TrendingUp, Users, Search, ChevronUp, ChevronDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertTriangle, Edit, Save, X, DollarSign, TrendingUp, Users, Search, ChevronUp, ChevronDown, List } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLHonorData } from "@shared/api";
 import { cn } from "@/lib/utils";
@@ -22,12 +23,50 @@ const fetchHonorData = async (bulan: number, tahun: number): Promise<PPLHonorDat
     return res.json();
 }
 
+// Komponen baru untuk Modal Detail Kegiatan
+const ActivityDetailModal = ({ isOpen, onClose, pplData, selectedMonth }: { isOpen: boolean, onClose: () => void, pplData: PPLHonorData | null, selectedMonth: number }) => {
+    if (!pplData) return null;
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Detail Kegiatan: {pplData.nama}</DialogTitle>
+                    <DialogDescription>
+                        Berikut adalah daftar kegiatan yang diikuti pada bulan {months[selectedMonth]} {currentYear}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="mt-4 max-h-80 overflow-y-auto">
+                    {pplData.kegiatanNames && pplData.kegiatanNames.length > 0 ? (
+                        <ul className="space-y-2">
+                            {pplData.kegiatanNames.map((kegiatan, index) => (
+                                <li key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-md">
+                                    <List className="w-4 h-4 text-bps-blue-500 mt-1 flex-shrink-0" />
+                                    <span>{kegiatan}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-gray-500 text-center py-4">Tidak ada kegiatan tercatat untuk bulan ini.</p>
+                    )}
+                </div>
+                <div className="mt-6 flex justify-end">
+                    <Button variant="outline" onClick={onClose}>Tutup</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 export default function ManajemenHonor() {
   const [globalSettings, setGlobalSettings] = useState({ batasHonorBulananGlobal: 3000000, selectedMonth: getCurrentMonth() });
   const [isEditingGlobalLimit, setIsEditingGlobalLimit] = useState(false);
   const [tempGlobalLimit, setTempGlobalLimit] = useState(globalSettings.batasHonorBulananGlobal);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedPplDetails, setSelectedPplDetails] = useState<PPLHonorData | null>(null);
 
   const { data: pplData = [], isLoading } = useQuery({
       queryKey: ['honor', globalSettings.selectedMonth, currentYear],
@@ -106,6 +145,11 @@ export default function ManajemenHonor() {
         rataRataHonorBulanan: pplData.length > 0 ? Math.round(totalHonor / pplData.length) : 0
     };
   }, [pplData, globalSettings.batasHonorBulananGlobal]);
+  
+  const handleOpenDetailModal = (ppl: PPLHonorData) => {
+    setSelectedPplDetails(ppl);
+    setIsDetailModalOpen(true);
+  };
 
   return (
     <Layout>
@@ -163,7 +207,11 @@ export default function ManajemenHonor() {
                         <TableRow key={ppl.id} className={overLimit ? "bg-red-50" : ""}>
                           <TableCell className="font-medium">{ppl.nama}</TableCell>
                           <TableCell className={cn("font-semibold", overLimit && "text-red-600")}>Rp {ppl.honorBulanIni.toLocaleString('id-ID')}</TableCell>
-                          <TableCell><Badge variant="outline">{ppl.activitiesCount} Kegiatan</Badge></TableCell>
+                          <TableCell>
+                            <Button variant="link" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailModal(ppl)}>
+                                {ppl.activitiesCount} Kegiatan
+                            </Button>
+                          </TableCell>
                           <TableCell>{difference === 0 ? <span className="text-gray-600">Tepat batas</span> : difference > 0 ? <span className="text-red-600 font-semibold">+Rp {difference.toLocaleString('id-ID')}</span> : <span className="text-green-600">-Rp {Math.abs(difference).toLocaleString('id-ID')}</span>}</TableCell>
                           <TableCell>{overLimit ? <Badge variant="destructive">Melebihi Batas</Badge> : <Badge className="bg-green-600">Normal</Badge>}</TableCell>
                         </TableRow>
@@ -176,6 +224,13 @@ export default function ManajemenHonor() {
           </CardContent>
         </Card>
       </div>
+
+      <ActivityDetailModal 
+        isOpen={isDetailModalOpen} 
+        onClose={() => setIsDetailModalOpen(false)} 
+        pplData={selectedPplDetails}
+        selectedMonth={globalSettings.selectedMonth}
+      />
     </Layout>
   );
 }

@@ -7,19 +7,23 @@ import SuccessModal from "@/components/SuccessModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Link2, X } from "lucide-react";
+import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
+import { cn } from "@/lib/utils";
 
 // --- Tipe Data Frontend ---
 type ClientPPL = PPL & { clientId: string };
 type ClientDokumen = Dokumen & { clientId: string };
 
-// Definisikan tipe data state yang lebih spesifik untuk frontend
-type FormState = Omit<Kegiatan, 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan'> & {
+type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan'> & {
     tanggalMulaiPelatihan?: Date;
     tanggalSelesaiPelatihan?: Date;
     tanggalMulaiPendataan?: Date;
@@ -27,6 +31,9 @@ type FormState = Omit<Kegiatan, 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatih
     ppl: ClientPPL[];
     dokumen: ClientDokumen[];
 };
+
+type DateFieldName = 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan';
+
 
 // --- API Functions ---
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
@@ -78,6 +85,35 @@ export default function EditActivity() {
         mutationFn: updateActivity,
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); setShowSuccessModal(true); }
     });
+    
+    const handleFormFieldChange = (field: keyof FormState, value: any) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    // PPL Management Handlers
+    const addPPL = () => {
+        const newPPL: ClientPPL = {
+            clientId: Date.now().toString(),
+            namaPPL: "",
+            namaPML: "",
+            bebanKerja: "",
+            satuanBebanKerja: "",
+            besaranHonor: ""
+        };
+        setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), newPPL]}));
+    };
+
+    const removePPL = (clientId: string) => {
+        setFormData(prev => ({ ...prev, ppl: prev.ppl?.filter(p => p.clientId !== clientId)}));
+    };
+
+    const updatePPL = (clientId: string, field: keyof PPL, value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            ppl: prev.ppl?.map(p => p.clientId === clientId ? { ...p, [field]: value } : p)
+        }));
+    };
+
 
     const handleSuccessAction = () => navigate('/dashboard');
     const handleSubmit = () => {
@@ -133,6 +169,10 @@ export default function EditActivity() {
     };
 
     if (isLoading) return <Layout><div>Memuat...</div></Layout>;
+    
+    const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
+    const tipeKegiatanOptions = ["Sensus Penduduk", "Survei Ekonomi", "Survei Pertanian"];
+
 
     return (
         <Layout>
@@ -152,20 +192,100 @@ export default function EditActivity() {
                     <TabsContent value="pelatihan" className="space-y-6">{renderDocumentSection('pasca-pelatihan', 'Pasca Pelatihan')}</TabsContent>
                     <TabsContent value="pendataan" className="space-y-6">{renderDocumentSection('pasca-pendataan', 'Pendataan')}</TabsContent>
                     <TabsContent value="basic" className="space-y-6">
-                        <Card>
-                            <CardHeader><CardTitle>Informasi Kegiatan</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2"><Label>Nama Kegiatan *</Label><Input value={formData.namaKegiatan || ''} onChange={(e) => setFormData(p => ({...p, namaKegiatan: e.target.value}))} /></div>
-                                {/* ... inputs lainnya untuk ketuaTim, timKerja, dll. */}
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader><CardTitle>Jadwal Kegiatan</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-4">
-                                {/* ... Popover Kalender untuk tanggal ... */}
-                            </CardContent>
-                        </Card>
-                        {/* ... Card untuk alokasi PPL ... */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Informasi Kegiatan</CardTitle>
+                            <CardDescription>Perbarui detail dasar mengenai kegiatan yang akan dilaksanakan.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="namaKegiatan">Nama Kegiatan *</Label>
+                                <Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
+                                <Select value={formData.ketuaTim || ''} onValueChange={(value) => handleFormFieldChange('ketuaTim', value)}>
+                                    <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
+                                    <SelectContent>{ketuaTimOptions.map((nama) => (<SelectItem key={nama} value={nama}>{nama}</SelectItem>))}</SelectContent>
+                                </Select>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="tipeKegiatan">Tipe Kegiatan *</Label>
+                            <Select value={formData.tipeKegiatan || ''} onValueChange={(value) => handleFormFieldChange('tipeKegiatan', value)}>
+                                <SelectTrigger><SelectValue placeholder="Pilih tipe" /></SelectTrigger>
+                                <SelectContent>{tipeKegiatanOptions.map((tipe) => (<SelectItem key={tipe} value={tipe}>{tipe}</SelectItem>))}</SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="timKerja">Tim Kerja</Label>
+                            <Textarea id="timKerja" value={formData.timKerja || ''} onChange={(e) => handleFormFieldChange('timKerja', e.target.value)} placeholder="Deskripsikan tim kerja dan pembagian tugas secara singkat." />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {([ {label: 'Mulai Pelatihan', field: 'tanggalMulaiPelatihan'}, {label: 'Selesai Pelatihan', field: 'tanggalSelesaiPelatihan'}, {label: 'Mulai Pendataan', field: 'tanggalMulaiPendataan'}, {label: 'Selesai Pendataan', field: 'tanggalSelesaiPendataan'} ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
+                                <div key={field} className="space-y-2">
+                                    <Label>{label}</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className={cn("w-full justify-start", !formData[field] && "text-muted-foreground")}>
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {formData[field] ? format(formData[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date)} /></PopoverContent>
+                                    </Popover>
+                                </div>
+                            ))}
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader>
+                            <CardTitle className="flex justify-between items-center">
+                                Alokasi PPL & PML
+                            </CardTitle>
+                            <CardDescription>
+                                Perbarui data Petugas Pencacah Lapangan (PPL) dan Petugas Pemeriksa Lapangan (PML).
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {formData.ppl?.map((ppl, index) => (
+                                <div key={ppl.clientId} className="p-4 border rounded-lg space-y-4 bg-gray-50">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="font-medium">PPL {index + 1}</h4>
+                                        {formData.ppl && formData.ppl.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removePPL(ppl.clientId)}><Trash2 className="w-4 h-4 text-red-500"/></Button>}
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Nama PPL *</Label>
+                                            <Input placeholder="Nama PPL" value={ppl.namaPPL} onChange={e => updatePPL(ppl.clientId, 'namaPPL', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Nama PML *</Label>
+                                            <Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => updatePPL(ppl.clientId, 'namaPML', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Beban Kerja *</Label>
+                                            <Input placeholder="Beban Kerja" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Satuan Beban Kerja</Label>
+                                            <Input placeholder="Satuan Beban Kerja" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2 md:col-span-2">
+                                            <Label>Besaran Honor (Rp) *</Label>
+                                            <Input placeholder="Besaran Honor (Rp)" value={ppl.besaranHonor} onChange={e => updatePPL(ppl.clientId, 'besaranHonor', e.target.value)} />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            <Button type="button" variant="outline" onClick={addPPL} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah PPL Manual</Button>
+                        </CardContent>
+                      </Card>
                     </TabsContent>
                 </Tabs>
                 <div className="flex justify-center mt-8">
