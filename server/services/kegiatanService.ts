@@ -4,7 +4,6 @@ import { Kegiatan, Dokumen, PPL } from '@shared/api';
 
 interface KegiatanPacket extends Kegiatan, RowDataPacket {}
 
-// ... (getAllKegiatan dan getKegiatanById tidak berubah)
 export const getAllKegiatan = async (): Promise<Kegiatan[]> => {
     const [kegiatanRows] = await db.query<KegiatanPacket[]>('SELECT * FROM kegiatan ORDER BY id DESC');
     for (const kegiatan of kegiatanRows) {
@@ -76,10 +75,9 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         }
         
         if (documents && documents.length > 0) {
-            // FIX: Corrected the SQL query to match the database schema
-            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe) VALUES ?';
+            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt) VALUES ?';
             const docValues = documents.map((doc: Dokumen) => [
-                kegiatanId, doc.nama, doc.link, doc.jenis, doc.tipe
+                kegiatanId, doc.nama, doc.link, doc.jenis, doc.tipe, new Date()
             ]);
             await connection.query(docQuery, [docValues]);
         }
@@ -98,7 +96,6 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
     }
 }
 
-// ... (Sisa service tetap sama)
 export const updatePplProgress = async (pplId: number, progressData: { open: number; submit: number; diperiksa: number; approved: number; }) => {
     const { open, submit, diperiksa, approved } = progressData;
     const query = `
@@ -137,7 +134,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             namaKegiatan, ketuaTim, timKerja, tipeKegiatan,
             tanggalMulaiPelatihan, tanggalSelesaiPelatihan,
             tanggalMulaiPendataan, tanggalSelesaiPendataan,
-            ppl, dokumen // Renamed for clarity
+            ppl, dokumen 
         } = data;
 
         const kegiatanQuery = `
@@ -159,7 +156,6 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         await connection.execute('DELETE FROM ppl WHERE kegiatanId = ?', [id]);
         await connection.execute('DELETE FROM dokumen WHERE kegiatanId = ?', [id]);
 
-        // Re-insert PPL data
         if (ppl && ppl.length > 0) {
             const pplQuery = 'INSERT INTO ppl (kegiatanId, namaPPL, namaPML, bebanKerja, besaranHonor, satuanBebanKerja) VALUES ?';
             const pplValues = ppl.map((p: PPL) => [
@@ -171,12 +167,10 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             await connection.query(pplQuery, [pplValues]);
         }
         
-        // Re-insert document data
         if (dokumen && dokumen.length > 0) {
-            // FIX: Corrected the SQL query to match the database schema
-            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe) VALUES ?';
+            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt) VALUES ?';
             const docValues = dokumen.map((doc: any) => [
-                id, doc.nama, doc.link, doc.jenis, doc.tipe
+                id, doc.nama, doc.link, doc.jenis, doc.tipe, doc.uploadedAt ? new Date(doc.uploadedAt) : new Date()
             ]);
             await connection.query(docQuery, [docValues]);
         }
