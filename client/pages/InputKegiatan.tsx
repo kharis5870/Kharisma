@@ -123,7 +123,7 @@ export default function InputKegiatan() {
 
   const handleSuccessAction = () => { navigate('/dashboard'); };
   const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
-  const tipeKegiatanOptions = ["Sensus Penduduk", "Survei Ekonomi", "Survei Pertanian"];
+  const tipeKegiatanOptions = ["Listing", "Updating", "Pendataan", "Pengolahan"];
 
   return (
     <Layout>
@@ -155,7 +155,7 @@ export default function InputKegiatan() {
               <div className="space-y-2">
                 <Label htmlFor="tipeKegiatan">Tipe Kegiatan *</Label>
                 <Select value={formData.tipeKegiatan} onValueChange={(value) => updateFormField('tipeKegiatan', value)}>
-                    <SelectTrigger><SelectValue placeholder="Pilih tipe" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Pilih tipe kegiatan" /></SelectTrigger>
                     <SelectContent>{tipeKegiatanOptions.map((tipe) => (<SelectItem key={tipe} value={tipe}>{tipe}</SelectItem>))}</SelectContent>
                 </Select>
               </div>

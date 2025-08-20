@@ -292,7 +292,18 @@ export default function Dashboard() {
               const { status, warnings, color } = getDynamicStatus(activity);
               return (
                 <Card key={activity.id} className="hover:shadow-lg transition-shadow flex flex-col">
-                    <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.ketuaTim}</p></div><Badge className={cn("ml-2 whitespace-nowrap", color)}>{status}</Badge></div></CardHeader>
+                    <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle>
+                                <div className="mt-1 flex flex-col text-sm">
+                                    <span className="text-gray-600">Ketua: {activity.ketuaTim}</span>
+                                    <span className="text-gray-500">Tipe: {activity.tipeKegiatan}</span>
+                                </div>
+                            </div>
+                            <Badge className={cn("ml-2 whitespace-nowrap", color)}>{status}</Badge>
+                        </div>
+                    </CardHeader>
                     <CardContent className="space-y-4 flex-grow flex flex-col justify-between">
                         <div>
                             <div className="flex justify-between items-center mb-2"><span className="text-sm font-medium">Progress Keseluruhan</span><span className="text-sm font-bold text-bps-blue-600">{activity.progressKeseluruhan || 0}%</span></div>

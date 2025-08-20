@@ -171,7 +171,7 @@ export default function EditActivity() {
     if (isLoading) return <Layout><div>Memuat...</div></Layout>;
     
     const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
-    const tipeKegiatanOptions = ["Sensus Penduduk", "Survei Ekonomi", "Survei Pertanian"];
+    const tipeKegiatanOptions = ["Listing", "Pencacahan", "Pengolahan", "Updating"];
 
 
     return (
