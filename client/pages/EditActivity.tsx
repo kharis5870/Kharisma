@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock } from "lucide-react";
+import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
@@ -34,11 +34,6 @@ type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'tipeKegiatan' | 'tanggalMul
 };
 
 type DateFieldName = 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan';
-
-const listingDocs: Omit<ClientDokumen, 'id' | 'link' | 'clientId'>[] = [
-    { nama: 'Formulir Listing Wajib', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
-    { nama: 'Peta Wilayah Listing Wajib', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
-];
 
 // --- API Functions ---
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
@@ -66,7 +61,6 @@ export default function EditActivity() {
     const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string }>({ isOpen: false, tipe: null, content: '' });
-    const [documentChoice, setDocumentChoice] = useState<Record<string, 'dokumen' | 'catatan'>>({});
 
     const { data: initialData, isLoading } = useQuery({
         queryKey: ['kegiatan', id],
@@ -76,18 +70,6 @@ export default function EditActivity() {
 
     useEffect(() => {
         if (initialData) {
-            const newDocChoice: Record<string, 'dokumen' | 'catatan'> = {};
-            const pengolahanDoc = initialData.dokumen.find(d => d.tipe === 'pengolahan-analisis');
-            const diseminasiDoc = initialData.dokumen.find(d => d.tipe === 'diseminasi-evaluasi');
-
-            if (pengolahanDoc) {
-                newDocChoice['pengolahan-analisis'] = pengolahanDoc.jenis === 'catatan' ? 'catatan' : 'dokumen';
-            }
-            if (diseminasiDoc) {
-                newDocChoice['diseminasi-evaluasi'] = diseminasiDoc.jenis === 'catatan' ? 'catatan' : 'dokumen';
-            }
-            setDocumentChoice(newDocChoice);
-
             setFormData({
                 ...initialData,
                 tanggalMulaiPelatihan: initialData.tanggalMulaiPelatihan ? parseISO(initialData.tanggalMulaiPelatihan) : undefined,
@@ -108,50 +90,37 @@ export default function EditActivity() {
     const handleFormFieldChange = (field: keyof FormState, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
-
-    const handleListingOption = (hasListing: boolean) => {
-        setFormData(prev => {
-            const newDocs = prev.dokumen?.filter(d => !(d.nama.includes('Listing Wajib'))) || [];
-            if (hasListing) {
-                const newListingDocs = listingDocs.map((doc, i) => ({
-                    ...doc,
-                    clientId: `wajib-listing-${i}`,
-                    link: '',
-                }));
-                return { ...prev, adaListing: true, dokumen: [...newDocs, ...newListingDocs] };
-            }
-            return { ...prev, adaListing: false, dokumen: newDocs };
-        });
-    };
+    
+    const titleCase = (str: string) => str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
     const handleNoteSubmit = () => {
         if (!noteModal.tipe) return;
-        const otherDocs = formData.dokumen?.filter(d => d.tipe !== noteModal.tipe) || [];
-        const noteDoc: ClientDokumen = {
-            clientId: `catatan-${noteModal.tipe}-${Date.now()}`,
-            tipe: noteModal.tipe,
-            nama: `Catatan Tahap ${titleCase(noteModal.tipe.replace('-', ' '))}`,
-            link: noteModal.content,
-            jenis: 'catatan',
-            isWajib: true,
-        };
-        setFormData(prev => ({ ...prev, dokumen: [...otherDocs, noteDoc] }));
+        const tipe = noteModal.tipe;
+        
+        setFormData(prev => {
+            const existingNote = prev.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
+            if (existingNote) {
+                // Update existing note
+                const updatedDocs = prev.dokumen!.map(d => 
+                    d.clientId === existingNote.clientId ? { ...d, link: noteModal.content } : d
+                );
+                return { ...prev, dokumen: updatedDocs };
+            } else {
+                // Add new note
+                const noteDoc: ClientDokumen = {
+                    clientId: `catatan-${tipe}-${Date.now()}`,
+                    tipe: tipe,
+                    nama: `Catatan Tahap ${titleCase(tipe.replace('-', ' '))}`,
+                    link: noteModal.content,
+                    jenis: 'catatan',
+                    isWajib: false,
+                };
+                return { ...prev, dokumen: [...(prev.dokumen || []), noteDoc] };
+            }
+        });
+
         setNoteModal({ isOpen: false, tipe: null, content: '' });
     };
-
-    const handleDocumentChoice = (tipe: Dokumen['tipe'], choice: 'dokumen' | 'catatan') => {
-        setDocumentChoice(prev => ({...prev, [tipe]: choice}));
-        if (choice === 'catatan') {
-            const existingNote = formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
-            setNoteModal({ isOpen: true, tipe, content: existingNote?.link || '' });
-        } else {
-            const newDocs = formData.dokumen?.filter(d => !(d.tipe === tipe && d.jenis === 'catatan')) || [];
-            setFormData(prev => ({...prev, dokumen: newDocs}));
-        }
-    };
-
-    const titleCase = (str: string) => str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
 
     // PPL Management Handlers
     const addPPL = () => {
@@ -176,7 +145,6 @@ export default function EditActivity() {
             ppl: prev.ppl?.map(p => p.clientId === clientId ? { ...p, [field]: value } : p)
         }));
     };
-
 
     const handleSuccessAction = () => navigate('/dashboard');
     const handleSubmit = () => {
@@ -203,75 +171,61 @@ export default function EditActivity() {
     };
 
     const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
-        const documents = formData.dokumen?.filter(d => d.tipe === tipe) || [];
-        const isOptionalStage = tipe === 'pengolahan-analisis' || tipe === 'diseminasi-evaluasi';
-        const currentChoice = documentChoice[tipe];
-
+        const documents = formData.dokumen?.filter(d => d.tipe === tipe && d.jenis !== 'catatan') || [];
+        const note = formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
+        
         return (
             <Card>
                 <CardHeader>
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-4">
                         <div>
                             <CardTitle>Dokumen {title}</CardTitle>
                             <CardDescription className="mt-1">
-                                Isi link untuk dokumen wajib dan tambahkan dokumen pendukung jika diperlukan.
+                                Isi link untuk dokumen wajib, tambahkan dokumen pendukung, dan kelola catatan.
                             </CardDescription>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2 flex-shrink-0"><Plus className="w-4 h-4" />Tambah Dokumen Pendukung</Button>
+                        <div className="flex flex-shrink-0 gap-2">
+                           <Button type="button" variant="outline" size="sm" onClick={() => setNoteModal({ isOpen: true, tipe, content: note?.link || '' })} className="flex items-center gap-2">
+                               <Notebook className="w-4 h-4" />{note ? 'Edit' : 'Tambah'} Catatan
+                           </Button>
+                           <Button type="button" variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2"><Plus className="w-4 h-4" />Dokumen</Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {isOptionalStage && (
-                        <div className="p-4 bg-slate-100 rounded-md space-y-3">
-                            <Label>Pilih Opsi Tahap Ini</Label>
-                            <div className="flex gap-2">
-                                <Button onClick={() => handleDocumentChoice(tipe, 'dokumen')} variant={currentChoice === 'dokumen' || !currentChoice ? 'default' : 'outline'} className="flex-1">Gunakan Dokumen</Button>
-                                <Button onClick={() => handleDocumentChoice(tipe, 'catatan')} variant={currentChoice === 'catatan' ? 'default' : 'outline'} className="flex-1">Gunakan Catatan</Button>
+                    {note && (
+                         <div className="flex items-center gap-3 p-3 border rounded-lg bg-yellow-50 border-yellow-200">
+                            <div className="flex-grow space-y-2">
+                                <Label className="font-semibold">{note.nama}</Label>
+                                <p className="text-sm text-gray-600 truncate">{note.link || 'Catatan kosong. Klik edit untuk mengisi.'}</p>
                             </div>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => setNoteModal({ isOpen: true, tipe, content: note.link })} className="self-center"><Notebook className="w-4 h-4 text-gray-500"/></Button>
                         </div>
                     )}
-                    
-                    {(!isOptionalStage || currentChoice === 'dokumen' || !currentChoice) && (
-                        <>
-                            {documents.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500"><p>Belum ada dokumen untuk fase ini.</p></div>
+                    {documents.map(doc => (
+                         <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
+                            <div className="flex-grow space-y-2">
+                                {doc.isWajib ? (
+                                    <Label className="font-semibold">{doc.nama} *</Label>
+                                ) : (
+                                    <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} />
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <Link2 className="w-4 h-4 text-gray-400"/>
+                                    <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} />
+                                </div>
+                            </div>
+                            {!doc.isWajib ? (
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>
                             ) : (
-                                documents.map(doc => (
-                                     <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
-                                        <div className="flex-grow space-y-2">
-                                            {doc.isWajib ? (
-                                                <Label className="font-semibold">{doc.nama} *</Label>
-                                            ) : (
-                                                <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} />
-                                            )}
-                                            <div className="flex items-center gap-2">
-                                                <Link2 className="w-4 h-4 text-gray-400"/>
-                                                <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} />
-                                            </div>
-                                        </div>
-                                        {!doc.isWajib ? (
-                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>
-                                        ) : (
-                                            <div className="self-center p-2" title="Dokumen Wajib">
-                                                <Lock className="w-4 h-4 text-gray-400"/>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))
+                                <div className="self-center p-2" title="Dokumen Wajib">
+                                    <Lock className="w-4 h-4 text-gray-400"/>
+                                </div>
                             )}
-                        </>
-                    )}
-
-                    {isOptionalStage && currentChoice === 'catatan' && (
-                        <div className="p-4 border rounded-lg bg-gray-50 text-center">
-                            <p className="text-sm text-gray-600">Anda memilih untuk menggunakan catatan untuk tahap ini.</p>
-                            <Button variant="secondary" className="mt-2" onClick={() => {
-                                const existingNote = formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
-                                setNoteModal({ isOpen: true, tipe, content: existingNote?.link || '' });
-                            }}>
-                                Edit Catatan
-                            </Button>
                         </div>
+                    ))}
+                    {documents.length === 0 && !note && (
+                        <div className="text-center py-8 text-gray-500"><p>Belum ada dokumen atau catatan untuk fase ini.</p></div>
                     )}
                 </CardContent>
             </Card>
@@ -291,105 +245,105 @@ export default function EditActivity() {
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                     <TabsList className="grid w-full grid-cols-5">
+                        <TabsTrigger value="basic">Info Dasar</TabsTrigger>
                         <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
                         <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
                         <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger>
                         <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
-                        <TabsTrigger value="basic">Info Dasar</TabsTrigger>
                     </TabsList>
+                    <TabsContent value="basic" className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Informasi Kegiatan</CardTitle>
+                                <CardDescription>Perbarui detail dasar mengenai kegiatan yang akan dilaksanakan.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <Label htmlFor="namaKegiatan">Nama Kegiatan *</Label>
+                                    <Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
+                                    <Select value={formData.ketuaTim || ''} onValueChange={(value) => handleFormFieldChange('ketuaTim', value)}>
+                                        <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
+                                        <SelectContent>{ketuaTimOptions.map((nama) => (<SelectItem key={nama} value={nama}>{nama}</SelectItem>))}</SelectContent>
+                                    </Select>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="timKerja">Tim Kerja</Label>
+                                <Textarea id="timKerja" value={formData.timKerja || ''} onChange={(e) => handleFormFieldChange('timKerja', e.target.value)} placeholder="Deskripsikan tim kerja dan pembagian tugas secara singkat." />
+                              </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {([ {label: 'Mulai Pelatihan', field: 'tanggalMulaiPelatihan'}, {label: 'Selesai Pelatihan', field: 'tanggalSelesaiPelatihan'}, {label: 'Mulai Pendataan', field: 'tanggalMulaiPendataan'}, {label: 'Selesai Pendataan', field: 'tanggalSelesaiPendataan'} ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
+                                    <div key={field} className="space-y-2">
+                                        <Label>{label}</Label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="outline" className={cn("w-full justify-start", !formData[field] && "text-muted-foreground")}>
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {formData[field] ? format(formData[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date)} /></PopoverContent>
+                                        </Popover>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex justify-between items-center">
+                                    Alokasi PPL & PML
+                                </CardTitle>
+                                <CardDescription>
+                                    Perbarui data Petugas Pencacah Lapangan (PPL) dan Petugas Pemeriksa Lapangan (PML).
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {formData.ppl?.map((ppl, index) => (
+                                    <div key={ppl.clientId} className="p-4 border rounded-lg space-y-4 bg-gray-50">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="font-medium">PPL {index + 1}</h4>
+                                            {formData.ppl && formData.ppl.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removePPL(ppl.clientId)}><Trash2 className="w-4 h-4 text-red-500"/></Button>}
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label>Nama PPL *</Label>
+                                                <Input placeholder="Nama PPL" value={ppl.namaPPL} onChange={e => updatePPL(ppl.clientId, 'namaPPL', e.target.value)} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Nama PML *</Label>
+                                                <Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => updatePPL(ppl.clientId, 'namaPML', e.target.value)} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Beban Kerja *</Label>
+                                                <Input placeholder="Beban Kerja" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Satuan Beban Kerja</Label>
+                                                <Input placeholder="Satuan Beban Kerja" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} />
+                                            </div>
+                                            <div className="space-y-2 md:col-span-2">
+                                                <Label>Besaran Honor (Rp) *</Label>
+                                                <Input placeholder="Besaran Honor (Rp)" value={ppl.besaranHonor} onChange={e => updatePPL(ppl.clientId, 'besaranHonor', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                <Button type="button" variant="outline" onClick={addPPL} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah PPL Manual</Button>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
                     <TabsContent value="persiapan">{renderDocumentSection('persiapan', 'Persiapan')}</TabsContent>
                     <TabsContent value="pengumpulan-data">{renderDocumentSection('pengumpulan-data', 'Pengumpulan Data')}</TabsContent>
                     <TabsContent value="pengolahan-analisis">{renderDocumentSection('pengolahan-analisis', 'Pengolahan & Analisis')}</TabsContent>
                     <TabsContent value="diseminasi-evaluasi">{renderDocumentSection('diseminasi-evaluasi', 'Diseminasi & Evaluasi')}</TabsContent>
-                    <TabsContent value="basic" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Informasi Kegiatan</CardTitle>
-                            <CardDescription>Perbarui detail dasar mengenai kegiatan yang akan dilaksanakan.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="namaKegiatan">Nama Kegiatan *</Label>
-                                <Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
-                                <Select value={formData.ketuaTim || ''} onValueChange={(value) => handleFormFieldChange('ketuaTim', value)}>
-                                    <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
-                                    <SelectContent>{ketuaTimOptions.map((nama) => (<SelectItem key={nama} value={nama}>{nama}</SelectItem>))}</SelectContent>
-                                </Select>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="timKerja">Tim Kerja</Label>
-                            <Textarea id="timKerja" value={formData.timKerja || ''} onChange={(e) => handleFormFieldChange('timKerja', e.target.value)} placeholder="Deskripsikan tim kerja dan pembagian tugas secara singkat." />
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
-                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {([ {label: 'Mulai Pelatihan', field: 'tanggalMulaiPelatihan'}, {label: 'Selesai Pelatihan', field: 'tanggalSelesaiPelatihan'}, {label: 'Mulai Pendataan', field: 'tanggalMulaiPendataan'}, {label: 'Selesai Pendataan', field: 'tanggalSelesaiPendataan'} ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
-                                <div key={field} className="space-y-2">
-                                    <Label>{label}</Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className={cn("w-full justify-start", !formData[field] && "text-muted-foreground")}>
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {formData[field] ? format(formData[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date)} /></PopoverContent>
-                                    </Popover>
-                                </div>
-                            ))}
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader>
-                            <CardTitle className="flex justify-between items-center">
-                                Alokasi PPL & PML
-                            </CardTitle>
-                            <CardDescription>
-                                Perbarui data Petugas Pencacah Lapangan (PPL) dan Petugas Pemeriksa Lapangan (PML).
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {formData.ppl?.map((ppl, index) => (
-                                <div key={ppl.clientId} className="p-4 border rounded-lg space-y-4 bg-gray-50">
-                                    <div className="flex justify-between items-center">
-                                        <h4 className="font-medium">PPL {index + 1}</h4>
-                                        {formData.ppl && formData.ppl.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removePPL(ppl.clientId)}><Trash2 className="w-4 h-4 text-red-500"/></Button>}
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Nama PPL *</Label>
-                                            <Input placeholder="Nama PPL" value={ppl.namaPPL} onChange={e => updatePPL(ppl.clientId, 'namaPPL', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Nama PML *</Label>
-                                            <Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => updatePPL(ppl.clientId, 'namaPML', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Beban Kerja *</Label>
-                                            <Input placeholder="Beban Kerja" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Satuan Beban Kerja</Label>
-                                            <Input placeholder="Satuan Beban Kerja" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2 md:col-span-2">
-                                            <Label>Besaran Honor (Rp) *</Label>
-                                            <Input placeholder="Besaran Honor (Rp)" value={ppl.besaranHonor} onChange={e => updatePPL(ppl.clientId, 'besaranHonor', e.target.value)} />
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                            <Button type="button" variant="outline" onClick={addPPL} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah PPL Manual</Button>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
                 </Tabs>
                 <div className="flex justify-center mt-8">
                     <Button onClick={handleSubmit} disabled={mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" size="lg"><Save className="w-4 h-4 mr-2" />Simpan Perubahan</Button>
@@ -401,7 +355,7 @@ export default function EditActivity() {
                     <DialogHeader>
                         <DialogTitle>Tambah/Edit Catatan</DialogTitle>
                         <DialogDescription>
-                            Isi catatan untuk tahap ini. Catatan ini akan disimpan sebagai pengganti dokumen.
+                            Isi catatan untuk tahap ini. Catatan ini akan disimpan sebagai dokumen terpisah.
                         </DialogDescription>
                     </DialogHeader>
                     <Textarea 
