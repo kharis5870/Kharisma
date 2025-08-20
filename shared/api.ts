@@ -7,6 +7,7 @@ export interface Dokumen {
   jenis: 'file' | 'link';
   status?: 'Pending' | 'Reviewed' | 'Approved';
   uploadedAt?: string;
+  isWajib?: boolean;
 }
 
 export interface PPL {

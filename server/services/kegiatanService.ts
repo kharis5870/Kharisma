@@ -75,9 +75,9 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         }
         
         if (documents && documents.length > 0) {
-            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt) VALUES ?';
+            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib) VALUES ?';
             const docValues = documents.map((doc: Dokumen) => [
-                kegiatanId, doc.nama, doc.link, doc.jenis, doc.tipe, new Date()
+                kegiatanId, doc.nama, doc.link, doc.jenis, doc.tipe, new Date(), doc.isWajib || false
             ]);
             await connection.query(docQuery, [docValues]);
         }
@@ -168,9 +168,9 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         }
         
         if (dokumen && dokumen.length > 0) {
-            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt) VALUES ?';
+            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib) VALUES ?';
             const docValues = dokumen.map((doc: any) => [
-                id, doc.nama, doc.link, doc.jenis, doc.tipe, doc.uploadedAt ? new Date(doc.uploadedAt) : new Date()
+                id, doc.nama, doc.link, doc.jenis, doc.tipe, doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(), doc.isWajib || false
             ]);
             await connection.query(docQuery, [docValues]);
         }

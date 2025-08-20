@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
@@ -33,6 +33,30 @@ type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'tanggalMulaiPelatihan' | 't
 };
 
 type DateFieldName = 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan';
+
+const mandatoryDocsConfig: Record<string, { tipe: Dokumen['tipe']; nama: string }[]> = {
+  Listing: [
+    { tipe: 'persiapan', nama: 'Formulir Listing Wajib' },
+    { tipe: 'persiapan', nama: 'Peta Wilayah Listing Wajib' },
+    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Listing Wajib' },
+    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Listing Wajib' },
+  ],
+  Pencacahan: [
+    { tipe: 'persiapan', nama: 'Kuesioner Pencacahan Wajib' },
+    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Pencacahan Wajib' },
+    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Pencacahan Wajib' },
+  ],
+  Pengolahan: [
+    { tipe: 'persiapan', nama: 'Pedoman Pengolahan Data Wajib' },
+    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Pengolahan Wajib' },
+    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Pengolahan Wajib' },
+  ],
+  Updating: [
+    { tipe: 'persiapan', nama: 'Dokumen Awal Pemutakhiran Wajib' },
+    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Pemutakhiran Wajib' },
+    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Pemutakhiran Wajib' },
+  ],
+};
 
 
 // --- API Functions ---
@@ -87,7 +111,33 @@ export default function EditActivity() {
     });
     
     const handleFormFieldChange = (field: keyof FormState, value: any) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+        const newState: Partial<FormState> = { ...formData, [field]: value };
+
+        if (field === 'tipeKegiatan') {
+            if (window.confirm("Mengubah tipe kegiatan akan mengatur ulang daftar dokumen wajib. Lanjutkan?")) {
+                const selectedType = value;
+                const currentDocs = newState.dokumen || [];
+                const userAddedDocs = currentDocs.filter(doc => !doc.isWajib);
+                
+                let newDocs = [...userAddedDocs];
+
+                if (selectedType && mandatoryDocsConfig[selectedType]) {
+                    const newMandatoryDocs: ClientDokumen[] = mandatoryDocsConfig[selectedType].map((docConfig, index) => ({
+                        clientId: `wajib-${selectedType}-${docConfig.tipe}-${index}`,
+                        tipe: docConfig.tipe,
+                        nama: docConfig.nama,
+                        link: '',
+                        jenis: 'link',
+                        isWajib: true,
+                    }));
+                    newDocs = [...newMandatoryDocs, ...userAddedDocs];
+                }
+                newState.dokumen = newDocs;
+            } else {
+                return; // Batalkan perubahan jika pengguna tidak setuju
+            }
+        }
+        setFormData(newState);
     };
 
     // PPL Management Handlers
@@ -129,7 +179,7 @@ export default function EditActivity() {
     
     // Document Management
     const addDocument = (tipe: Dokumen['tipe']) => {
-        const newDoc: ClientDokumen = { clientId: Date.now().toString(), tipe, nama: "", link: "", jenis: 'link' };
+        const newDoc: ClientDokumen = { clientId: Date.now().toString(), tipe, nama: "", link: "", jenis: 'link', isWajib: false };
         setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] as ClientDokumen[] }));
     };
     const updateDocument = (clientId: string, field: 'nama' | 'link', value: string) => {
@@ -144,22 +194,38 @@ export default function EditActivity() {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        Dokumen {title}
-                        <Button variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2"><Link2 className="w-4 h-4" />Tambah Dokumen (Link)</Button>
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Dokumen {title}</CardTitle>
+                        <Button variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2"><Plus className="w-4 h-4" />Tambah Dokumen Pendukung</Button>
+                    </div>
+                    <CardDescription>
+                        Isi link untuk dokumen wajib dan tambahkan dokumen pendukung jika diperlukan.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {documents.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500"><p>Belum ada dokumen.</p></div>
+                        <div className="text-center py-8 text-gray-500"><p>Belum ada dokumen untuk fase ini.</p></div>
                     ) : (
                         documents.map(doc => (
-                            <div key={doc.clientId} className="flex items-center gap-3 p-3 border rounded-lg">
-                                <div className="flex-1 space-y-2">
-                                    <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-blue-600" /><Input placeholder="Nama dokumen" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} /></div>
-                                    <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} />
+                             <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
+                                <div className="flex-grow space-y-2">
+                                    {doc.isWajib ? (
+                                        <Label className="font-semibold">{doc.nama} *</Label>
+                                    ) : (
+                                        <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} />
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <Link2 className="w-4 h-4 text-gray-400"/>
+                                        <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} />
+                                    </div>
                                 </div>
-                                <Button variant="outline" size="sm" onClick={() => removeDocument(doc.clientId)} className="text-red-600 hover:text-red-700"><X className="w-4 h-4" /></Button>
+                                {!doc.isWajib ? (
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>
+                                ) : (
+                                    <div className="self-center p-2" title="Dokumen Wajib">
+                                        <Lock className="w-4 h-4 text-gray-400"/>
+                                    </div>
+                                )}
                             </div>
                         ))
                     )}

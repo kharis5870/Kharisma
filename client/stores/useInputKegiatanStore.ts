@@ -33,6 +33,7 @@ export type Actions = {
   updateDocument: (id: string, field: 'nama' | 'link', value: string) => void;
   removeDocument: (id: string) => void;
   setPplAllocations: (allocations: PPLItem[]) => void;
+  setDocuments: (documents: DocumentItem[]) => void;
   resetForm: () => void;
 };
 
@@ -62,7 +63,7 @@ const useInputKegiatanStore = create<State & Actions>()(
         )
       })),
       addDocumentLink: () => set((state: State) => ({
-        documents: [...state.documents, { id: Date.now().toString(), nama: "", jenis: 'link', tipe: 'persiapan', link: '' }]
+        documents: [...state.documents, { id: Date.now().toString(), nama: "", jenis: 'link', tipe: 'persiapan', link: '', isWajib: false }]
       })),
       updateDocument: (id: string, field: 'nama' | 'link', value: string) => set((state: State) => ({
         documents: state.documents.map((doc: DocumentItem) =>
@@ -71,6 +72,7 @@ const useInputKegiatanStore = create<State & Actions>()(
       })),
       removeDocument: (id: string) => set((state: State) => ({ documents: state.documents.filter((doc: DocumentItem) => doc.id !== id) })),
       setPplAllocations: (allocations: PPLItem[]) => set({ pplAllocations: allocations }),
+      setDocuments: (documents: DocumentItem[]) => set({ documents }),
       resetForm: () => set(initialState),
     }),
     {

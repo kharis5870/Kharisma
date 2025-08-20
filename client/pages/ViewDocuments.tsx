@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, FileText, Link2, ExternalLink, Download, Eye, CheckCircle, Clock, Users, Activity } from "lucide-react";
+import { ArrowLeft, FileText, Link2, ExternalLink, Eye, CheckCircle, Clock, Users, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Kegiatan, Dokumen } from "@shared/api";
@@ -52,14 +52,16 @@ export default function ViewDocuments() {
     };
 
     const renderDocumentTable = (documents: Dokumen[], fase: string) => {
-        if (documents.length === 0) {
-            return <div className="text-center py-12 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" /><p>Belum ada dokumen untuk fase {fase}.</p></div>;
+        const uploadedDocuments = documents.filter(doc => doc.link && doc.link.trim() !== '');
+
+        if (uploadedDocuments.length === 0) {
+            return <div className="text-center py-12 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" /><p>Belum ada dokumen yang diunggah untuk fase {fase}.</p></div>;
         }
         return (
             <Table>
                 <TableHeader><TableRow><TableHead>Nama Dokumen</TableHead><TableHead>Jenis</TableHead><TableHead>Status</TableHead><TableHead>Tanggal</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
                 <TableBody>
-                    {documents.map((doc) => (
+                    {uploadedDocuments.map((doc) => (
                         <TableRow key={doc.id}><TableCell className="font-medium flex items-center gap-2">{doc.jenis === 'link' ? <Link2 className="w-4 h-4 text-blue-600" /> : <FileText className="w-4 h-4 text-green-600" />} {doc.nama}</TableCell><TableCell><Badge variant="outline">{doc.jenis === 'link' ? 'Drive Link' : 'File'}</Badge></TableCell><TableCell><Badge className={cn("flex items-center gap-1 w-fit", getStatusColor(doc.status))}>{getStatusIcon(doc.status)} {doc.status || 'N/A'}</Badge></TableCell><TableCell>{getRelativeTime(doc.uploadedAt)}</TableCell><TableCell><Button variant="outline" size="sm" asChild><a href={doc.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Buka</a></Button></TableCell></TableRow>
                     ))}
                 </TableBody>
@@ -71,7 +73,7 @@ export default function ViewDocuments() {
     if (!activityData) return <Layout><p>Kegiatan tidak ditemukan.</p></Layout>;
 
     const docsByTipe = (tipe: Dokumen['tipe']) => activityData.dokumen.filter(d => d.tipe === tipe);
-    const totalDocuments = activityData.dokumen.length;
+    const totalDocuments = activityData.dokumen.filter(doc => doc.link && doc.link.trim() !== '').length;
     const approvedDocuments = activityData.dokumen.filter(d => d.status === 'Approved').length;
 
     return (
@@ -89,9 +91,9 @@ export default function ViewDocuments() {
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                     <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="persiapan">Persiapan <Badge variant="secondary" className="ml-2">{docsByTipe('persiapan').length}</Badge></TabsTrigger>
-                        <TabsTrigger value="pelatihan">Pasca Pelatihan <Badge variant="secondary" className="ml-2">{docsByTipe('pasca-pelatihan').length}</Badge></TabsTrigger>
-                        <TabsTrigger value="pendataan">Pendataan <Badge variant="secondary" className="ml-2">{docsByTipe('pasca-pendataan').length}</Badge></TabsTrigger>
+                        <TabsTrigger value="persiapan">Persiapan <Badge variant="secondary" className="ml-2">{docsByTipe('persiapan').filter(d => d.link).length}</Badge></TabsTrigger>
+                        <TabsTrigger value="pelatihan">Pasca Pelatihan <Badge variant="secondary" className="ml-2">{docsByTipe('pasca-pelatihan').filter(d => d.link).length}</Badge></TabsTrigger>
+                        <TabsTrigger value="pendataan">Pendataan <Badge variant="secondary" className="ml-2">{docsByTipe('pasca-pendataan').filter(d => d.link).length}</Badge></TabsTrigger>
                     </TabsList>
                     <TabsContent value="persiapan"><Card><CardHeader><CardTitle>Dokumen Persiapan</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('persiapan'), 'persiapan')}</CardContent></Card></TabsContent>
                     <TabsContent value="pelatihan"><Card><CardHeader><CardTitle>Dokumen Laporan Pasca Pelatihan</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('pasca-pelatihan'), 'pelatihan')}</CardContent></Card></TabsContent>
