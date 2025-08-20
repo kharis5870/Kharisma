@@ -10,7 +10,7 @@ import { ArrowLeft, FileText, Link2, ExternalLink, Eye, CheckCircle, Clock, User
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Kegiatan, Dokumen } from "@shared/api";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     const res = await fetch(`/api/kegiatan/${id}`);
@@ -53,9 +53,11 @@ export default function ViewDocuments() {
         return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     };
 
-    const renderDocumentTable = (documents: Dokumen[], fase: string) => {
+    const renderDocumentTable = (tipe: Dokumen['tipe']) => {
+        const documents = activityData?.dokumen.filter(d => d.tipe === tipe && (d.jenis === 'catatan' || (d.jenis === 'link' && d.link)));
+        
         if (!documents || documents.length === 0) {
-            return <div className="text-center py-12 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" /><p>Belum ada dokumen atau catatan untuk fase {fase}.</p></div>;
+            return <div className="text-center py-12 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" /><p>Belum ada dokumen atau catatan untuk fase ini.</p></div>;
         }
         return (
             <Table>
@@ -95,9 +97,9 @@ export default function ViewDocuments() {
     if (isLoading) return <Layout><p>Memuat...</p></Layout>;
     if (!activityData) return <Layout><p>Kegiatan tidak ditemukan.</p></Layout>;
 
-    const docsByTipe = (tipe: Dokumen['tipe']) => activityData.dokumen.filter(d => d.tipe === tipe);
-    const totalDocuments = activityData.dokumen.length;
-    const approvedDocuments = activityData.dokumen.filter(d => d.status === 'Approved').length;
+    const docsByTipe = (tipe: Dokumen['tipe']) => activityData.dokumen.filter(d => d.tipe === tipe && (d.jenis === 'catatan' || (d.jenis === 'link' && d.link)));
+    const totalDocuments = activityData.dokumen.filter(d => (d.jenis === 'catatan' || (d.jenis === 'link' && d.link))).length;
+    const approvedDocuments = activityData.dokumen.filter(d => d.status === 'Approved' && (d.jenis === 'catatan' || (d.jenis === 'link' && d.link))).length;
 
     return (
         <Layout>
@@ -119,23 +121,26 @@ export default function ViewDocuments() {
                         <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis <Badge variant="secondary" className="ml-2">{docsByTipe('pengolahan-analisis').length}</Badge></TabsTrigger>
                         <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi <Badge variant="secondary" className="ml-2">{docsByTipe('diseminasi-evaluasi').length}</Badge></TabsTrigger>
                     </TabsList>
-                    <TabsContent value="persiapan"><Card><CardHeader><CardTitle>Dokumen Persiapan</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('persiapan'), 'persiapan')}</CardContent></Card></TabsContent>
-                    <TabsContent value="pengumpulan-data"><Card><CardHeader><CardTitle>Dokumen Pengumpulan Data</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('pengumpulan-data'), 'pengumpulan data')}</CardContent></Card></TabsContent>
-                    <TabsContent value="pengolahan-analisis"><Card><CardHeader><CardTitle>Dokumen Pengolahan & Analisis</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('pengolahan-analisis'), 'pengolahan & analisis')}</CardContent></Card></TabsContent>
-                    <TabsContent value="diseminasi-evaluasi"><Card><CardHeader><CardTitle>Dokumen Diseminasi & Evaluasi</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('diseminasi-evaluasi'), 'diseminasi & evaluasi')}</CardContent></Card></TabsContent>
+                    <TabsContent value="persiapan"><Card><CardHeader><CardTitle>Dokumen Persiapan</CardTitle></CardHeader><CardContent>{renderDocumentTable('persiapan')}</CardContent></Card></TabsContent>
+                    <TabsContent value="pengumpulan-data"><Card><CardHeader><CardTitle>Dokumen Pengumpulan Data</CardTitle></CardHeader><CardContent>{renderDocumentTable('pengumpulan-data')}</CardContent></Card></TabsContent>
+                    <TabsContent value="pengolahan-analisis"><Card><CardHeader><CardTitle>Dokumen Pengolahan & Analisis</CardTitle></CardHeader><CardContent>{renderDocumentTable('pengolahan-analisis')}</CardContent></Card></TabsContent>
+                    <TabsContent value="diseminasi-evaluasi"><Card><CardHeader><CardTitle>Dokumen Diseminasi & Evaluasi</CardTitle></CardHeader><CardContent>{renderDocumentTable('diseminasi-evaluasi')}</CardContent></Card></TabsContent>
                 </Tabs>
                 <div className="mt-8 p-4 bg-blue-50 border rounded-lg"><div className="flex items-center justify-between"><div><h4 className="font-medium text-blue-900">Perlu Menambah atau Mengedit Dokumen?</h4><p className="text-blue-700 text-sm mt-1">Gunakan halaman Edit untuk mengelola semua dokumen dan laporan.</p></div><Button asChild className="bg-blue-600 hover:bg-blue-700"><Link to={`/edit-activity/${activityData.id}`}>Ke Halaman Edit</Link></Button></div></div>
             </div>
 
-            <Dialog open={noteViewModal.isOpen} onOpenChange={() => setNoteViewModal({ isOpen: false, title: '', content: '' })}>
+            <Dialog open={noteViewModal.isOpen} onOpenChange={(isOpen) => !isOpen && setNoteViewModal({ isOpen: false, title: '', content: '' })}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{noteViewModal.title}</DialogTitle>
                         <DialogDescription>Catatan untuk tahap ini.</DialogDescription>
                     </DialogHeader>
-                    <div className="prose prose-sm max-w-none py-4 whitespace-pre-wrap bg-gray-50 p-4 rounded-md text-gray-800">
+                    <div className="prose prose-sm max-w-none py-4 whitespace-pre-wrap bg-gray-50 p-4 rounded-md text-gray-800 max-h-[50vh] overflow-y-auto">
                         {noteViewModal.content || "Belum ada catatan yang ditambahkan."}
                     </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setNoteViewModal({ isOpen: false, title: '', content: '' })}>Tutup</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </Layout>
