@@ -33,7 +33,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         await connection.beginTransaction();
 
         const {
-            namaKegiatan, ketuaTim, timKerja, tipeKegiatan,
+            namaKegiatan, ketuaTim, timKerja, adaListing,
             tanggalMulaiPelatihan, tanggalSelesaiPelatihan,
             tanggalMulaiPendataan, tanggalSelesaiPendataan,
             pplAllocations, documents
@@ -41,14 +41,14 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
 
         const kegiatanQuery = `
             INSERT INTO kegiatan 
-            (namaKegiatan, ketuaTim, timKerja, tipeKegiatan, 
+            (namaKegiatan, ketuaTim, timKerja, adaListing,
              tanggalMulaiPelatihan, tanggalSelesaiPelatihan, 
              tanggalMulaiPendataan, tanggalSelesaiPendataan, 
              status, progressKeseluruhan) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
-            namaKegiatan, ketuaTim, timKerja, tipeKegiatan,
+            namaKegiatan, ketuaTim, timKerja, adaListing || false,
             tanggalMulaiPelatihan || null,
             tanggalSelesaiPelatihan || null,
             tanggalMulaiPendataan || null,
@@ -126,12 +126,11 @@ export const updatePplProgress = async (pplId: number, progressData: { open: num
 
 export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> => {
     const connection = await db.getConnection();
-    console.log(`SERVER RECEIVED UPDATE FOR ID ${id}:`, JSON.stringify(data, null, 2));
     try {
         await connection.beginTransaction();
 
         const {
-            namaKegiatan, ketuaTim, timKerja, tipeKegiatan,
+            namaKegiatan, ketuaTim, timKerja, adaListing,
             tanggalMulaiPelatihan, tanggalSelesaiPelatihan,
             tanggalMulaiPendataan, tanggalSelesaiPendataan,
             ppl, dokumen 
@@ -139,14 +138,14 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
 
         const kegiatanQuery = `
             UPDATE kegiatan SET 
-            namaKegiatan = ?, ketuaTim = ?, timKerja = ?, tipeKegiatan = ?, 
+            namaKegiatan = ?, ketuaTim = ?, timKerja = ?, adaListing = ?,
             tanggalMulaiPelatihan = ?, tanggalSelesaiPelatihan = ?, 
             tanggalMulaiPendataan = ?, tanggalSelesaiPendataan = ?,
             lastUpdated = CURRENT_TIMESTAMP
             WHERE id = ?
         `;
         await connection.execute(kegiatanQuery, [
-            namaKegiatan, ketuaTim, timKerja, tipeKegiatan,
+            namaKegiatan, ketuaTim, timKerja, adaListing || false,
             tanggalMulaiPelatihan || null, tanggalSelesaiPelatihan || null,
             tanggalMulaiPendataan || null, tanggalSelesaiPendataan || null,
             id

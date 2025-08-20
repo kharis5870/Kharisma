@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, FileText, Link2, ExternalLink, Eye, CheckCircle, Clock, Users, Activity } from "lucide-react";
+import { ArrowLeft, FileText, Link2, ExternalLink, Eye, CheckCircle, Clock, Users, Activity, Notebook } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Kegiatan, Dokumen } from "@shared/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     const res = await fetch(`/api/kegiatan/${id}`);
@@ -20,6 +21,7 @@ const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
 export default function ViewDocuments() {
     const { id } = useParams<{ id: string }>();
     const [activeTab, setActiveTab] = useState("persiapan");
+    const [noteViewModal, setNoteViewModal] = useState<{ isOpen: boolean; title: string; content: string }>({ isOpen: false, title: '', content: '' });
 
     const { data: activityData, isLoading } = useQuery({
         queryKey: ['kegiatan', id],
@@ -52,7 +54,7 @@ export default function ViewDocuments() {
     };
 
     const renderDocumentTable = (documents: Dokumen[], fase: string) => {
-        const uploadedDocuments = documents.filter(doc => doc.link && doc.link.trim() !== '');
+        const uploadedDocuments = documents.filter(doc => doc.jenis === 'catatan' || (doc.link && doc.link.trim() !== ''));
 
         if (uploadedDocuments.length === 0) {
             return <div className="text-center py-12 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" /><p>Belum ada dokumen yang diunggah untuk fase {fase}.</p></div>;
@@ -62,7 +64,28 @@ export default function ViewDocuments() {
                 <TableHeader><TableRow><TableHead>Nama Dokumen</TableHead><TableHead>Jenis</TableHead><TableHead>Status</TableHead><TableHead>Tanggal</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
                 <TableBody>
                     {uploadedDocuments.map((doc) => (
-                        <TableRow key={doc.id}><TableCell className="font-medium flex items-center gap-2">{doc.jenis === 'link' ? <Link2 className="w-4 h-4 text-blue-600" /> : <FileText className="w-4 h-4 text-green-600" />} {doc.nama}</TableCell><TableCell><Badge variant="outline">{doc.jenis === 'link' ? 'Drive Link' : 'File'}</Badge></TableCell><TableCell><Badge className={cn("flex items-center gap-1 w-fit", getStatusColor(doc.status))}>{getStatusIcon(doc.status)} {doc.status || 'N/A'}</Badge></TableCell><TableCell>{getRelativeTime(doc.uploadedAt)}</TableCell><TableCell><Button variant="outline" size="sm" asChild><a href={doc.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Buka</a></Button></TableCell></TableRow>
+                        <TableRow key={doc.id}>
+                            <TableCell className="font-medium flex items-center gap-2">
+                                {doc.jenis === 'link' ? <Link2 className="w-4 h-4 text-blue-600" /> : doc.jenis === 'catatan' ? <Notebook className="w-4 h-4 text-orange-600" /> : <FileText className="w-4 h-4 text-green-600" />} 
+                                {doc.nama}
+                            </TableCell>
+                            <TableCell><Badge variant="outline">{doc.jenis === 'link' ? 'Drive Link' : doc.jenis === 'catatan' ? 'Catatan' : 'File'}</Badge></TableCell>
+                            <TableCell><Badge className={cn("flex items-center gap-1 w-fit", getStatusColor(doc.status))}>{getStatusIcon(doc.status)} {doc.status || 'N/A'}</Badge></TableCell>
+                            <TableCell>{getRelativeTime(doc.uploadedAt)}</TableCell>
+                            <TableCell>
+                                {doc.jenis === 'catatan' ? (
+                                    <Button variant="outline" size="sm" onClick={() => setNoteViewModal({ isOpen: true, title: doc.nama, content: doc.link })} className="flex items-center gap-1">
+                                        <Notebook className="w-3 h-3" /> Lihat Catatan
+                                    </Button>
+                                ) : (
+                                    <Button variant="outline" size="sm" asChild>
+                                        <a href={doc.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                                            <ExternalLink className="w-3 h-3" /> Buka
+                                        </a>
+                                    </Button>
+                                )}
+                            </TableCell>
+                        </TableRow>
                     ))}
                 </TableBody>
             </Table>
@@ -90,17 +113,31 @@ export default function ViewDocuments() {
                     <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium">Status Kegiatan</p><Badge>{activityData.status}</Badge></div><Activity className="w-8 h-8 text-orange-500" /></div></CardContent></Card>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="persiapan">Persiapan <Badge variant="secondary" className="ml-2">{docsByTipe('persiapan').filter(d => d.link).length}</Badge></TabsTrigger>
-                        <TabsTrigger value="pelatihan">Pasca Pelatihan <Badge variant="secondary" className="ml-2">{docsByTipe('pasca-pelatihan').filter(d => d.link).length}</Badge></TabsTrigger>
-                        <TabsTrigger value="pendataan">Pendataan <Badge variant="secondary" className="ml-2">{docsByTipe('pasca-pendataan').filter(d => d.link).length}</Badge></TabsTrigger>
+                        <TabsTrigger value="pengumpulan-data">Pengumpulan Data <Badge variant="secondary" className="ml-2">{docsByTipe('pengumpulan-data').filter(d => d.link).length}</Badge></TabsTrigger>
+                        <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis <Badge variant="secondary" className="ml-2">{docsByTipe('pengolahan-analisis').filter(d => d.link).length}</Badge></TabsTrigger>
+                        <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi <Badge variant="secondary" className="ml-2">{docsByTipe('diseminasi-evaluasi').filter(d => d.link).length}</Badge></TabsTrigger>
                     </TabsList>
                     <TabsContent value="persiapan"><Card><CardHeader><CardTitle>Dokumen Persiapan</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('persiapan'), 'persiapan')}</CardContent></Card></TabsContent>
-                    <TabsContent value="pelatihan"><Card><CardHeader><CardTitle>Dokumen Laporan Pasca Pelatihan</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('pasca-pelatihan'), 'pelatihan')}</CardContent></Card></TabsContent>
-                    <TabsContent value="pendataan"><Card><CardHeader><CardTitle>Dokumen Laporan Pendataan</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('pasca-pendataan'), 'pendataan')}</CardContent></Card></TabsContent>
+                    <TabsContent value="pengumpulan-data"><Card><CardHeader><CardTitle>Dokumen Pengumpulan Data</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('pengumpulan-data'), 'pengumpulan data')}</CardContent></Card></TabsContent>
+                    <TabsContent value="pengolahan-analisis"><Card><CardHeader><CardTitle>Dokumen Pengolahan & Analisis</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('pengolahan-analisis'), 'pengolahan & analisis')}</CardContent></Card></TabsContent>
+                    <TabsContent value="diseminasi-evaluasi"><Card><CardHeader><CardTitle>Dokumen Diseminasi & Evaluasi</CardTitle></CardHeader><CardContent>{renderDocumentTable(docsByTipe('diseminasi-evaluasi'), 'diseminasi & evaluasi')}</CardContent></Card></TabsContent>
                 </Tabs>
                 <div className="mt-8 p-4 bg-blue-50 border rounded-lg"><div className="flex items-center justify-between"><div><h4 className="font-medium text-blue-900">Perlu Menambah atau Mengedit Dokumen?</h4><p className="text-blue-700 text-sm mt-1">Gunakan halaman Edit untuk mengelola semua dokumen dan laporan.</p></div><Button asChild className="bg-blue-600 hover:bg-blue-700"><Link to={`/edit-activity/${activityData.id}`}>Ke Halaman Edit</Link></Button></div></div>
             </div>
+
+            <Dialog open={noteViewModal.isOpen} onOpenChange={() => setNoteViewModal({ isOpen: false, title: '', content: '' })}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{noteViewModal.title}</DialogTitle>
+                        <DialogDescription>Catatan untuk tahap ini.</DialogDescription>
+                    </DialogHeader>
+                    <div className="prose prose-sm max-w-none py-4 whitespace-pre-wrap bg-gray-50 p-4 rounded-md">
+                        {noteViewModal.content || "Belum ada catatan yang ditambahkan."}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </Layout>
     );
 }

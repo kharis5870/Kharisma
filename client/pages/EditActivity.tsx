@@ -18,12 +18,13 @@ import { format, parseISO } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 // --- Tipe Data Frontend ---
 type ClientPPL = PPL & { clientId: string };
 type ClientDokumen = Dokumen & { clientId: string };
 
-type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan'> & {
+type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'tipeKegiatan' | 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan'> & {
     tanggalMulaiPelatihan?: Date;
     tanggalSelesaiPelatihan?: Date;
     tanggalMulaiPendataan?: Date;
@@ -34,30 +35,10 @@ type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'tanggalMulaiPelatihan' | 't
 
 type DateFieldName = 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan';
 
-const mandatoryDocsConfig: Record<string, { tipe: Dokumen['tipe']; nama: string }[]> = {
-  Listing: [
-    { tipe: 'persiapan', nama: 'Formulir Listing Wajib' },
-    { tipe: 'persiapan', nama: 'Peta Wilayah Listing Wajib' },
-    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Listing Wajib' },
-    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Listing Wajib' },
-  ],
-  Pencacahan: [
-    { tipe: 'persiapan', nama: 'Kuesioner Pencacahan Wajib' },
-    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Pencacahan Wajib' },
-    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Pencacahan Wajib' },
-  ],
-  Pengolahan: [
-    { tipe: 'persiapan', nama: 'Pedoman Pengolahan Data Wajib' },
-    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Pengolahan Wajib' },
-    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Pengolahan Wajib' },
-  ],
-  Updating: [
-    { tipe: 'persiapan', nama: 'Dokumen Awal Pemutakhiran Wajib' },
-    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Pemutakhiran Wajib' },
-    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Pemutakhiran Wajib' },
-  ],
-};
-
+const listingDocs: Omit<ClientDokumen, 'id' | 'link' | 'clientId'>[] = [
+    { nama: 'Formulir Listing Wajib', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+    { nama: 'Peta Wilayah Listing Wajib', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+];
 
 // --- API Functions ---
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
@@ -84,6 +65,8 @@ export default function EditActivity() {
     const [activeTab, setActiveTab] = useState("persiapan");
     const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string }>({ isOpen: false, tipe: null, content: '' });
+    const [documentChoice, setDocumentChoice] = useState<Record<string, 'dokumen' | 'catatan'>>({});
 
     const { data: initialData, isLoading } = useQuery({
         queryKey: ['kegiatan', id],
@@ -93,6 +76,18 @@ export default function EditActivity() {
 
     useEffect(() => {
         if (initialData) {
+            const newDocChoice: Record<string, 'dokumen' | 'catatan'> = {};
+            const pengolahanDoc = initialData.dokumen.find(d => d.tipe === 'pengolahan-analisis');
+            const diseminasiDoc = initialData.dokumen.find(d => d.tipe === 'diseminasi-evaluasi');
+
+            if (pengolahanDoc) {
+                newDocChoice['pengolahan-analisis'] = pengolahanDoc.jenis === 'catatan' ? 'catatan' : 'dokumen';
+            }
+            if (diseminasiDoc) {
+                newDocChoice['diseminasi-evaluasi'] = diseminasiDoc.jenis === 'catatan' ? 'catatan' : 'dokumen';
+            }
+            setDocumentChoice(newDocChoice);
+
             setFormData({
                 ...initialData,
                 tanggalMulaiPelatihan: initialData.tanggalMulaiPelatihan ? parseISO(initialData.tanggalMulaiPelatihan) : undefined,
@@ -111,34 +106,52 @@ export default function EditActivity() {
     });
     
     const handleFormFieldChange = (field: keyof FormState, value: any) => {
-        const newState: Partial<FormState> = { ...formData, [field]: value };
-
-        if (field === 'tipeKegiatan') {
-            if (window.confirm("Mengubah tipe kegiatan akan mengatur ulang daftar dokumen wajib. Lanjutkan?")) {
-                const selectedType = value;
-                const currentDocs = newState.dokumen || [];
-                const userAddedDocs = currentDocs.filter(doc => !doc.isWajib);
-                
-                let newDocs = [...userAddedDocs];
-
-                if (selectedType && mandatoryDocsConfig[selectedType]) {
-                    const newMandatoryDocs: ClientDokumen[] = mandatoryDocsConfig[selectedType].map((docConfig, index) => ({
-                        clientId: `wajib-${selectedType}-${docConfig.tipe}-${index}`,
-                        tipe: docConfig.tipe,
-                        nama: docConfig.nama,
-                        link: '',
-                        jenis: 'link',
-                        isWajib: true,
-                    }));
-                    newDocs = [...newMandatoryDocs, ...userAddedDocs];
-                }
-                newState.dokumen = newDocs;
-            } else {
-                return; // Batalkan perubahan jika pengguna tidak setuju
-            }
-        }
-        setFormData(newState);
+        setFormData(prev => ({ ...prev, [field]: value }));
     };
+
+    const handleListingOption = (hasListing: boolean) => {
+        setFormData(prev => {
+            const newDocs = prev.dokumen?.filter(d => !(d.nama.includes('Listing Wajib'))) || [];
+            if (hasListing) {
+                const newListingDocs = listingDocs.map((doc, i) => ({
+                    ...doc,
+                    clientId: `wajib-listing-${i}`,
+                    link: '',
+                }));
+                return { ...prev, adaListing: true, dokumen: [...newDocs, ...newListingDocs] };
+            }
+            return { ...prev, adaListing: false, dokumen: newDocs };
+        });
+    };
+
+    const handleNoteSubmit = () => {
+        if (!noteModal.tipe) return;
+        const otherDocs = formData.dokumen?.filter(d => d.tipe !== noteModal.tipe) || [];
+        const noteDoc: ClientDokumen = {
+            clientId: `catatan-${noteModal.tipe}-${Date.now()}`,
+            tipe: noteModal.tipe,
+            nama: `Catatan Tahap ${titleCase(noteModal.tipe.replace('-', ' '))}`,
+            link: noteModal.content,
+            jenis: 'catatan',
+            isWajib: true,
+        };
+        setFormData(prev => ({ ...prev, dokumen: [...otherDocs, noteDoc] }));
+        setNoteModal({ isOpen: false, tipe: null, content: '' });
+    };
+
+    const handleDocumentChoice = (tipe: Dokumen['tipe'], choice: 'dokumen' | 'catatan') => {
+        setDocumentChoice(prev => ({...prev, [tipe]: choice}));
+        if (choice === 'catatan') {
+            const existingNote = formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
+            setNoteModal({ isOpen: true, tipe, content: existingNote?.link || '' });
+        } else {
+            const newDocs = formData.dokumen?.filter(d => !(d.tipe === tipe && d.jenis === 'catatan')) || [];
+            setFormData(prev => ({...prev, dokumen: newDocs}));
+        }
+    };
+
+    const titleCase = (str: string) => str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
 
     // PPL Management Handlers
     const addPPL = () => {
@@ -191,43 +204,74 @@ export default function EditActivity() {
 
     const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
         const documents = formData.dokumen?.filter(d => d.tipe === tipe) || [];
+        const isOptionalStage = tipe === 'pengolahan-analisis' || tipe === 'diseminasi-evaluasi';
+        const currentChoice = documentChoice[tipe];
+
         return (
             <Card>
                 <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Dokumen {title}</CardTitle>
-                        <Button variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2"><Plus className="w-4 h-4" />Tambah Dokumen Pendukung</Button>
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <CardTitle>Dokumen {title}</CardTitle>
+                            <CardDescription className="mt-1">
+                                Isi link untuk dokumen wajib dan tambahkan dokumen pendukung jika diperlukan.
+                            </CardDescription>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2 flex-shrink-0"><Plus className="w-4 h-4" />Tambah Dokumen Pendukung</Button>
                     </div>
-                    <CardDescription>
-                        Isi link untuk dokumen wajib dan tambahkan dokumen pendukung jika diperlukan.
-                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {documents.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500"><p>Belum ada dokumen untuk fase ini.</p></div>
-                    ) : (
-                        documents.map(doc => (
-                             <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
-                                <div className="flex-grow space-y-2">
-                                    {doc.isWajib ? (
-                                        <Label className="font-semibold">{doc.nama} *</Label>
-                                    ) : (
-                                        <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} />
-                                    )}
-                                    <div className="flex items-center gap-2">
-                                        <Link2 className="w-4 h-4 text-gray-400"/>
-                                        <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} />
-                                    </div>
-                                </div>
-                                {!doc.isWajib ? (
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>
-                                ) : (
-                                    <div className="self-center p-2" title="Dokumen Wajib">
-                                        <Lock className="w-4 h-4 text-gray-400"/>
-                                    </div>
-                                )}
+                    {isOptionalStage && (
+                        <div className="p-4 bg-slate-100 rounded-md space-y-3">
+                            <Label>Pilih Opsi Tahap Ini</Label>
+                            <div className="flex gap-2">
+                                <Button onClick={() => handleDocumentChoice(tipe, 'dokumen')} variant={currentChoice === 'dokumen' || !currentChoice ? 'default' : 'outline'} className="flex-1">Gunakan Dokumen</Button>
+                                <Button onClick={() => handleDocumentChoice(tipe, 'catatan')} variant={currentChoice === 'catatan' ? 'default' : 'outline'} className="flex-1">Gunakan Catatan</Button>
                             </div>
-                        ))
+                        </div>
+                    )}
+                    
+                    {(!isOptionalStage || currentChoice === 'dokumen' || !currentChoice) && (
+                        <>
+                            {documents.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500"><p>Belum ada dokumen untuk fase ini.</p></div>
+                            ) : (
+                                documents.map(doc => (
+                                     <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
+                                        <div className="flex-grow space-y-2">
+                                            {doc.isWajib ? (
+                                                <Label className="font-semibold">{doc.nama} *</Label>
+                                            ) : (
+                                                <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} />
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <Link2 className="w-4 h-4 text-gray-400"/>
+                                                <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} />
+                                            </div>
+                                        </div>
+                                        {!doc.isWajib ? (
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>
+                                        ) : (
+                                            <div className="self-center p-2" title="Dokumen Wajib">
+                                                <Lock className="w-4 h-4 text-gray-400"/>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </>
+                    )}
+
+                    {isOptionalStage && currentChoice === 'catatan' && (
+                        <div className="p-4 border rounded-lg bg-gray-50 text-center">
+                            <p className="text-sm text-gray-600">Anda memilih untuk menggunakan catatan untuk tahap ini.</p>
+                            <Button variant="secondary" className="mt-2" onClick={() => {
+                                const existingNote = formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
+                                setNoteModal({ isOpen: true, tipe, content: existingNote?.link || '' });
+                            }}>
+                                Edit Catatan
+                            </Button>
+                        </div>
                     )}
                 </CardContent>
             </Card>
@@ -237,8 +281,6 @@ export default function EditActivity() {
     if (isLoading) return <Layout><div>Memuat...</div></Layout>;
     
     const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
-    const tipeKegiatanOptions = ["Listing", "Pencacahan", "Pengolahan", "Updating"];
-
 
     return (
         <Layout>
@@ -248,15 +290,17 @@ export default function EditActivity() {
                     <div><h1 className="text-3xl font-bold">Edit Kegiatan</h1><p className="text-gray-600">Perbarui informasi dan kelola dokumen.</p></div>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
-                        <TabsTrigger value="pelatihan">Pelatihan</TabsTrigger>
-                        <TabsTrigger value="pendataan">Pendataan</TabsTrigger>
+                        <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
+                        <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger>
+                        <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
                         <TabsTrigger value="basic">Info Dasar</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="persiapan" className="space-y-6">{renderDocumentSection('persiapan', 'Persiapan')}</TabsContent>
-                    <TabsContent value="pelatihan" className="space-y-6">{renderDocumentSection('pasca-pelatihan', 'Pasca Pelatihan')}</TabsContent>
-                    <TabsContent value="pendataan" className="space-y-6">{renderDocumentSection('pasca-pendataan', 'Pendataan')}</TabsContent>
+                    <TabsContent value="persiapan">{renderDocumentSection('persiapan', 'Persiapan')}</TabsContent>
+                    <TabsContent value="pengumpulan-data">{renderDocumentSection('pengumpulan-data', 'Pengumpulan Data')}</TabsContent>
+                    <TabsContent value="pengolahan-analisis">{renderDocumentSection('pengolahan-analisis', 'Pengolahan & Analisis')}</TabsContent>
+                    <TabsContent value="diseminasi-evaluasi">{renderDocumentSection('diseminasi-evaluasi', 'Diseminasi & Evaluasi')}</TabsContent>
                     <TabsContent value="basic" className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -276,13 +320,6 @@ export default function EditActivity() {
                                     <SelectContent>{ketuaTimOptions.map((nama) => (<SelectItem key={nama} value={nama}>{nama}</SelectItem>))}</SelectContent>
                                 </Select>
                             </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tipeKegiatan">Tipe Kegiatan *</Label>
-                            <Select value={formData.tipeKegiatan || ''} onValueChange={(value) => handleFormFieldChange('tipeKegiatan', value)}>
-                                <SelectTrigger><SelectValue placeholder="Pilih tipe" /></SelectTrigger>
-                                <SelectContent>{tipeKegiatanOptions.map((tipe) => (<SelectItem key={tipe} value={tipe}>{tipe}</SelectItem>))}</SelectContent>
-                            </Select>
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="timKerja">Tim Kerja</Label>
@@ -359,6 +396,26 @@ export default function EditActivity() {
                 </div>
                 <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} onAction={handleSuccessAction} title="Kegiatan Berhasil Diperbarui!" description={`Perubahan untuk "${formData.namaKegiatan}" telah disimpan.`} actionLabel="Ke Dashboard" />
             </div>
+            <Dialog open={noteModal.isOpen} onOpenChange={(isOpen) => !isOpen && setNoteModal({ isOpen: false, tipe: null, content: '' })}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Tambah/Edit Catatan</DialogTitle>
+                        <DialogDescription>
+                            Isi catatan untuk tahap ini. Catatan ini akan disimpan sebagai pengganti dokumen.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Textarea 
+                        value={noteModal.content}
+                        onChange={(e) => setNoteModal(prev => ({...prev, content: e.target.value}))}
+                        rows={8}
+                        placeholder="Tulis catatan di sini..."
+                    />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setNoteModal({ isOpen: false, tipe: null, content: '' })}>Batal</Button>
+                        <Button onClick={handleNoteSubmit}>Simpan Catatan</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Layout>
     );
 }

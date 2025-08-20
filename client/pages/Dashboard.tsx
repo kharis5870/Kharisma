@@ -12,9 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Calendar, Activity, FileText, AlertTriangle, Clock, Search, Filter } from "lucide-react";
+import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Calendar, Activity, FileText, AlertTriangle, Clock, Search, Filter, BarChart, BookOpen, Send, CheckSquare } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Kegiatan, PPL } from "@shared/api";
+import { Kegiatan, PPL, Dokumen } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { toDate, format } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
@@ -36,7 +36,6 @@ const fetchActivities = async (): Promise<KegiatanWithRelations[]> => {
   const res = await fetch("/api/kegiatan");
   if (!res.ok) throw new Error("Gagal memuat kegiatan");
   const activities: Kegiatan[] = await res.json();
-  // PERBAIKAN: Memastikan semua PPL memiliki nilai default untuk progres
   return activities.map(activity => ({
       ...activity,
       ppl: (activity.ppl || []).map(p => ({
@@ -66,42 +65,58 @@ const updatePplProgress = async ({ pplId, progressData }: { pplId: number; progr
 };
 
 // --- Helper Functions ---
-const getDynamicStatus = (kegiatan: Kegiatan): { status: string; color: string; warnings: string[] } => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+const getDynamicStatus = (kegiatan: Kegiatan): { status: Kegiatan['status']; color: string; warnings: string[] } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const warnings: string[] = [];
-    let status: string = 'Persiapan';
 
-    const mulaiPelatihan = kegiatan.tanggalMulaiPelatihan ? toDate(new Date(kegiatan.tanggalMulaiPelatihan)) : null;
-    const selesaiPelatihan = kegiatan.tanggalSelesaiPelatihan ? toDate(new Date(kegiatan.tanggalSelesaiPelatihan)) : null;
-    const mulaiPendataan = kegiatan.tanggalMulaiPendataan ? toDate(new Date(kegiatan.tanggalMulaiPendataan)) : null;
-    
-    if (kegiatan.dokumen.some(d => d.tipe === 'pasca-pendataan')) {
+    const hasDoc = (tipe: Dokumen['tipe']) => kegiatan.dokumen.some(d => d.tipe === tipe && d.link && d.link.trim() !== '');
+
+    let status: Kegiatan['status'] = 'Persiapan';
+
+    if (hasDoc('diseminasi-evaluasi')) {
         status = 'Selesai';
-    } else if (mulaiPendataan && today >= mulaiPendataan) {
-        status = 'Pendataan';
-        const deadlineLaporan = new Date(mulaiPendataan); deadlineLaporan.setDate(deadlineLaporan.getDate() + 7);
-        if (today > deadlineLaporan && !kegiatan.dokumen.some(d => d.tipe === 'pasca-pendataan')) {
-            warnings.push("Belum upload laporan pendataan (lewat 7 hari)");
-        }
-    } else if (mulaiPelatihan && selesaiPelatihan && today >= mulaiPelatihan) {
-        status = 'Pelatihan';
-        if (today > selesaiPelatihan) {
-            const deadlineLaporan = new Date(selesaiPelatihan); deadlineLaporan.setDate(deadlineLaporan.getDate() + 3);
-            if (today > deadlineLaporan && !kegiatan.dokumen.some(d => d.tipe === 'pasca-pelatihan')) {
-                warnings.push("Belum upload laporan pasca pelatihan (lewat 3 hari)");
-            }
+    } else if (hasDoc('pengolahan-analisis')) {
+        status = 'Diseminasi & Evaluasi';
+    } else if (hasDoc('pengumpulan-data')) {
+        status = 'Pengolahan & Analisis';
+    } else if (hasDoc('persiapan')) {
+        status = 'Pengumpulan Data';
+    }
+
+    // Deadline logic
+    const selesaiPelatihan = kegiatan.tanggalSelesaiPelatihan ? toDate(new Date(kegiatan.tanggalSelesaiPelatihan)) : null;
+    const selesaiPendataan = kegiatan.tanggalSelesaiPendataan ? toDate(new Date(kegiatan.tanggalSelesaiPendataan)) : null;
+
+    if (selesaiPelatihan && status === 'Pengumpulan Data') {
+        const deadline = new Date(selesaiPelatihan);
+        deadline.setDate(deadline.getDate() + 3); // 3 days deadline
+        if (today > deadline && !hasDoc('pengumpulan-data')) {
+            warnings.push("Laporan Pengumpulan Data terlambat");
         }
     }
     
-    let color = 'bg-gray-100 text-gray-700';
+    if (selesaiPendataan && status === 'Pengolahan & Analisis') {
+        const deadline = new Date(selesaiPendataan);
+        deadline.setDate(deadline.getDate() + 7); // 7 days deadline
+         if (today > deadline && !hasDoc('pengolahan-analisis')) {
+            warnings.push("Laporan Pengolahan & Analisis terlambat");
+        }
+    }
+
+    let color = 'bg-blue-100 text-blue-700';
     switch (status) {
-        case 'Persiapan': color = 'bg-blue-100 text-blue-700'; break;
-        case 'Pelatihan': color = 'bg-yellow-100 text-yellow-700'; break;
-        case 'Pendataan': color = 'bg-green-100 text-green-700'; break;
+        case 'Pengumpulan Data': color = 'bg-yellow-100 text-yellow-700'; break;
+        case 'Pengolahan & Analisis': color = 'bg-green-100 text-green-700'; break;
+        case 'Diseminasi & Evaluasi': color = 'bg-indigo-100 text-indigo-700'; break;
         case 'Selesai': color = 'bg-purple-100 text-purple-700'; break;
     }
+    
+    // if (warnings.length > 0) {
+    //     color = 'bg-red-100 text-red-700';
+    // }
 
-    return { status, warnings, color };
+    return { status, color, warnings };
 };
 
 const getProgressBarValue = (ppl: PPLWithProgress) => {
@@ -152,10 +167,10 @@ export default function Dashboard() {
 
   const filteredActivities = useMemo(() => {
     return activities.filter(activity => {
-        const { status } = getDynamicStatus(activity);
+        const { status, warnings } = getDynamicStatus(activity);
         const matchesSearch = activity.namaKegiatan.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === "all" ||
-                              (statusFilter === "warning" ? activity.warnings.length > 0 : status === statusFilter);
+                              (statusFilter === "warning" ? warnings.length > 0 : status === statusFilter);
         return matchesSearch && matchesStatus;
     });
   }, [activities, searchTerm, statusFilter]);
@@ -170,8 +185,9 @@ export default function Dashboard() {
     return {
         totalKegiatan: activities.length,
         persiapan: statusCounts['Persiapan'] || 0,
-        pelatihan: statusCounts['Pelatihan'] || 0,
-        pendataan: statusCounts['Pendataan'] || 0,
+        pengumpulanData: statusCounts['Pengumpulan Data'] || 0,
+        pengolahan: statusCounts['Pengolahan & Analisis'] || 0,
+        diseminasi: statusCounts['Diseminasi & Evaluasi'] || 0,
         selesai: statusCounts['Selesai'] || 0,
         jumlahWarning: activities.filter(a => getDynamicStatus(a).warnings.length > 0).length,
     };
@@ -244,12 +260,13 @@ export default function Dashboard() {
     <Layout>
       <div className="space-y-8">
         <div><h1 className="text-3xl font-bold">Dashboard Monitoring</h1><p className="text-gray-600 mt-1">Pantau progress dan kelola semua kegiatan</p></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6">
           <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Total Kegiatan</p><p className="text-2xl font-bold">{stats.totalKegiatan}</p></div><Activity className="w-8 h-8 text-bps-blue-500"/></div></CardContent></Card>
-          <Card className="border-l-4 border-l-blue-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Persiapan</p><p className="text-2xl font-bold">{stats.persiapan}</p></div><Clock className="w-8 h-8 text-blue-500"/></div></CardContent></Card>
-          <Card className="border-l-4 border-l-yellow-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Pelatihan</p><p className="text-2xl font-bold">{stats.pelatihan}</p></div><Users className="w-8 h-8 text-yellow-500"/></div></CardContent></Card>
-          <Card className="border-l-4 border-l-green-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Pendataan</p><p className="text-2xl font-bold">{stats.pendataan}</p></div><FileCheck className="w-8 h-8 text-green-500"/></div></CardContent></Card>
-          <Card className="border-l-4 border-l-purple-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Selesai</p><p className="text-2xl font-bold">{stats.selesai}</p></div><Calendar className="w-8 h-8 text-purple-500"/></div></CardContent></Card>
+          <Card className="border-l-4 border-l-blue-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Persiapan</p><p className="text-2xl font-bold">{stats.persiapan}</p></div><BookOpen className="w-8 h-8 text-blue-500"/></div></CardContent></Card>
+          <Card className="border-l-4 border-l-yellow-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Pengumpulan Data</p><p className="text-2xl font-bold">{stats.pengumpulanData}</p></div><Users className="w-8 h-8 text-yellow-500"/></div></CardContent></Card>
+          <Card className="border-l-4 border-l-green-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Pengolahan</p><p className="text-2xl font-bold">{stats.pengolahan}</p></div><BarChart className="w-8 h-8 text-green-500"/></div></CardContent></Card>
+          <Card className="border-l-4 border-l-indigo-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Diseminasi</p><p className="text-2xl font-bold">{stats.diseminasi}</p></div><Send className="w-8 h-8 text-indigo-500"/></div></CardContent></Card>
+          <Card className="border-l-4 border-l-purple-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Selesai</p><p className="text-2xl font-bold">{stats.selesai}</p></div><CheckSquare className="w-8 h-8 text-purple-500"/></div></CardContent></Card>
           <Card className="border-l-4 border-l-red-500"><CardContent className="p-6"><div className="flex justify-between items-center"><div><p className="text-sm font-medium">Jumlah Warning</p><p className="text-2xl font-bold">{stats.jumlahWarning}</p></div><AlertTriangle className="w-8 h-8 text-red-500"/></div></CardContent></Card>
         </div>
 
@@ -271,8 +288,9 @@ export default function Dashboard() {
               <SelectContent>
                 <SelectItem value="all">Semua Status</SelectItem>
                 <SelectItem value="Persiapan">Persiapan</SelectItem>
-                <SelectItem value="Pelatihan">Pelatihan</SelectItem>
-                <SelectItem value="Pendataan">Pendataan</SelectItem>
+                <SelectItem value="Pengumpulan Data">Pengumpulan Data</SelectItem>
+                <SelectItem value="Pengolahan & Analisis">Pengolahan & Analisis</SelectItem>
+                <SelectItem value="Diseminasi & Evaluasi">Diseminasi & Evaluasi</SelectItem>
                 <SelectItem value="Selesai">Selesai</SelectItem>
                 <SelectItem value="warning">Ada Warning</SelectItem>
               </SelectContent>
@@ -289,21 +307,10 @@ export default function Dashboard() {
             </div>
           ) : (
             filteredActivities.map((activity) => {
-              const { status, warnings, color } = getDynamicStatus(activity);
+              const { status, color, warnings } = getDynamicStatus(activity);
               return (
                 <Card key={activity.id} className="hover:shadow-lg transition-shadow flex flex-col">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                                <CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle>
-                                <div className="mt-1 flex flex-col text-sm">
-                                    <span className="text-gray-600">Ketua: {activity.ketuaTim}</span>
-                                    <span className="text-gray-500">Tipe: {activity.tipeKegiatan}</span>
-                                </div>
-                            </div>
-                            <Badge className={cn("ml-2 whitespace-nowrap", color)}>{status}</Badge>
-                        </div>
-                    </CardHeader>
+                    <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.ketuaTim}</p></div><Badge className={cn("ml-2 whitespace-nowrap", color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
                     <CardContent className="space-y-4 flex-grow flex flex-col justify-between">
                         <div>
                             <div className="flex justify-between items-center mb-2"><span className="text-sm font-medium">Progress Keseluruhan</span><span className="text-sm font-bold text-bps-blue-600">{activity.progressKeseluruhan || 0}%</span></div>
@@ -343,10 +350,6 @@ export default function Dashboard() {
                               <div className="flex justify-between">
                                 <span className="text-gray-500">Ketua Tim:</span>
                                 <span className="font-medium">{selectedActivity.ketuaTim}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Tipe Kegiatan:</span>
-                                <span className="font-medium">{selectedActivity.tipeKegiatan}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-500">Status:</span>
@@ -470,8 +473,8 @@ export default function Dashboard() {
                             <div>
                               <h4 className="font-medium text-blue-900">Informasi Akses</h4>
                               <p className="text-blue-700 text-sm mt-1">
-                                Gunakan tombol <strong>Edit</strong> untuk mengakses dan mengupload dokumen semua fase (persiapan, pelatihan, pendataan).
-                                Tombol <strong>View Docs</strong> untuk melihat semua dokumen.
+                                Gunakan tombol <strong>Edit</strong> untuk mengakses dan mengupload dokumen semua fase.
+                                Tombol <strong>View Docs</strong> untuk melihat semua dokumen yang telah diunggah.
                               </p>
                             </div>
                           </div>

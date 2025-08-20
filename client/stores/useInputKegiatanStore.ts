@@ -15,7 +15,7 @@ export type State = {
   namaKegiatan: string;
   ketuaTim: string;
   timKerja: string;
-  tipeKegiatan: string;
+  adaListing: boolean;
   pplAllocations: PPLItem[];
   tanggalMulaiPelatihan?: Date;
   tanggalSelesaiPelatihan?: Date;
@@ -29,7 +29,7 @@ export type Actions = {
   addPPL: () => void;
   removePPL: (id: string) => void;
   updatePPL: (id: string, field: keyof Omit<PPLItem, 'id'>, value: string) => void;
-  addDocumentLink: () => void;
+  addDocumentLink: (tipe: Dokumen['tipe']) => void;
   updateDocument: (id: string, field: 'nama' | 'link', value: string) => void;
   removeDocument: (id: string) => void;
   setPplAllocations: (allocations: PPLItem[]) => void;
@@ -37,17 +37,24 @@ export type Actions = {
   resetForm: () => void;
 };
 
+const mandatoryDocs: Omit<DocumentItem, 'id' | 'link'>[] = [
+    { nama: 'Dokumen Persiapan Wajib 1', tipe: 'persiapan', isWajib: true, jenis: 'link' },
+    { nama: 'Laporan Pengumpulan Data Wajib', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+    { nama: 'Laporan Pengolahan & Analisis Wajib', tipe: 'pengolahan-analisis', isWajib: true, jenis: 'link' },
+    { nama: 'Laporan Diseminasi & Evaluasi Wajib', tipe: 'diseminasi-evaluasi', isWajib: true, jenis: 'link' },
+];
+
 const initialState: State = {
   namaKegiatan: "",
   ketuaTim: "",
   timKerja: "",
-  tipeKegiatan: "",
+  adaListing: false,
   pplAllocations: [{ id: "1", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }],
   tanggalMulaiPelatihan: undefined,
   tanggalSelesaiPelatihan: undefined,
   tanggalMulaiPendataan: undefined,
   tanggalSelesaiPendataan: undefined,
-  documents: []
+  documents: mandatoryDocs.map((doc, i) => ({ ...doc, id: `wajib-initial-${i}`, link: '' }))
 };
 
 const useInputKegiatanStore = create<State & Actions>()(
@@ -62,8 +69,8 @@ const useInputKegiatanStore = create<State & Actions>()(
           ppl.id === id ? { ...ppl, [field]: value } : ppl
         )
       })),
-      addDocumentLink: () => set((state: State) => ({
-        documents: [...state.documents, { id: Date.now().toString(), nama: "", jenis: 'link', tipe: 'persiapan', link: '', isWajib: false }]
+      addDocumentLink: (tipe) => set((state: State) => ({
+        documents: [...state.documents, { id: Date.now().toString(), nama: "", jenis: 'link', tipe, link: '', isWajib: false }]
       })),
       updateDocument: (id: string, field: 'nama' | 'link', value: string) => set((state: State) => ({
         documents: state.documents.map((doc: DocumentItem) =>
@@ -76,7 +83,7 @@ const useInputKegiatanStore = create<State & Actions>()(
       resetForm: () => set(initialState),
     }),
     {
-      name: 'input-kegiatan-storage', // Nama untuk penyimpanan di local storage
+      name: 'input-kegiatan-storage',
     }
   )
 );

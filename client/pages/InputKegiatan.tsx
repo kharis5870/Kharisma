@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -28,32 +28,6 @@ interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'u
 }
 
 type DateFieldName = 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan';
-
-// --- Konfigurasi Dokumen Wajib ---
-const mandatoryDocsConfig: Record<string, { tipe: Dokumen['tipe']; nama: string }[]> = {
-  Listing: [
-    { tipe: 'persiapan', nama: 'Formulir Listing Wajib' },
-    { tipe: 'persiapan', nama: 'Peta Wilayah Listing Wajib' },
-    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Listing Wajib' },
-    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Listing Wajib' },
-  ],
-  Pencacahan: [
-    { tipe: 'persiapan', nama: 'Kuesioner Pencacahan Wajib' },
-    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Pencacahan Wajib' },
-    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Pencacahan Wajib' },
-  ],
-  Pengolahan: [
-    { tipe: 'persiapan', nama: 'Pedoman Pengolahan Data Wajib' },
-    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Pengolahan Wajib' },
-    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Pengolahan Wajib' },
-  ],
-  Updating: [
-    { tipe: 'persiapan', nama: 'Dokumen Awal Pemutakhiran Wajib' },
-    { tipe: 'pasca-pelatihan', nama: 'Laporan Pelatihan Pemutakhiran Wajib' },
-    { tipe: 'pasca-pendataan', nama: 'Laporan Hasil Pemutakhiran Wajib' },
-  ],
-};
-
 
 // --- Fungsi API ---
 const createActivity = async (data: any) => {
@@ -92,33 +66,8 @@ export default function InputKegiatan() {
     updateDocument,
     removeDocument,
     setPplAllocations,
-    setDocuments,
     resetForm
   } = useInputKegiatanStore((state: InputKegiatanStore) => ({ formData: state, ...state }));
-
-  useEffect(() => {
-    const selectedType = formData.tipeKegiatan;
-    const currentDocs = formData.documents || [];
-    const userAddedDocs = currentDocs.filter(doc => !doc.isWajib);
-    
-    let newDocs = [...userAddedDocs];
-
-    if (selectedType && mandatoryDocsConfig[selectedType]) {
-      const newMandatoryDocs: DocumentItem[] = mandatoryDocsConfig[selectedType].map((docConfig, index) => ({
-        id: `wajib-${selectedType}-${docConfig.tipe}-${index}`,
-        nama: docConfig.nama,
-        tipe: docConfig.tipe,
-        link: '',
-        jenis: 'link',
-        isWajib: true,
-      }));
-      newDocs = [...newMandatoryDocs, ...userAddedDocs];
-    }
-    
-    setDocuments(newDocs);
-
-  }, [formData.tipeKegiatan, setDocuments]);
-
 
   const mutation = useMutation({ mutationFn: createActivity, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); setShowSuccessModal(true); resetForm(); }, });
   const downloadTemplate = () => { const headers = ['Nama PPL', 'Beban Kerja', 'Satuan Beban Kerja', 'Besaran Honor (Rp)', 'Nama PML']; const csvContent = headers.join(',') + '\n' + 'Contoh PPL 1,120,Hari,2400000,Contoh PML 1\n'; const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'Template_PPL.csv'; link.click(); };
@@ -158,13 +107,13 @@ export default function InputKegiatan() {
 
   const handleExcelUpload = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file) parseExcelFile(file); event.target.value = ''; };
   const validateForm = () => {
-    return formData.namaKegiatan && formData.ketuaTim && formData.tipeKegiatan && formData.tanggalMulaiPelatihan && formData.tanggalSelesaiPelatihan && formData.tanggalMulaiPendataan && formData.tanggalSelesaiPendataan && formData.pplAllocations.every((ppl: PPLItem) => ppl.namaPPL && ppl.besaranHonor);
+    return formData.namaKegiatan && formData.ketuaTim && formData.tanggalMulaiPelatihan && formData.tanggalSelesaiPelatihan && formData.tanggalMulaiPendataan && formData.tanggalSelesaiPendataan && formData.pplAllocations.every((ppl: PPLItem) => ppl.namaPPL && ppl.besaranHonor);
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) {
-        alert("Harap lengkapi semua field bertanda *");
+        alert("Harap lengkapi semua field bertanda *.");
         return;
     }
     mutation.mutate({
@@ -178,17 +127,16 @@ export default function InputKegiatan() {
 
   const handleSuccessAction = () => { navigate('/dashboard'); };
   const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
-  const tipeKegiatanOptions = ["Listing", "Pencacahan", "Pengolahan", "Updating"];
   
   const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
         const documents = formData.documents?.filter(d => d.tipe === tipe) || [];
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        Dokumen {title}
-                        <Button type="button" variant="outline" size="sm" onClick={() => addDocumentLink()} className="flex items-center gap-2"><Plus className="w-4 h-4" />Tambah Dokumen Pendukung</Button>
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Dokumen {title}</CardTitle>
+                        <Button type="button" variant="outline" size="sm" onClick={() => addDocumentLink(tipe)} className="flex items-center gap-2"><Plus className="w-4 h-4" />Tambah Dokumen Pendukung</Button>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {documents.length === 0 ? (
@@ -198,7 +146,7 @@ export default function InputKegiatan() {
                              <div key={doc.id} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
                                 <div className="flex-grow space-y-2">
                                     {doc.isWajib ? (
-                                        <Label className="font-semibold">{doc.nama} *</Label>
+                                        <Label className="font-semibold">{doc.nama}</Label>
                                     ) : (
                                         <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.id, 'nama', e.target.value)} />
                                     )}
@@ -251,13 +199,6 @@ export default function InputKegiatan() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tipeKegiatan">Tipe Kegiatan *</Label>
-                <Select value={formData.tipeKegiatan} onValueChange={(value) => updateFormField('tipeKegiatan', value)}>
-                    <SelectTrigger><SelectValue placeholder="Pilih tipe" /></SelectTrigger>
-                    <SelectContent>{tipeKegiatanOptions.map((tipe) => (<SelectItem key={tipe} value={tipe}>{tipe}</SelectItem>))}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="timKerja">Tim Kerja</Label>
                 <Textarea id="timKerja" value={formData.timKerja} onChange={(e) => updateFormField('timKerja', e.target.value)} placeholder="Deskripsikan tim kerja dan pembagian tugas secara singkat." />
               </div>
@@ -284,14 +225,16 @@ export default function InputKegiatan() {
           </Card>
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
-                  <TabsTrigger value="pelatihan">Pasca Pelatihan</TabsTrigger>
-                  <TabsTrigger value="pendataan">Pendataan</TabsTrigger>
+                  <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
+                  <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger>
+                  <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
               </TabsList>
-              <TabsContent value="persiapan" className="space-y-6">{renderDocumentSection('persiapan', 'Persiapan')}</TabsContent>
-              <TabsContent value="pelatihan" className="space-y-6">{renderDocumentSection('pasca-pelatihan', 'Pasca Pelatihan')}</TabsContent>
-              <TabsContent value="pendataan" className="space-y-6">{renderDocumentSection('pasca-pendataan', 'Pendataan')}</TabsContent>
+              <TabsContent value="persiapan">{renderDocumentSection('persiapan', 'Persiapan')}</TabsContent>
+              <TabsContent value="pengumpulan-data">{renderDocumentSection('pengumpulan-data', 'Pengumpulan Data')}</TabsContent>
+              <TabsContent value="pengolahan-analisis">{renderDocumentSection('pengolahan-analisis', 'Pengolahan & Analisis')}</TabsContent>
+              <TabsContent value="diseminasi-evaluasi">{renderDocumentSection('diseminasi-evaluasi', 'Diseminasi & Evaluasi')}</TabsContent>
           </Tabs>
 
           <Card>
