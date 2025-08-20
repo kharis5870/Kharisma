@@ -1,6 +1,6 @@
 // client/pages/EditActivity.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -13,8 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook, FileText } from "lucide-react";
+import { format, parseISO, isValid } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 type ClientPPL = PPL & { clientId: string };
 type ClientDokumen = Dokumen & { clientId: string };
 
-type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'tipeKegiatan' | 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan'> & {
+type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan'> & {
     tanggalMulaiPelatihan?: Date;
     tanggalSelesaiPelatihan?: Date;
     tanggalMulaiPendataan?: Date;
@@ -43,13 +43,17 @@ const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
 }
 
 const updateActivity = async (kegiatan: Partial<Kegiatan> & {id: number}): Promise<Kegiatan> => {
+    // Membersihkan clientId sebelum mengirim ke server
     const sanitizedData = {
         ...kegiatan,
         dokumen: kegiatan.dokumen?.map(({ clientId, ...rest }: any) => rest),
         ppl: kegiatan.ppl?.map(({ clientId, ...rest }: any) => rest)
     };
     const res = await fetch(`/api/kegiatan/${kegiatan.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sanitizedData) });
-    if (!res.ok) throw new Error("Gagal memperbarui kegiatan");
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Gagal memperbarui kegiatan");
+    }
     return res.json();
 }
 
@@ -62,7 +66,7 @@ export default function EditActivity() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string }>({ isOpen: false, tipe: null, content: '' });
 
-    const { data: initialData, isLoading } = useQuery({
+    const { data: initialData, isLoading, isError } = useQuery({
         queryKey: ['kegiatan', id],
         queryFn: () => fetchActivityDetails(id!),
         enabled: !!id,
@@ -70,53 +74,67 @@ export default function EditActivity() {
 
     useEffect(() => {
         if (initialData) {
+            const parseDate = (dateString?: string): Date | undefined => {
+                if (!dateString) return undefined;
+                const date = parseISO(dateString);
+                return isValid(date) ? date : undefined;
+            };
+
             setFormData({
                 ...initialData,
-                tanggalMulaiPelatihan: initialData.tanggalMulaiPelatihan ? parseISO(initialData.tanggalMulaiPelatihan) : undefined,
-                tanggalSelesaiPelatihan: initialData.tanggalSelesaiPelatihan ? parseISO(initialData.tanggalSelesaiPelatihan) : undefined,
-                tanggalMulaiPendataan: initialData.tanggalMulaiPendataan ? parseISO(initialData.tanggalMulaiPendataan) : undefined,
-                tanggalSelesaiPendataan: initialData.tanggalSelesaiPendataan ? parseISO(initialData.tanggalSelesaiPendataan) : undefined,
-                dokumen: initialData.dokumen.map(d => ({...d, clientId: d.id?.toString() || Date.now().toString() })),
-                ppl: initialData.ppl.map(p => ({...p, clientId: p.id?.toString() || Date.now().toString() }))
+                tanggalMulaiPelatihan: parseDate(initialData.tanggalMulaiPelatihan),
+                tanggalSelesaiPelatihan: parseDate(initialData.tanggalSelesaiPelatihan),
+                tanggalMulaiPendataan: parseDate(initialData.tanggalMulaiPendataan),
+                tanggalSelesaiPendataan: parseDate(initialData.tanggalSelesaiPendataan),
+                dokumen: initialData.dokumen.map((d, i) => ({...d, clientId: d.id?.toString() || `doc-${Date.now()}-${i}` })),
+                ppl: initialData.ppl.map((p, i) => ({...p, clientId: p.id?.toString() || `ppl-${Date.now()}-${i}` }))
             });
         }
     }, [initialData]);
 
     const mutation = useMutation({
         mutationFn: updateActivity,
-        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); setShowSuccessModal(true); }
+        onSuccess: () => { 
+            queryClient.invalidateQueries({ queryKey: ['kegiatan', id] });
+            queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); // Invalidate list
+            setShowSuccessModal(true); 
+        },
+        onError: (error) => {
+            console.error("Gagal menyimpan:", error);
+            alert(`Terjadi kesalahan saat menyimpan: ${error.message}`);
+        }
     });
     
     const handleFormFieldChange = (field: keyof FormState, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
     
-    const titleCase = (str: string) => str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    const titleCase = (str: string) => str.replace(/-/g, ' ').toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
     const handleNoteSubmit = () => {
         if (!noteModal.tipe) return;
         const tipe = noteModal.tipe;
         
         setFormData(prev => {
-            const existingNote = prev.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
-            if (existingNote) {
+            const newDocs = [...(prev.dokumen || [])];
+            const existingNoteIndex = newDocs.findIndex(d => d.tipe === tipe && d.jenis === 'catatan');
+
+            if (existingNoteIndex > -1) {
                 // Update existing note
-                const updatedDocs = prev.dokumen!.map(d => 
-                    d.clientId === existingNote.clientId ? { ...d, link: noteModal.content } : d
-                );
-                return { ...prev, dokumen: updatedDocs };
+                newDocs[existingNoteIndex] = { ...newDocs[existingNoteIndex], link: noteModal.content };
             } else {
                 // Add new note
                 const noteDoc: ClientDokumen = {
                     clientId: `catatan-${tipe}-${Date.now()}`,
                     tipe: tipe,
-                    nama: `Catatan Tahap ${titleCase(tipe.replace('-', ' '))}`,
+                    nama: `Catatan Tahap ${titleCase(tipe)}`,
                     link: noteModal.content,
                     jenis: 'catatan',
                     isWajib: false,
                 };
-                return { ...prev, dokumen: [...(prev.dokumen || []), noteDoc] };
+                newDocs.push(noteDoc);
             }
+            return { ...prev, dokumen: newDocs };
         });
 
         setNoteModal({ isOpen: false, tipe: null, content: '' });
@@ -124,14 +142,7 @@ export default function EditActivity() {
 
     // PPL Management Handlers
     const addPPL = () => {
-        const newPPL: ClientPPL = {
-            clientId: Date.now().toString(),
-            namaPPL: "",
-            namaPML: "",
-            bebanKerja: "",
-            satuanBebanKerja: "",
-            besaranHonor: ""
-        };
+        const newPPL: ClientPPL = { clientId: `new-ppl-${Date.now()}`, namaPPL: "", namaPML: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "" };
         setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), newPPL]}));
     };
 
@@ -140,37 +151,39 @@ export default function EditActivity() {
     };
 
     const updatePPL = (clientId: string, field: keyof PPL, value: string) => {
-        setFormData(prev => ({
-            ...prev,
-            ppl: prev.ppl?.map(p => p.clientId === clientId ? { ...p, [field]: value } : p)
-        }));
+        setFormData(prev => ({ ...prev, ppl: prev.ppl?.map(p => p.clientId === clientId ? { ...p, [field]: value } : p) }));
     };
 
     const handleSuccessAction = () => navigate('/dashboard');
     const handleSubmit = () => {
+        if (!formData.id) {
+            alert("Error: ID Kegiatan tidak ditemukan.");
+            return;
+        }
         const dataToSubmit = {
             ...formData,
-            tanggalMulaiPelatihan: formData.tanggalMulaiPelatihan ? format(formData.tanggalMulaiPelatihan, 'yyyy-MM-dd') : null,
-            tanggalSelesaiPelatihan: formData.tanggalSelesaiPelatihan ? format(formData.tanggalSelesaiPelatihan, 'yyyy-MM-dd') : null,
-            tanggalMulaiPendataan: formData.tanggalMulaiPendataan ? format(formData.tanggalMulaiPendataan, 'yyyy-MM-dd') : null,
-            tanggalSelesaiPendataan: formData.tanggalSelesaiPendataan ? format(formData.tanggalSelesaiPendataan, 'yyyy-MM-dd') : null,
+            id: formData.id,
+            tanggalMulaiPelatihan: formData.tanggalMulaiPelatihan && isValid(formData.tanggalMulaiPelatihan) ? format(formData.tanggalMulaiPelatihan, 'yyyy-MM-dd') : undefined,
+            tanggalSelesaiPelatihan: formData.tanggalSelesaiPelatihan && isValid(formData.tanggalSelesaiPelatihan) ? format(formData.tanggalSelesaiPelatihan, 'yyyy-MM-dd') : undefined,
+            tanggalMulaiPendataan: formData.tanggalMulaiPendataan && isValid(formData.tanggalMulaiPendataan) ? format(formData.tanggalMulaiPendataan, 'yyyy-MM-dd') : undefined,
+            tanggalSelesaiPendataan: formData.tanggalSelesaiPendataan && isValid(formData.tanggalSelesaiPendataan) ? format(formData.tanggalSelesaiPendataan, 'yyyy-MM-dd') : undefined,
         };
         mutation.mutate(dataToSubmit as Partial<Kegiatan> & {id: number});
     };
     
     // Document Management
     const addDocument = (tipe: Dokumen['tipe']) => {
-        const newDoc: ClientDokumen = { clientId: Date.now().toString(), tipe, nama: "", link: "", jenis: 'link', isWajib: false };
-        setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] as ClientDokumen[] }));
+        const newDoc: ClientDokumen = { clientId: `new-doc-${Date.now()}`, tipe, nama: "", link: "", jenis: 'link', isWajib: false };
+        setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
     };
     const updateDocument = (clientId: string, field: 'nama' | 'link', value: string) => {
-        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.map(d => (d.clientId === clientId ? { ...d, [field]: value } : d)) as ClientDokumen[] }));
+        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.map(d => (d.clientId === clientId ? { ...d, [field]: value } : d)) }));
     };
     const removeDocument = (clientId: string) => {
-        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) as ClientDokumen[] }));
+        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) }));
     };
 
-    const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
+    const renderDocumentSection = useCallback((tipe: Dokumen['tipe'], title: string) => {
         const documents = formData.dokumen?.filter(d => d.tipe === tipe && d.jenis !== 'catatan') || [];
         const note = formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
         
@@ -230,9 +243,10 @@ export default function EditActivity() {
                 </CardContent>
             </Card>
         );
-    };
+    }, [formData.dokumen]);
 
-    if (isLoading) return <Layout><div>Memuat...</div></Layout>;
+    if (isLoading) return <Layout><div>Memuat data kegiatan...</div></Layout>;
+    if (isError) return <Layout><div>Gagal memuat data. Silakan coba lagi.</div></Layout>;
     
     const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
 
@@ -241,7 +255,11 @@ export default function EditActivity() {
             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center gap-4 mb-8">
                     <Button variant="outline" asChild><Link to="/dashboard"><ArrowLeft className="w-4 h-4 mr-2" />Kembali</Link></Button>
-                    <div><h1 className="text-3xl font-bold">Edit Kegiatan</h1><p className="text-gray-600">Perbarui informasi dan kelola dokumen.</p></div>
+                    <Button variant="outline" asChild><Link to={`/view-documents/${id}`}><FileText className="w-4 h-4 mr-2" />Lihat Dokumen</Link></Button>
+                    <div className="ml-4">
+                        <h1 className="text-3xl font-bold">Edit Kegiatan</h1>
+                        <p className="text-gray-600">Perbarui informasi dan kelola dokumen.</p>
+                    </div>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                     <TabsList className="grid w-full grid-cols-5">
@@ -290,7 +308,7 @@ export default function EditActivity() {
                                                     {formData[field] ? format(formData[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}
                                                 </Button>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date)} /></PopoverContent>
+                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date as Date)} /></PopoverContent>
                                         </Popover>
                                     </div>
                                 ))}
@@ -346,7 +364,9 @@ export default function EditActivity() {
                     <TabsContent value="diseminasi-evaluasi">{renderDocumentSection('diseminasi-evaluasi', 'Diseminasi & Evaluasi')}</TabsContent>
                 </Tabs>
                 <div className="flex justify-center mt-8">
-                    <Button onClick={handleSubmit} disabled={mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" size="lg"><Save className="w-4 h-4 mr-2" />Simpan Perubahan</Button>
+                    <Button onClick={handleSubmit} disabled={mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" size="lg"><Save className="w-4 h-4 mr-2" />
+                        {mutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}
+                    </Button>
                 </div>
                 <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} onAction={handleSuccessAction} title="Kegiatan Berhasil Diperbarui!" description={`Perubahan untuk "${formData.namaKegiatan}" telah disimpan.`} actionLabel="Ke Dashboard" />
             </div>

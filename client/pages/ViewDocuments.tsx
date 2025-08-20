@@ -54,7 +54,8 @@ export default function ViewDocuments() {
     };
 
     const renderDocumentTable = (tipe: Dokumen['tipe']) => {
-        const documents = activityData?.dokumen.filter(d => d.tipe === tipe && (d.jenis === 'catatan' || (d.jenis === 'link' && d.link)));
+        // Filter untuk semua jenis dokumen (link dan catatan) pada tipe yang sesuai
+        const documents = activityData?.dokumen.filter(d => d.tipe === tipe);
         
         if (!documents || documents.length === 0) {
             return <div className="text-center py-12 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" /><p>Belum ada dokumen atau catatan untuk fase ini.</p></div>;
@@ -97,9 +98,9 @@ export default function ViewDocuments() {
     if (isLoading) return <Layout><p>Memuat...</p></Layout>;
     if (!activityData) return <Layout><p>Kegiatan tidak ditemukan.</p></Layout>;
 
-    const docsByTipe = (tipe: Dokumen['tipe']) => activityData.dokumen.filter(d => d.tipe === tipe && (d.jenis === 'catatan' || (d.jenis === 'link' && d.link)));
-    const totalDocuments = activityData.dokumen.filter(d => (d.jenis === 'catatan' || (d.jenis === 'link' && d.link))).length;
-    const approvedDocuments = activityData.dokumen.filter(d => d.status === 'Approved' && (d.jenis === 'catatan' || (d.jenis === 'link' && d.link))).length;
+    const docsByTipe = (tipe: Dokumen['tipe']) => activityData.dokumen.filter(d => d.tipe === tipe);
+    const totalDocuments = activityData.dokumen.length;
+    const approvedDocuments = activityData.dokumen.filter(d => d.status === 'Approved').length;
 
     return (
         <Layout>

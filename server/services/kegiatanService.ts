@@ -151,25 +151,42 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             id
         ]);
 
-        // Clear existing related data
+        // Hapus data PPL dan dokumen yang ada untuk kegiatan ini
         await connection.execute('DELETE FROM ppl WHERE kegiatanId = ?', [id]);
         await connection.execute('DELETE FROM dokumen WHERE kegiatanId = ?', [id]);
 
+        // Masukkan kembali data PPL yang diperbarui
         if (ppl && ppl.length > 0) {
-            const pplQuery = 'INSERT INTO ppl (kegiatanId, namaPPL, namaPML, bebanKerja, besaranHonor, satuanBebanKerja) VALUES ?';
-            const pplValues = ppl.map((p: PPL) => [
-                id, p.namaPPL, p.namaPML,
-                parseInt(p.bebanKerja) || 0,
-                parseInt(p.besaranHonor) || 0,
-                p.satuanBebanKerja
-            ]);
+            const pplQuery = 'INSERT INTO ppl (kegiatanId, namaPPL, namaPML, bebanKerja, besaranHonor, satuanBebanKerja, progressOpen, progressSubmit, progressDiperiksa, progressApproved) VALUES ?';
+            const pplValues = ppl.map((p: PPL) => {
+                 const bebanKerja = parseInt(p.bebanKerja) || 0;
+                 return [
+                    id, p.namaPPL, p.namaPML,
+                    bebanKerja,
+                    parseInt(p.besaranHonor) || 0,
+                    p.satuanBebanKerja,
+                    // Pertahankan progress jika ada, jika tidak, set default
+                    p.progressOpen ?? bebanKerja, 
+                    p.progressSubmit ?? 0, 
+                    p.progressDiperiksa ?? 0, 
+                    p.progressApproved ?? 0
+                ];
+            });
             await connection.query(pplQuery, [pplValues]);
         }
         
+        // Masukkan kembali data dokumen yang diperbarui
         if (dokumen && dokumen.length > 0) {
-            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib) VALUES ?';
+            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib, status) VALUES ?';
             const docValues = dokumen.map((doc: any) => [
-                id, doc.nama, doc.link, doc.jenis, doc.tipe, doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(), doc.isWajib || false
+                id, 
+                doc.nama, 
+                doc.link, 
+                doc.jenis, // Pastikan 'jenis' (catatan/link) disimpan
+                doc.tipe, 
+                doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(), 
+                doc.isWajib || false,
+                doc.status || 'Pending' // Simpan status
             ]);
             await connection.query(docQuery, [docValues]);
         }
