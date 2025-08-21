@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, FileText, Link2, ExternalLink, Eye, CheckCircle, Clock, Users, Activity, Notebook } from "lucide-react";
+import { ArrowLeft, FileText, Link2, ExternalLink, Eye, CheckCircle, Clock, Users, Activity, Notebook, ThumbsUp, ThumbsDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, Dokumen } from "@shared/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import ConfirmationModal from "@/components/ConfirmationModal";
 
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     const res = await fetch(`/api/kegiatan/${id}`);
@@ -18,16 +19,66 @@ const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     return res.json();
 };
 
+const updateDocumentStatus = async ({ dokumenId, status }: { dokumenId: number, status: Dokumen['status'] }) => {
+    const res = await fetch(`/api/kegiatan/dokumen/${dokumenId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error("Gagal memperbarui status dokumen");
+    return res.json();
+};
+
+const approveTahapan = async ({ kegiatanId, tipe }: { kegiatanId: number, tipe: Dokumen['tipe'] }) => {
+    const res = await fetch(`/api/kegiatan/${kegiatanId}/tahapan/approve`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipe }),
+    });
+    if (!res.ok) throw new Error("Gagal menyetujui tahapan");
+    return res.json();
+};
+
 export default function ViewDocuments() {
     const { id } = useParams<{ id: string }>();
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState("persiapan");
     const [noteViewModal, setNoteViewModal] = useState<{ isOpen: boolean; title: string; content: string }>({ isOpen: false, title: '', content: '' });
+    const [confirmationModal, setConfirmationModal] = useState<{ isOpen: boolean; onConfirm: () => void; title: string; description: string }>({ isOpen: false, onConfirm: () => {}, title: '', description: '' });
 
     const { data: activityData, isLoading } = useQuery({
         queryKey: ['kegiatan', id],
         queryFn: () => fetchActivityDetails(id!),
         enabled: !!id,
     });
+
+    const statusMutation = useMutation({
+        mutationFn: updateDocumentStatus,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['kegiatan', id] });
+        }
+    });
+
+    const tahapanMutation = useMutation({
+        mutationFn: approveTahapan,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['kegiatan', id] });
+        }
+    });
+
+    const handleStatusChange = (dokumenId: number, currentStatus: Dokumen['status']) => {
+        const newStatus = currentStatus === 'Approved' ? 'Pending' : 'Approved';
+        statusMutation.mutate({ dokumenId, status: newStatus });
+    };
+    
+    const handleApproveTahapan = (tipe: Dokumen['tipe']) => {
+        setConfirmationModal({
+            isOpen: true,
+            title: `Setujui Semua Dokumen?`,
+            description: `Anda akan menyetujui semua dokumen untuk tahap "${tipe.replace(/-/g, ' ')}". Aksi ini tidak dapat dibatalkan secara massal.`,
+            onConfirm: () => tahapanMutation.mutate({ kegiatanId: parseInt(id!), tipe })
+        });
+    };
 
     const getStatusColor = (status?: string) => {
         switch (status) {
@@ -53,45 +104,92 @@ export default function ViewDocuments() {
         return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     };
 
-    const renderDocumentTable = (tipe: Dokumen['tipe']) => {
-        // Filter untuk semua jenis dokumen (link dan catatan) pada tipe yang sesuai
-        const documents = activityData?.dokumen.filter(d => d.tipe === tipe);
-        
+    const renderDocumentTable = (documents: Dokumen[] | undefined) => {
         if (!documents || documents.length === 0) {
             return <div className="text-center py-12 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" /><p>Belum ada dokumen atau catatan untuk fase ini.</p></div>;
         }
         return (
             <Table>
-                <TableHeader><TableRow><TableHead>Nama Dokumen</TableHead><TableHead>Jenis</TableHead><TableHead>Status</TableHead><TableHead>Tanggal</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Nama Dokumen</TableHead>
+                        <TableHead>Jenis</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Tanggal</TableHead>
+                        <TableHead>Aksi</TableHead>
+                        <TableHead>Persetujuan</TableHead>
+                    </TableRow>
+                </TableHeader>
                 <TableBody>
-                    {documents.map((doc) => (
-                        <TableRow key={doc.id}>
-                            <TableCell className="font-medium flex items-center gap-2">
-                                {doc.jenis === 'link' ? <Link2 className="w-4 h-4 text-blue-600" /> : doc.jenis === 'catatan' ? <Notebook className="w-4 h-4 text-orange-600" /> : <FileText className="w-4 h-4 text-green-600" />} 
-                                {doc.nama}
-                            </TableCell>
-                            <TableCell><Badge variant="outline">{doc.jenis === 'link' ? 'Drive Link' : doc.jenis === 'catatan' ? 'Catatan' : 'File'}</Badge></TableCell>
-                            <TableCell><Badge className={cn("flex items-center gap-1 w-fit", getStatusColor(doc.status))}>{getStatusIcon(doc.status)} {doc.status || 'N/A'}</Badge></TableCell>
-                            <TableCell>{getRelativeTime(doc.uploadedAt)}</TableCell>
-                            <TableCell>
-                                {doc.jenis === 'catatan' ? (
-                                    <Button variant="outline" size="sm" onClick={() => setNoteViewModal({ isOpen: true, title: doc.nama, content: doc.link })} className="flex items-center gap-1">
-                                        <Notebook className="w-3 h-3" /> Lihat Catatan
-                                    </Button>
-                                ) : (
-                                     doc.link ? (
-                                        <Button variant="outline" size="sm" asChild>
-                                            <a href={doc.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
-                                                <ExternalLink className="w-3 h-3" /> Buka
-                                            </a>
+                    {documents.map((doc) => {
+                        const isApproved = doc.status === 'Approved';
+                        return (
+                            <TableRow key={doc.id}>
+                                <TableCell className="font-medium flex items-center gap-2">
+                                    {doc.jenis === 'link' ? <Link2 className="w-4 h-4 text-blue-600" /> : doc.jenis === 'catatan' ? <Notebook className="w-4 h-4 text-orange-600" /> : <FileText className="w-4 h-4 text-green-600" />} 
+                                    {doc.nama}
+                                </TableCell>
+                                <TableCell><Badge variant="outline">{doc.jenis === 'link' ? 'Drive Link' : doc.jenis === 'catatan' ? 'Catatan' : 'File'}</Badge></TableCell>
+                                <TableCell><Badge className={cn("flex items-center gap-1 w-fit", getStatusColor(doc.status))}>{getStatusIcon(doc.status)} {doc.status || 'N/A'}</Badge></TableCell>
+                                <TableCell>{getRelativeTime(doc.uploadedAt)}</TableCell>
+                                <TableCell>
+                                    {doc.jenis === 'catatan' ? (
+                                        <Button variant="outline" size="sm" onClick={() => setNoteViewModal({ isOpen: true, title: doc.nama, content: doc.link })} className="flex items-center gap-1">
+                                            <Notebook className="w-3 h-3" /> Lihat Catatan
                                         </Button>
-                                    ) : <span className="text-xs text-gray-500">Link kosong</span>
-                                )}
-                            </TableCell>
-                        </TableRow>
-                    ))}
+                                    ) : (
+                                        doc.link ? (
+                                            <Button variant="outline" size="sm" asChild>
+                                                <a href={doc.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                                                    <ExternalLink className="w-3 h-3" /> Buka
+                                                </a>
+                                            </Button>
+                                        ) : <span className="text-xs text-gray-500">Link kosong</span>
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    <Button 
+                                        variant={isApproved ? "destructive" : "default"} 
+                                        size="sm" 
+                                        onClick={() => handleStatusChange(doc.id!, doc.status)}
+                                        className={cn("flex items-center gap-1", isApproved ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700")}
+                                    >
+                                        {isApproved ? <ThumbsDown className="w-3 h-3" /> : <ThumbsUp className="w-3 h-3" />}
+                                        {isApproved ? 'Batal' : 'Setujui'}
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        );
+                    })}
                 </TableBody>
             </Table>
+        );
+    };
+
+    const renderTahapanContent = (tipe: Dokumen['tipe'], title: string) => {
+        const documents = activityData?.dokumen.filter(d => d.tipe === tipe);
+        const allApproved = documents && documents.length > 0 ? documents.every(d => d.status === 'Approved') : false;
+
+        return (
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <CardTitle>{title}</CardTitle>
+                        <Button
+                            size="sm"
+                            onClick={() => handleApproveTahapan(tipe)}
+                            disabled={allApproved || !documents || documents.length === 0}
+                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+                        >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            {allApproved ? 'Tahap Disetujui' : 'Setujui Tahap Ini'}
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {renderDocumentTable(documents)}
+                </CardContent>
+            </Card>
         );
     };
 
@@ -122,10 +220,10 @@ export default function ViewDocuments() {
                         <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis <Badge variant="secondary" className="ml-2">{docsByTipe('pengolahan-analisis').length}</Badge></TabsTrigger>
                         <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi <Badge variant="secondary" className="ml-2">{docsByTipe('diseminasi-evaluasi').length}</Badge></TabsTrigger>
                     </TabsList>
-                    <TabsContent value="persiapan"><Card><CardHeader><CardTitle>Dokumen Persiapan</CardTitle></CardHeader><CardContent>{renderDocumentTable('persiapan')}</CardContent></Card></TabsContent>
-                    <TabsContent value="pengumpulan-data"><Card><CardHeader><CardTitle>Dokumen Pengumpulan Data</CardTitle></CardHeader><CardContent>{renderDocumentTable('pengumpulan-data')}</CardContent></Card></TabsContent>
-                    <TabsContent value="pengolahan-analisis"><Card><CardHeader><CardTitle>Dokumen Pengolahan & Analisis</CardTitle></CardHeader><CardContent>{renderDocumentTable('pengolahan-analisis')}</CardContent></Card></TabsContent>
-                    <TabsContent value="diseminasi-evaluasi"><Card><CardHeader><CardTitle>Dokumen Diseminasi & Evaluasi</CardTitle></CardHeader><CardContent>{renderDocumentTable('diseminasi-evaluasi')}</CardContent></Card></TabsContent>
+                    <TabsContent value="persiapan">{renderTahapanContent('persiapan', 'Dokumen Persiapan')}</TabsContent>
+                    <TabsContent value="pengumpulan-data">{renderTahapanContent('pengumpulan-data', 'Dokumen Pengumpulan Data')}</TabsContent>
+                    <TabsContent value="pengolahan-analisis">{renderTahapanContent('pengolahan-analisis', 'Dokumen Pengolahan & Analisis')}</TabsContent>
+                    <TabsContent value="diseminasi-evaluasi">{renderTahapanContent('diseminasi-evaluasi', 'Dokumen Diseminasi & Evaluasi')}</TabsContent>
                 </Tabs>
                 <div className="mt-8 p-4 bg-blue-50 border rounded-lg"><div className="flex items-center justify-between"><div><h4 className="font-medium text-blue-900">Perlu Menambah atau Mengedit Dokumen?</h4><p className="text-blue-700 text-sm mt-1">Gunakan halaman Edit untuk mengelola semua dokumen dan laporan.</p></div><Button asChild className="bg-blue-600 hover:bg-blue-700"><Link to={`/edit-activity/${activityData.id}`}>Ke Halaman Edit</Link></Button></div></div>
             </div>
@@ -144,6 +242,17 @@ export default function ViewDocuments() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ConfirmationModal 
+                isOpen={confirmationModal.isOpen}
+                onClose={() => setConfirmationModal({ ...confirmationModal, isOpen: false })}
+                onConfirm={() => {
+                    confirmationModal.onConfirm();
+                    setConfirmationModal({ ...confirmationModal, isOpen: false });
+                }}
+                title={confirmationModal.title}
+                description={confirmationModal.description}
+                variant="info"
+            />
         </Layout>
     );
 }

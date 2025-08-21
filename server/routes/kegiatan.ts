@@ -5,7 +5,9 @@ import {
   createKegiatan,
   updateKegiatan,
   updatePplProgress,
-  deleteKegiatan
+  deleteKegiatan,
+  updateDocumentStatus,
+  approveDocumentsByTipe // <-- Impor fungsi baru
 } from '../services/kegiatanService';
 
 const router = Router();
@@ -69,6 +71,41 @@ router.put('/ppl/:pplId/progress', async (req, res) => {
     }
 });
 
+// RUTE UNTUK UPDATE STATUS DOKUMEN
+router.put('/dokumen/:dokumenId/status', async (req, res) => {
+    try {
+        const { dokumenId } = req.params;
+        const { status } = req.body;
+
+        if (!status || !['Pending', 'Reviewed', 'Approved'].includes(status)) {
+            return res.status(400).json({ message: 'Status tidak valid' });
+        }
+
+        const updatedDokumen = await updateDocumentStatus(parseInt(dokumenId), status);
+        res.json(updatedDokumen);
+    } catch (error) {
+        console.error("Error updating document status:", error);
+        res.status(500).json({ message: 'Gagal memperbarui status dokumen' });
+    }
+});
+
+// RUTE BARU UNTUK APPROVE SEMUA DOKUMEN PER TAHAPAN
+router.put('/:kegiatanId/tahapan/approve', async (req, res) => {
+    try {
+        const { kegiatanId } = req.params;
+        const { tipe } = req.body;
+
+        if (!tipe || !['persiapan', 'pengumpulan-data', 'pengolahan-analisis', 'diseminasi-evaluasi'].includes(tipe)) {
+            return res.status(400).json({ message: 'Tipe tahapan tidak valid' });
+        }
+
+        await approveDocumentsByTipe(parseInt(kegiatanId), tipe);
+        res.status(200).json({ message: `Semua dokumen untuk tahap ${tipe} telah disetujui.` });
+    } catch (error) {
+        console.error("Error approving documents by stage:", error);
+        res.status(500).json({ message: 'Gagal menyetujui dokumen tahapan' });
+    }
+});
 
 // DELETE kegiatan
 router.delete('/:id', async (req, res) => {
@@ -84,6 +121,5 @@ router.delete('/:id', async (req, res) => {
         res.status(500).json({ message: 'Gagal menghapus kegiatan' });
     }
 });
-
 
 export default router;

@@ -43,7 +43,6 @@ const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
 }
 
 const updateActivity = async (kegiatan: Partial<Kegiatan> & {id: number}): Promise<Kegiatan> => {
-    // Membersihkan clientId sebelum mengirim ke server
     const sanitizedData = {
         ...kegiatan,
         dokumen: kegiatan.dokumen?.map(({ clientId, ...rest }: any) => rest),
@@ -64,7 +63,7 @@ export default function EditActivity() {
     const [activeTab, setActiveTab] = useState("persiapan");
     const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string }>({ isOpen: false, tipe: null, content: '' });
+    const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string; isApproved: boolean }>({ isOpen: false, tipe: null, content: '', isApproved: false });
 
     const { data: initialData, isLoading, isError } = useQuery({
         queryKey: ['kegiatan', id],
@@ -96,7 +95,7 @@ export default function EditActivity() {
         mutationFn: updateActivity,
         onSuccess: () => { 
             queryClient.invalidateQueries({ queryKey: ['kegiatan', id] });
-            queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); // Invalidate list
+            queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
             setShowSuccessModal(true); 
         },
         onError: (error) => {
@@ -120,10 +119,8 @@ export default function EditActivity() {
             const existingNoteIndex = newDocs.findIndex(d => d.tipe === tipe && d.jenis === 'catatan');
 
             if (existingNoteIndex > -1) {
-                // Update existing note
                 newDocs[existingNoteIndex] = { ...newDocs[existingNoteIndex], link: noteModal.content };
             } else {
-                // Add new note
                 const noteDoc: ClientDokumen = {
                     clientId: `catatan-${tipe}-${Date.now()}`,
                     tipe: tipe,
@@ -137,10 +134,9 @@ export default function EditActivity() {
             return { ...prev, dokumen: newDocs };
         });
 
-        setNoteModal({ isOpen: false, tipe: null, content: '' });
+        setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false });
     };
 
-    // PPL Management Handlers
     const addPPL = () => {
         const newPPL: ClientPPL = { clientId: `new-ppl-${Date.now()}`, namaPPL: "", namaPML: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "" };
         setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), newPPL]}));
@@ -171,7 +167,6 @@ export default function EditActivity() {
         mutation.mutate(dataToSubmit as Partial<Kegiatan> & {id: number});
     };
     
-    // Document Management
     const addDocument = (tipe: Dokumen['tipe']) => {
         const newDoc: ClientDokumen = { clientId: `new-doc-${Date.now()}`, tipe, nama: "", link: "", jenis: 'link', isWajib: false };
         setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
@@ -186,6 +181,7 @@ export default function EditActivity() {
     const renderDocumentSection = useCallback((tipe: Dokumen['tipe'], title: string) => {
         const documents = formData.dokumen?.filter(d => d.tipe === tipe && d.jenis !== 'catatan') || [];
         const note = formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
+        const isNoteApproved = note?.status === 'Approved';
         
         return (
             <Card>
@@ -198,7 +194,7 @@ export default function EditActivity() {
                             </CardDescription>
                         </div>
                         <div className="flex flex-shrink-0 gap-2">
-                           <Button type="button" variant="outline" size="sm" onClick={() => setNoteModal({ isOpen: true, tipe, content: note?.link || '' })} className="flex items-center gap-2">
+                           <Button type="button" variant="outline" size="sm" onClick={() => setNoteModal({ isOpen: true, tipe, content: note?.link || '', isApproved: isNoteApproved })} className="flex items-center gap-2">
                                <Notebook className="w-4 h-4" />{note ? 'Edit' : 'Tambah'} Catatan
                            </Button>
                            <Button type="button" variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2"><Plus className="w-4 h-4" />Dokumen</Button>
@@ -207,36 +203,38 @@ export default function EditActivity() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {note && (
-                         <div className="flex items-center gap-3 p-3 border rounded-lg bg-yellow-50 border-yellow-200">
+                         <div className={cn("flex items-center gap-3 p-3 border rounded-lg", isNoteApproved ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200")}>
                             <div className="flex-grow space-y-2">
                                 <Label className="font-semibold">{note.nama}</Label>
                                 <p className="text-sm text-gray-600 truncate">{note.link || 'Catatan kosong. Klik edit untuk mengisi.'}</p>
                             </div>
-                            <Button type="button" variant="ghost" size="icon" onClick={() => setNoteModal({ isOpen: true, tipe, content: note.link })} className="self-center"><Notebook className="w-4 h-4 text-gray-500"/></Button>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => setNoteModal({ isOpen: true, tipe, content: note.link, isApproved: isNoteApproved })} className="self-center"><Notebook className="w-4 h-4 text-gray-500"/></Button>
                         </div>
                     )}
-                    {documents.map(doc => (
-                         <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
+                    {documents.map(doc => {
+                        const isApproved = doc.status === 'Approved';
+                        return (
+                         <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50 border-green-200" : (doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50"))}>
                             <div className="flex-grow space-y-2">
                                 {doc.isWajib ? (
                                     <Label className="font-semibold">{doc.nama} *</Label>
                                 ) : (
-                                    <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} />
+                                    <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} disabled={isApproved} />
                                 )}
                                 <div className="flex items-center gap-2">
                                     <Link2 className="w-4 h-4 text-gray-400"/>
-                                    <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} />
+                                    <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} disabled={isApproved} />
                                 </div>
                             </div>
-                            {!doc.isWajib ? (
+                            {!doc.isWajib && !isApproved ? (
                                 <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>
                             ) : (
-                                <div className="self-center p-2" title="Dokumen Wajib">
+                                <div className="self-center p-2" title={isApproved ? "Dokumen Disetujui" : "Dokumen Wajib"}>
                                     <Lock className="w-4 h-4 text-gray-400"/>
                                 </div>
                             )}
                         </div>
-                    ))}
+                    )})}
                     {documents.length === 0 && !note && (
                         <div className="text-center py-8 text-gray-500"><p>Belum ada dokumen atau catatan untuk fase ini.</p></div>
                     )}
@@ -370,12 +368,12 @@ export default function EditActivity() {
                 </div>
                 <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} onAction={handleSuccessAction} title="Kegiatan Berhasil Diperbarui!" description={`Perubahan untuk "${formData.namaKegiatan}" telah disimpan.`} actionLabel="Ke Dashboard" />
             </div>
-            <Dialog open={noteModal.isOpen} onOpenChange={(isOpen) => !isOpen && setNoteModal({ isOpen: false, tipe: null, content: '' })}>
+            <Dialog open={noteModal.isOpen} onOpenChange={(isOpen) => !isOpen && setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false })}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Tambah/Edit Catatan</DialogTitle>
                         <DialogDescription>
-                            Isi catatan untuk tahap ini. Catatan ini akan disimpan sebagai dokumen terpisah.
+                            Isi catatan untuk tahap ini. {noteModal.isApproved && "Catatan ini sudah disetujui dan tidak bisa diedit."}
                         </DialogDescription>
                     </DialogHeader>
                     <Textarea 
@@ -383,10 +381,11 @@ export default function EditActivity() {
                         onChange={(e) => setNoteModal(prev => ({...prev, content: e.target.value}))}
                         rows={8}
                         placeholder="Tulis catatan di sini..."
+                        disabled={noteModal.isApproved}
                     />
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setNoteModal({ isOpen: false, tipe: null, content: '' })}>Batal</Button>
-                        <Button onClick={handleNoteSubmit}>Simpan Catatan</Button>
+                        <Button variant="outline" onClick={() => setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false })}>Batal</Button>
+                        <Button onClick={handleNoteSubmit} disabled={noteModal.isApproved}>Simpan Catatan</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

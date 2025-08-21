@@ -26,7 +26,6 @@ export const getKegiatanById = async (id: number): Promise<Kegiatan | null> => {
     return kegiatan;
 };
 
-
 export const createKegiatan = async (data: any): Promise<Kegiatan> => {
     const connection = await db.getConnection();
     try {
@@ -151,11 +150,9 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             id
         ]);
 
-        // Hapus data PPL dan dokumen yang ada untuk kegiatan ini
         await connection.execute('DELETE FROM ppl WHERE kegiatanId = ?', [id]);
         await connection.execute('DELETE FROM dokumen WHERE kegiatanId = ?', [id]);
 
-        // Masukkan kembali data PPL yang diperbarui
         if (ppl && ppl.length > 0) {
             const pplQuery = 'INSERT INTO ppl (kegiatanId, namaPPL, namaPML, bebanKerja, besaranHonor, satuanBebanKerja, progressOpen, progressSubmit, progressDiperiksa, progressApproved) VALUES ?';
             const pplValues = ppl.map((p: PPL) => {
@@ -165,7 +162,6 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
                     bebanKerja,
                     parseInt(p.besaranHonor) || 0,
                     p.satuanBebanKerja,
-                    // Pertahankan progress jika ada, jika tidak, set default
                     p.progressOpen ?? bebanKerja, 
                     p.progressSubmit ?? 0, 
                     p.progressDiperiksa ?? 0, 
@@ -175,18 +171,10 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             await connection.query(pplQuery, [pplValues]);
         }
         
-        // Masukkan kembali data dokumen yang diperbarui
         if (dokumen && dokumen.length > 0) {
             const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib, status) VALUES ?';
             const docValues = dokumen.map((doc: any) => [
-                id, 
-                doc.nama, 
-                doc.link, 
-                doc.jenis, // Pastikan 'jenis' (catatan/link) disimpan
-                doc.tipe, 
-                doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(), 
-                doc.isWajib || false,
-                doc.status || 'Pending' // Simpan status
+                id, doc.nama, doc.link, doc.jenis, doc.tipe, doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(), doc.isWajib || false, doc.status || 'Pending'
             ]);
             await connection.query(docQuery, [docValues]);
         }
@@ -224,4 +212,21 @@ export const deleteKegiatan = async (id: number): Promise<boolean> => {
     } finally {
         connection.release();
     }
+};
+
+export const updateDocumentStatus = async (dokumenId: number, status: Dokumen['status']): Promise<Dokumen> => {
+    const query = 'UPDATE dokumen SET status = ? WHERE id = ?';
+    await db.execute(query, [status, dokumenId]);
+    const [rows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE id = ?', [dokumenId]);
+    if (rows.length === 0) {
+        throw new Error("Dokumen tidak ditemukan setelah update");
+    }
+    return rows[0] as Dokumen;
+};
+
+// Fungsi baru untuk approve semua dokumen dalam satu tahapan
+export const approveDocumentsByTipe = async (kegiatanId: number, tipe: Dokumen['tipe']): Promise<OkPacket> => {
+    const query = 'UPDATE dokumen SET status = ? WHERE kegiatanId = ? AND tipe = ?';
+    const [result] = await db.execute<OkPacket>(query, ['Approved', kegiatanId, tipe]);
+    return result;
 };
