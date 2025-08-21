@@ -126,7 +126,7 @@ export default function InputKegiatan() {
   };
 
   const handleSuccessAction = () => { navigate('/dashboard'); };
-  const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
+  const ketuaTimOptions = ["MOHAMMAD FATHAN ROMDHONI, S.ST., M.Si", "ENGKY HENDARMADI R, S.E", "ROSSI BETTEGA, S.E", "NOPTI RIANAH, SP", "EDIANTO, SE", "WILSON, SE", "YAYUK KURNIA NINGSIH, S.I.KOM", "ANDI OKTA FENGKI, SSI., M.SI", "DEFRI ARIYANTO, SSI., M.SI"];
   
   const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
         const documents = formData.documents?.filter(d => d.tipe === tipe) || [];

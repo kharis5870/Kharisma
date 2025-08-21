@@ -246,7 +246,7 @@ export default function EditActivity() {
     if (isLoading) return <Layout><div>Memuat data kegiatan...</div></Layout>;
     if (isError) return <Layout><div>Gagal memuat data. Silakan coba lagi.</div></Layout>;
     
-    const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
+    const ketuaTimOptions = ["MOHAMMAD FATHAN ROMDHONI, S.ST., M.Si", "ENGKY HENDARMADI R, S.E", "ROSSI BETTEGA, S.E", "NOPTI RIANAH, SP", "EDIANTO, SE", "WILSON, SE", "YAYUK KURNIA NINGSIH, S.I.KOM", "ANDI OKTA FENGKI, SSI., M.SI", "DEFRI ARIYANTO, SSI., M.SI"];
 
     return (
         <Layout>

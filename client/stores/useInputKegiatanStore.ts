@@ -38,9 +38,18 @@ export type Actions = {
 };
 
 const mandatoryDocs: Omit<DocumentItem, 'id' | 'link'>[] = [
-    { nama: 'Dokumen Persiapan Wajib 1', tipe: 'persiapan', isWajib: true, jenis: 'link' },
-    { nama: 'Laporan Pengumpulan Data Wajib', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+    { nama: 'Surat Tugas', tipe: 'persiapan', isWajib: true, jenis: 'link' },
+    { nama: 'Undangan', tipe: 'persiapan', isWajib: true, jenis: 'link' },
+    { nama: 'Daftar Hadir', tipe: 'persiapan', isWajib: true, jenis: 'link' },
+    { nama: 'Notulensi', tipe: 'persiapan', isWajib: true, jenis: 'link' },
+    { nama: 'KAK', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+    { nama: 'SK', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+    { nama: 'ST', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+    { nama: 'Visum', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+    { nama: 'Laporan Pengumpulan Data', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
     { nama: 'Laporan Pengolahan & Analisis Wajib', tipe: 'pengolahan-analisis', isWajib: true, jenis: 'link' },
+    { nama: 'Laporan Kegiatan', tipe: 'diseminasi-evaluasi', isWajib: true, jenis: 'link' },
+    { nama: 'Publikasi', tipe: 'diseminasi-evaluasi', isWajib: true, jenis: 'link' },
     { nama: 'Laporan Diseminasi & Evaluasi Wajib', tipe: 'diseminasi-evaluasi', isWajib: true, jenis: 'link' },
 ];
 
