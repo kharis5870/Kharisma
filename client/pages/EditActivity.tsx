@@ -1,5 +1,3 @@
-// client/pages/EditActivity.tsx
-
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -13,10 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook, FileText } from "lucide-react";
+import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook, FileText, Check, ChevronsUpDown } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format, parseISO, isValid } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Kegiatan, PPL, Dokumen } from "@shared/api";
+import { Kegiatan, PPL, Dokumen, PPLMaster } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
@@ -42,6 +41,12 @@ const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     return res.json();
 }
 
+const fetchPPLs = async (): Promise<PPLMaster[]> => {
+    const res = await fetch('/api/ppl');
+    if (!res.ok) throw new Error('Gagal memuat daftar PPL');
+    return res.json();
+};
+
 const updateActivity = async (kegiatan: Partial<Kegiatan> & {id: number}): Promise<Kegiatan> => {
     const sanitizedData = {
         ...kegiatan,
@@ -64,12 +69,15 @@ export default function EditActivity() {
     const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string; isApproved: boolean }>({ isOpen: false, tipe: null, content: '', isApproved: false });
+    const [pplComboboxStates, setPplComboboxStates] = useState<{ [key: string]: boolean }>({});
 
     const { data: initialData, isLoading, isError } = useQuery({
         queryKey: ['kegiatan', id],
         queryFn: () => fetchActivityDetails(id!),
         enabled: !!id,
     });
+
+    const { data: pplList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
 
     useEffect(() => {
         if (initialData) {
@@ -325,34 +333,34 @@ export default function EditActivity() {
                                 {formData.ppl?.map((ppl, index) => (
                                     <div key={ppl.clientId} className="p-4 border rounded-lg space-y-4 bg-gray-50">
                                         <div className="flex justify-between items-center">
-                                            <h4 className="font-medium">PPL {index + 1}</h4>
+                                            <h4 className="font-medium">Alokasi {index + 1}</h4>
                                             {formData.ppl && formData.ppl.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removePPL(ppl.clientId)}><Trash2 className="w-4 h-4 text-red-500"/></Button>}
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label>Nama PPL *</Label>
-                                                <Input placeholder="Nama PPL" value={ppl.namaPPL} onChange={e => updatePPL(ppl.clientId, 'namaPPL', e.target.value)} />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <div className="space-y-2 lg:col-span-3">
+                                                <Label>Pilih PPL *</Label>
+                                                <Popover open={pplComboboxStates[ppl.clientId] || false} onOpenChange={(open) => setPplComboboxStates(prev => ({ ...prev, [ppl.clientId]: open }))}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" role="combobox" className="w-full justify-between">{ppl.namaPPL || "Pilih PPL..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Cari PPL..." /><CommandList><CommandEmpty>PPL tidak ditemukan.</CommandEmpty><CommandGroup>
+                                                        {pplList.map((pplOption) => (
+                                                            <CommandItem key={pplOption.id} value={`${pplOption.id} ${pplOption.namaPPL}`} onSelect={() => { updatePPL(ppl.clientId, 'pplId', pplOption.id); updatePPL(ppl.clientId, 'namaPPL', pplOption.namaPPL); setPplComboboxStates(prev => ({ ...prev, [ppl.clientId]: false })); }}>
+                                                                <Check className={cn("mr-2 h-4 w-4", ppl.pplId === pplOption.id ? "opacity-100" : "opacity-0")} />
+                                                                <div className="flex flex-col"><span>{pplOption.namaPPL}</span><span className="text-xs text-gray-500">ID: {pplOption.id}</span></div>
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup></CommandList></Command></PopoverContent>
+                                                </Popover>
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label>Nama PML *</Label>
-                                                <Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => updatePPL(ppl.clientId, 'namaPML', e.target.value)} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label>Beban Kerja *</Label>
-                                                <Input placeholder="Beban Kerja" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label>Satuan Beban Kerja</Label>
-                                                <Input placeholder="Satuan Beban Kerja" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} />
-                                            </div>
-                                            <div className="space-y-2 md:col-span-2">
-                                                <Label>Besaran Honor (Rp) *</Label>
-                                                <Input placeholder="Besaran Honor (Rp)" value={ppl.besaranHonor} onChange={e => updatePPL(ppl.clientId, 'besaranHonor', e.target.value)} />
-                                            </div>
+                                            <div className="space-y-2"><Label>Beban Kerja *</Label><Input placeholder="Beban Kerja" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} /></div>
+                                            <div className="space-y-2"><Label>Satuan</Label><Input placeholder="Contoh: Hari" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} /></div>
+                                            <div className="space-y-2"><Label>Honor (Rp) *</Label><Input placeholder="Contoh: 2000000" value={ppl.besaranHonor} onChange={e => updatePPL(ppl.clientId, 'besaranHonor', e.target.value)} /></div>
+                                            <div className="space-y-2 md:col-span-2 lg:col-span-3"><Label>Nama PML *</Label><Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => updatePPL(ppl.clientId, 'namaPML', e.target.value)} /></div>
                                         </div>
                                     </div>
                                 ))}
-                                <Button type="button" variant="outline" onClick={addPPL} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah PPL Manual</Button>
+                                <Button type="button" variant="outline" onClick={addPPL} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL</Button>
                             </CardContent>
                         </Card>
                     </TabsContent>

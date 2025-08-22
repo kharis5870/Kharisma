@@ -3,8 +3,8 @@ export interface Dokumen {
   kegiatanId?: number;
   tipe: 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi';
   nama: string;
-  link: string; // Akan menyimpan link ATAU isi catatan
-  jenis: 'file' | 'link' | 'catatan'; // Menambahkan 'catatan'
+  link: string;
+  jenis: 'file' | 'link' | 'catatan';
   status?: 'Pending' | 'Reviewed' | 'Approved';
   uploadedAt?: string;
   isWajib?: boolean;
@@ -13,6 +13,7 @@ export interface Dokumen {
 export interface PPL {
   id?: number; 
   kegiatanId?: number;
+  pplId?: string; // ID dari ppl_master
   namaPPL: string;
   namaPML: string;
   bebanKerja: string;
@@ -22,6 +23,11 @@ export interface PPL {
   progressSubmit?: number;
   progressDiperiksa?: number;
   progressApproved?: number;
+}
+
+export interface PPLMaster {
+  id: string;
+  namaPPL: string;
 }
 
 export interface Kegiatan {

@@ -16,6 +16,7 @@ export default function Header() {
     { name: "Input Kegiatan", href: "/input-kegiatan" },
     { name: "Dashboard", href: "/dashboard" },
     { name: "Manajemen Honor", href: "/manajemen-honor" },
+    { name: "Manajemen PPL", href: "/manajemen-ppl" }, // <-- Tambah link baru
   ];
 
   const handleLogoutClick = () => {
@@ -29,13 +30,10 @@ export default function Header() {
 
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm">
-      {/* Top Header with Logo and Title */}
       <div className="bg-gradient-to-r from-bps-blue-600 to-bps-blue-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
             <div className="flex-1"></div>
-
-            {/* Center Logo */}
             <div className="text-center">
               <h1 className="text-3xl md:text-4xl font-bold text-white tracking-wide">
                 KHARISMA
@@ -44,8 +42,6 @@ export default function Header() {
                 BPS Kabupaten Bengkulu Selatan
               </p>
             </div>
-
-            {/* User Info & Logout */}
             <div className="flex-1 flex justify-end">
               <div className="flex items-center gap-4 text-white">
                 <div className="hidden sm:flex items-center gap-2 text-sm">
@@ -66,8 +62,6 @@ export default function Header() {
           </div>
         </div>
       </div>
-
-      {/* Navigation Bar */}
       <div className="bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex justify-center space-x-8">
@@ -88,8 +82,6 @@ export default function Header() {
           </nav>
         </div>
       </div>
-
-      {/* Logout Confirmation Modal */}
       <ConfirmationModal
         isOpen={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}

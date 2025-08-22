@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import kegiatanRoutes from './routes/kegiatan';
 import honorRoutes from './routes/honor';
+import pplRoutes from './routes/ppl'; // <-- Impor rute PPL
 
 export function createServer() {
   const app = express();
@@ -15,6 +16,7 @@ export function createServer() {
   // API routes
   app.use('/api/kegiatan', kegiatanRoutes);
   app.use('/api/honor', honorRoutes);
+  app.use('/api/ppl', pplRoutes); // <-- Daftarkan rute PPL
 
   return app;
 }
