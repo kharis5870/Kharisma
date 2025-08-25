@@ -1,5 +1,7 @@
+// server/routes/honor.ts
+
 import { Router } from 'express';
-import { getHonorBulanan } from '../services/honorService';
+import { getHonorBulanan, getHonorDetail } from '../services/honorService';
 
 const router = Router();
 
@@ -20,8 +22,9 @@ router.get('/', async (req, res) => {
     }
 });
 
+// GET /api/honor/:pplId/detail?tahun=2024
 router.get('/:pplId/detail', async (req, res) => {
-    const { pplId } = req.params;
+    const { pplId } = req.params; // pplId sekarang adalah ppl_master_id (string)
     const { tahun } = req.query;
 
     if (!tahun || typeof tahun !== 'string') {
@@ -29,7 +32,8 @@ router.get('/:pplId/detail', async (req, res) => {
     }
 
     try {
-        const data = await getHonorDetail(parseInt(pplId), parseInt(tahun));
+        // PERBAIKAN: Tidak perlu parseInt untuk pplId karena sudah string
+        const data = await getHonorDetail(pplId, parseInt(tahun));
         res.json(data);
     } catch (error) {
         console.error(error);

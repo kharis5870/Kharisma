@@ -1,3 +1,5 @@
+// client/pages/InputKegiatan.tsx
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -20,7 +22,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore from "@/stores/useInputKegiatanStore";
 import { Dokumen, PPLMaster, KetuaTim } from "@shared/api";
 
-type DateFieldName = 
+type DateFieldName =
   | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
   | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData'
   | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
@@ -59,7 +61,7 @@ export default function InputKegiatan() {
   const { selectedPPLsForActivity, clearSelectedPPLsForActivity } = usePPL();
   const { data: pplList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
   const { data: ketuaTimList = [] } = useQuery({ queryKey: ['ketuaTim'], queryFn: fetchKetuaTim });
-  
+
   const [activeTab, setActiveTab] = useState("persiapan");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
@@ -95,7 +97,7 @@ export default function InputKegiatan() {
   });
 
   const validateForm = () => {
-    return store.namaKegiatan && store.ketua_tim_id && 
+    return store.namaKegiatan && store.ketua_tim_id &&
            store.tanggalMulaiPersiapan && store.tanggalSelesaiPersiapan &&
            store.tanggalMulaiPengumpulanData && store.tanggalSelesaiPengumpulanData &&
            store.tanggalMulaiPengolahanAnalisis && store.tanggalSelesaiPengolahanAnalisis &&
@@ -123,7 +125,7 @@ export default function InputKegiatan() {
   };
 
   const handleSuccessAction = () => navigate('/dashboard');
-  
+
   const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
     const documents = store.documents?.filter(d => d.tipe === tipe) || [];
     return (
@@ -183,9 +185,9 @@ export default function InputKegiatan() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={store.namaKegiatan} onChange={(e) => store.updateFormField('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" /></div>
                 <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
-                    <Select value={store.ketua_tim_id?.toString()} onValueChange={(value) => store.updateFormField('ketua_tim_id', parseInt(value))}>
+                    <Select value={store.ketua_tim_id} onValueChange={(value) => store.updateFormField('ketua_tim_id', value)}>
                         <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
-                        <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id.toString()}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
+                        <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
                     </Select>
                 </div>
               </div>
@@ -195,8 +197,8 @@ export default function InputKegiatan() {
           <Card>
             <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                {([ 
-                    {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, 
+                {([
+                    {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'},
                     {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},
                     {label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'},
                     {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'},
@@ -212,7 +214,7 @@ export default function InputKegiatan() {
                 ))}
             </CardContent>
           </Card>
-          
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
               <TabsList className="grid w-full grid-cols-4"><TabsTrigger value="persiapan">Persiapan</TabsTrigger><TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger><TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger><TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger></TabsList>
               <TabsContent value="persiapan">{renderDocumentSection('persiapan', 'Persiapan')}</TabsContent>

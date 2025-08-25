@@ -1,3 +1,5 @@
+// server/services/adminService.ts
+
 import { RowDataPacket, OkPacket } from 'mysql2';
 import db from '../db';
 import { UserData, KetuaTimData, PPLAdminData } from '@shared/api';
@@ -15,10 +17,14 @@ export const createUser = async (user: UserData): Promise<UserData> => {
     await db.execute('INSERT INTO users (id, username, password, nama_lengkap, role) VALUES (?, ?, ?, ?, ?)', [id, username, password, namaLengkap, role]);
     return user;
 };
-export const updateUser = async (originalId: string, user: UserData): Promise<UserData> => {
-    const { id, username, password, namaLengkap, role } = user;
-    // Perbaikan: Menggunakan nama kolom 'nama_lengkap' saat UPDATE
-    await db.execute('UPDATE users SET id = ?, username = ?, password = ?, nama_lengkap = ?, role = ? WHERE id = ?', [id, username, password, namaLengkap, role, originalId]);
+export const updateUser = async (id: string, user: UserData): Promise<UserData> => {
+    const { username, password, namaLengkap, role } = user;
+    // Perbaikan: Menggunakan nama kolom 'nama_lengkap' saat UPDATE dan tidak mengubah Primary Key (id)
+    if (password) {
+        await db.execute('UPDATE users SET username = ?, password = ?, nama_lengkap = ?, role = ? WHERE id = ?', [username, password, namaLengkap, role, id]);
+    } else {
+        await db.execute('UPDATE users SET username = ?, nama_lengkap = ?, role = ? WHERE id = ?', [username, namaLengkap, role, id]);
+    }
     return user;
 };
 export const deleteUser = async (id: string): Promise<boolean> => {
@@ -36,9 +42,10 @@ export const createKetuaTim = async (data: KetuaTimData): Promise<KetuaTimData> 
     await db.execute('INSERT INTO ketua_tim (id, nama_ketua, nip) VALUES (?, ?, ?)', [id, nama, nip]);
     return data;
 };
-export const updateKetuaTim = async (originalId: string, data: KetuaTimData): Promise<KetuaTimData> => {
-    const { id, nama, nip } = data;
-    await db.execute('UPDATE ketua_tim SET id = ?, nama_ketua = ?, nip = ? WHERE id = ?', [id, nama, nip, originalId]);
+export const updateKetuaTim = async (id: string, data: KetuaTimData): Promise<KetuaTimData> => {
+    const { nama, nip } = data;
+    // Perbaikan: Tidak mengubah Primary Key (id)
+    await db.execute('UPDATE ketua_tim SET nama_ketua = ?, nip = ? WHERE id = ?', [nama, nip, id]);
     return data;
 };
 export const deleteKetuaTim = async (id: string): Promise<boolean> => {
@@ -68,9 +75,10 @@ export const createPPLAdmin = async (data: PPLAdminData): Promise<PPLAdminData> 
     await db.execute('INSERT INTO ppl_master (id, namaPPL, alamat, noTelepon) VALUES (?, ?, ?, ?)', [id, namaPPL, alamat, noTelepon]);
     return data;
 };
-export const updatePPLAdmin = async (originalId: string, data: PPLAdminData): Promise<PPLAdminData> => {
-    const { id, namaPPL, alamat, noTelepon } = data;
-    await db.execute('UPDATE ppl_master SET id = ?, namaPPL = ?, alamat = ?, noTelepon = ? WHERE id = ?', [id, namaPPL, alamat, noTelepon, originalId]);
+export const updatePPLAdmin = async (id: string, data: PPLAdminData): Promise<PPLAdminData> => {
+    const { namaPPL, alamat, noTelepon } = data;
+    // Perbaikan: Tidak mengubah Primary Key (id)
+    await db.execute('UPDATE ppl_master SET namaPPL = ?, alamat = ?, noTelepon = ? WHERE id = ?', [namaPPL, alamat, noTelepon, id]);
     return data;
 };
 export const deletePPLAdmin = async (id: string): Promise<boolean> => {

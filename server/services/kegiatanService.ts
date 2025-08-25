@@ -1,3 +1,5 @@
+// server/services/kegiatanService.ts
+
 import { RowDataPacket, OkPacket } from 'mysql2';
 import db from '../db';
 import { Kegiatan, Dokumen, PPL } from '@shared/api';
@@ -5,10 +7,18 @@ import { Kegiatan, Dokumen, PPL } from '@shared/api';
 interface KegiatanPacket extends Kegiatan, RowDataPacket {}
 
 const getKegiatanWithRelations = async (whereClause: string, params: any[]): Promise<Kegiatan[]> => {
+    // PERBAIKAN: Menambahkan CASE statement untuk menentukan status secara dinamis berdasarkan tanggal saat ini
     const query = `
         SELECT 
             k.*, 
-            kt.nama_ketua AS namaKetua
+            kt.nama_ketua AS namaKetua,
+            CASE
+                WHEN CURDATE() > k.tanggalSelesaiDiseminasiEvaluasi THEN 'Selesai'
+                WHEN CURDATE() >= k.tanggalMulaiDiseminasiEvaluasi THEN 'Diseminasi & Evaluasi'
+                WHEN CURDATE() >= k.tanggalMulaiPengolahanAnalisis THEN 'Pengolahan & Analisis'
+                WHEN CURDATE() >= k.tanggalMulaiPengumpulanData THEN 'Pengumpulan Data'
+                ELSE 'Persiapan'
+            END AS status
         FROM kegiatan k
         LEFT JOIN ketua_tim kt ON k.ketua_tim_id = kt.id
         ${whereClause}
@@ -30,6 +40,7 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
     return kegiatanRows;
 };
 
+// ... sisa file tetap sama, tidak ada perubahan di fungsi lain ...
 export const getAllKegiatan = async (): Promise<Kegiatan[]> => {
     return getKegiatanWithRelations('ORDER BY k.id DESC', []);
 };
@@ -188,7 +199,6 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
     }
 }
 
-// ... (sisa fungsi seperti deleteKegiatan, updatePplProgress, dll tetap sama)
 export const updatePplProgress = async (pplId: number, progressData: { open: number; submit: number; diperiksa: number; approved: number; }) => {
     const { open, submit, diperiksa, approved } = progressData;
     const query = `

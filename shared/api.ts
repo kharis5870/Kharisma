@@ -1,4 +1,5 @@
-// ... (Tipe Dokumen, PPL, PPLMaster, KetuaTim, Kegiatan, PPLHonorData tetap sama)
+// shared/api.ts
+
 export interface Dokumen {
   id?: number;
   kegiatanId?: number;
@@ -12,10 +13,10 @@ export interface Dokumen {
 }
 
 export interface PPL {
-  id?: number; 
+  id?: number;
   kegiatanId?: number;
-  ppl_master_id: string; 
-  namaPPL?: string; 
+  ppl_master_id: string;
+  namaPPL?: string;
   namaPML: string;
   bebanKerja: string;
   satuanBebanKerja: string;
@@ -32,7 +33,7 @@ export interface PPLMaster {
 }
 
 export interface KetuaTim {
-  id: number;
+  id: string;
   namaKetua: string;
   nip?: string;
 }
@@ -40,8 +41,8 @@ export interface KetuaTim {
 export interface Kegiatan {
   id: number;
   namaKegiatan: string;
-  ketua_tim_id: number; 
-  namaKetua?: string; 
+  ketua_tim_id: string;
+  namaKetua?: string;
   timKerja: string;
   adaListing: boolean;
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';
@@ -65,16 +66,15 @@ export interface PPLHonorData {
   honorBulanIni: number;
   activitiesCount: number;
   kegiatanNames: string[];
-  honorPerBulan: number[]; 
+  honorPerBulan: number[];
 }
-
 
 // --- Tipe Data Baru untuk Halaman Admin ---
 
 export interface UserData {
     id: string;
     username: string;
-    password?: string; // Password bersifat opsional saat mengambil data
+    password?: string;
     namaLengkap: string;
     role: 'admin' | 'supervisor' | 'user';
 }

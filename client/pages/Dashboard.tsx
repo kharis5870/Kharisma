@@ -1,3 +1,5 @@
+// client/pages/Dashboard.tsx
+
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -16,7 +18,7 @@ import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, Ale
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
 import { cn } from "@/lib/utils";
-import { format, isPast } from "date-fns";
+import { format, isPast, parseISO } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
 
 // --- Tipe Data Frontend ---
@@ -26,27 +28,21 @@ type PPLWithProgress = PPL & {
   progressDiperiksa: number;
   progressApproved: number;
 };
-type KegiatanWithRelations = Kegiatan & {
-  ppl: PPLWithProgress[];
-  warnings: string[];
+
+// PERBAIKAN: Menambahkan `dynamicStatus` dan `warnings` ke tipe data frontend
+type KegiatanWithDynamicStatus = Kegiatan & {
+  dynamicStatus: {
+    status: Kegiatan['status'];
+    color: string;
+    warnings: string[];
+  }
 };
 
 // --- API Functions ---
-const fetchActivities = async (): Promise<KegiatanWithRelations[]> => {
+const fetchActivities = async (): Promise<Kegiatan[]> => {
   const res = await fetch("/api/kegiatan");
   if (!res.ok) throw new Error("Gagal memuat kegiatan");
-  const activities: Kegiatan[] = await res.json();
-  return activities.map(activity => ({
-      ...activity,
-      ppl: (activity.ppl || []).map(p => ({
-          ...p,
-          progressOpen: p.progressOpen || 0,
-          progressSubmit: p.progressSubmit || 0,
-          progressDiperiksa: p.progressDiperiksa || 0,
-          progressApproved: p.progressApproved || 0,
-      })) as PPLWithProgress[],
-      warnings: getDynamicStatus(activity).warnings,
-  }));
+  return res.json();
 };
 
 const deleteActivity = async (id: number): Promise<void> => {
@@ -65,29 +61,45 @@ const updatePplProgress = async ({ pplId, progressData }: { pplId: number; progr
 };
 
 // --- Helper Functions ---
-const getDynamicStatus = (kegiatan: Kegiatan): { status: Kegiatan['status']; color: string; warnings: string[] } => {
+// PERBAIKAN: Fungsi baru untuk menghitung status dan warning secara dinamis
+const calculateActivityStatus = (kegiatan: Kegiatan): KegiatanWithDynamicStatus['dynamicStatus'] => {
     const warnings: string[] = [];
+    const now = new Date();
 
-    const checkTahapan = (
+    const checkTahapanWarning = (
         tanggalSelesai: string | undefined, 
         tipeDokumen: Dokumen['tipe'],
         namaTahapan: string
     ) => {
-        if (tanggalSelesai && isPast(new Date(tanggalSelesai))) {
-            const dokumenTahapan = kegiatan.dokumen.filter(d => d.tipe === tipeDokumen);
+        if (tanggalSelesai && isPast(parseISO(tanggalSelesai))) {
+            const dokumenTahapan = kegiatan.dokumen.filter(d => d.tipe === tipeDokumen && d.isWajib);
             if (dokumenTahapan.length > 0 && !dokumenTahapan.every(d => d.status === 'Approved')) {
                 warnings.push(`Laporan ${namaTahapan} terlambat disetujui`);
             }
         }
     };
 
-    checkTahapan(kegiatan.tanggalSelesaiPersiapan, 'persiapan', 'Persiapan');
-    checkTahapan(kegiatan.tanggalSelesaiPengumpulanData, 'pengumpulan-data', 'Pengumpulan Data');
-    checkTahapan(kegiatan.tanggalSelesaiPengolahanAnalisis, 'pengolahan-analisis', 'Pengolahan & Analisis');
-    checkTahapan(kegiatan.tanggalSelesaiDiseminasiEvaluasi, 'diseminasi-evaluasi', 'Diseminasi & Evaluasi');
+    checkTahapanWarning(kegiatan.tanggalSelesaiPersiapan, 'persiapan', 'Persiapan');
+    checkTahapanWarning(kegiatan.tanggalSelesaiPengumpulanData, 'pengumpulan-data', 'Pengumpulan Data');
+    checkTahapanWarning(kegiatan.tanggalSelesaiPengolahanAnalisis, 'pengolahan-analisis', 'Pengolahan & Analisis');
+    checkTahapanWarning(kegiatan.tanggalSelesaiDiseminasiEvaluasi, 'diseminasi-evaluasi', 'Diseminasi & Evaluasi');
 
-    let status: Kegiatan['status'] = kegiatan.status;
+    let status: Kegiatan['status'] = kegiatan.status; // Status dari DB sebagai default
     let color = 'bg-blue-100 text-blue-700';
+    
+    // Override status dari DB dengan logika tanggal
+    if (kegiatan.tanggalSelesaiDiseminasiEvaluasi && isPast(parseISO(kegiatan.tanggalSelesaiDiseminasiEvaluasi))) {
+        status = 'Selesai';
+    } else if (kegiatan.tanggalMulaiDiseminasiEvaluasi && now >= parseISO(kegiatan.tanggalMulaiDiseminasiEvaluasi)) {
+        status = 'Diseminasi & Evaluasi';
+    } else if (kegiatan.tanggalMulaiPengolahanAnalisis && now >= parseISO(kegiatan.tanggalMulaiPengolahanAnalisis)) {
+        status = 'Pengolahan & Analisis';
+    } else if (kegiatan.tanggalMulaiPengumpulanData && now >= parseISO(kegiatan.tanggalMulaiPengumpulanData)) {
+        status = 'Pengumpulan Data';
+    } else {
+        status = 'Persiapan';
+    }
+
     switch (status) {
         case 'Pengumpulan Data': color = 'bg-yellow-100 text-yellow-700'; break;
         case 'Pengolahan & Analisis': color = 'bg-green-100 text-green-700'; break;
@@ -97,6 +109,7 @@ const getDynamicStatus = (kegiatan: Kegiatan): { status: Kegiatan['status']; col
 
     return { status, color, warnings };
 };
+
 
 const getProgressBarValue = (ppl: PPLWithProgress) => {
     const totalBeban = parseInt(ppl.bebanKerja as any) || 0;
@@ -118,8 +131,8 @@ const getRelativeTime = (dateString: string) => {
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
-  const [selectedActivity, setSelectedActivity] = useState<KegiatanWithRelations | null>(null);
-  const [updateModalActivity, setUpdateModalActivity] = useState<KegiatanWithRelations | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<KegiatanWithDynamicStatus | null>(null);
+  const [updateModalActivity, setUpdateModalActivity] = useState<KegiatanWithDynamicStatus | null>(null);
   const [activityToDelete, setActivityToDelete] = useState<Kegiatan | null>(null);
   const [showProgressSuccessModal, setShowProgressSuccessModal] = useState(false);
   const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
@@ -131,8 +144,23 @@ export default function Dashboard() {
   const [pplSearchView, setPplSearchView] = useState("");
   const [pplSearchUpdate, setPplSearchUpdate] = useState("");
 
-  const { data: activities = [], isLoading } = useQuery<KegiatanWithRelations[]>({ queryKey: ['kegiatan'], queryFn: fetchActivities });
-  
+  const { data: activities = [], isLoading } = useQuery<Kegiatan[]>({ queryKey: ['kegiatan'], queryFn: fetchActivities });
+
+  // PERBAIKAN: Proses data dari server untuk menambahkan status dinamis
+  const processedActivities = useMemo(() => {
+    return activities.map(activity => ({
+        ...activity,
+        ppl: (activity.ppl || []).map(p => ({
+            ...p,
+            progressOpen: p.progressOpen || 0,
+            progressSubmit: p.progressSubmit || 0,
+            progressDiperiksa: p.progressDiperiksa || 0,
+            progressApproved: p.progressApproved || 0,
+        })) as PPLWithProgress[],
+        dynamicStatus: calculateActivityStatus(activity),
+    }));
+  }, [activities]);
+
   const deleteMutation = useMutation({
     mutationFn: deleteActivity,
     onSuccess: () => {
@@ -145,34 +173,34 @@ export default function Dashboard() {
   const progressMutation = useMutation({ mutationFn: updatePplProgress, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); } });
 
   const filteredActivities = useMemo(() => {
-    return activities.filter(activity => {
-        const { status, warnings } = getDynamicStatus(activity);
+    return processedActivities.filter(activity => {
+        const { status, warnings } = activity.dynamicStatus;
         const matchesSearch = activity.namaKegiatan.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === "all" ||
                               (statusFilter === "warning" ? warnings.length > 0 : status === statusFilter);
         return matchesSearch && matchesStatus;
     });
-  }, [activities, searchTerm, statusFilter]);
+  }, [processedActivities, searchTerm, statusFilter]);
 
   const stats = useMemo(() => {
-    const statusCounts = activities.reduce((acc, act) => {
-        const { status } = getDynamicStatus(act);
+    const statusCounts = processedActivities.reduce((acc, act) => {
+        const { status } = act.dynamicStatus;
         acc[status] = (acc[status] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
 
     return {
-        totalKegiatan: activities.length,
+        totalKegiatan: processedActivities.length,
         persiapan: statusCounts['Persiapan'] || 0,
         pengumpulanData: statusCounts['Pengumpulan Data'] || 0,
         pengolahan: statusCounts['Pengolahan & Analisis'] || 0,
         diseminasi: statusCounts['Diseminasi & Evaluasi'] || 0,
         selesai: statusCounts['Selesai'] || 0,
-        jumlahWarning: activities.filter(a => getDynamicStatus(a).warnings.length > 0).length,
+        jumlahWarning: processedActivities.filter(a => a.dynamicStatus.warnings.length > 0).length,
     };
-  }, [activities]);
+  }, [processedActivities]);
 
-  const handleOpenUpdateModal = (activity: KegiatanWithRelations) => { setLocalPplProgress(JSON.parse(JSON.stringify(activity.ppl || []))); setUpdateModalActivity(activity); };
+  const handleOpenUpdateModal = (activity: KegiatanWithDynamicStatus) => { setLocalPplProgress(JSON.parse(JSON.stringify(activity.ppl || []))); setUpdateModalActivity(activity); };
 
   const handleUpdatePPL = (pplId: number, field: keyof PPLWithProgress, value: string) => {
     setLocalPplProgress(prev =>
@@ -286,7 +314,7 @@ export default function Dashboard() {
                     </div>
                 ) : (
                     filteredActivities.map((activity) => {
-                    const { status, color, warnings } = getDynamicStatus(activity);
+                    const { status, color, warnings } = activity.dynamicStatus;
                     return (
                         <Card key={activity.id} className="hover:shadow-lg transition-shadow flex flex-col">
                             <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.namaKetua}</p></div><Badge className={cn("ml-2 whitespace-nowrap", warnings.length > 0 ? 'bg-red-100 text-red-700' : color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
@@ -325,7 +353,7 @@ export default function Dashboard() {
                                     <div className="space-y-3 text-sm">
                                     <div className="flex justify-between"><span className="text-gray-500">Nama Kegiatan:</span><span className="font-medium text-right max-w-xs">{selectedActivity.namaKegiatan}</span></div>
                                     <div className="flex justify-between"><span className="text-gray-500">Ketua Tim:</span><span className="font-medium">{selectedActivity.namaKetua}</span></div>
-                                    <div className="flex justify-between items-center"><span className="text-gray-500">Status:</span><Badge className={cn(getDynamicStatus(selectedActivity).color)}>{getDynamicStatus(selectedActivity).status}</Badge></div>
+                                    <div className="flex justify-between items-center"><span className="text-gray-500">Status:</span><Badge className={cn(selectedActivity.dynamicStatus.color)}>{selectedActivity.dynamicStatus.status}</Badge></div>
                                     <div className="flex justify-between"><span className="text-gray-500">Terakhir Update:</span><span className="font-medium text-bps-blue-600">{getRelativeTime(selectedActivity.lastUpdated)}</span></div>
                                     </div>
                                 </div>

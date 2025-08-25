@@ -1,3 +1,5 @@
+// client/pages/EditActivity.tsx
+
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -308,7 +310,7 @@ export default function EditActivity() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
-                                    <Select value={formData.ketua_tim_id?.toString()} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', parseInt(value))}>
+                                    <Select value={formData.ketua_tim_id?.toString()} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
                                         <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
                                         <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id.toString()}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
                                     </Select>
