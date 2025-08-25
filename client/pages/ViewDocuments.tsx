@@ -210,7 +210,7 @@ export default function ViewDocuments() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                     <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium">Total Dokumen</p><p className="text-2xl font-bold">{totalDocuments}</p></div><FileText className="w-8 h-8 text-blue-500" /></div></CardContent></Card>
                     <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium">Approved</p><p className="text-2xl font-bold">{approvedDocuments}</p></div><CheckCircle className="w-8 h-8 text-green-500" /></div></CardContent></Card>
-                    <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium">Ketua Tim</p><p className="text-lg font-medium">{activityData.ketuaTim}</p></div><Users className="w-8 h-8 text-purple-500" /></div></CardContent></Card>
+                    <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium">Ketua Tim</p><p className="text-lg font-medium">{activityData.namaKetua}</p></div><Users className="w-8 h-8 text-purple-500" /></div></CardContent></Card>
                     <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium">Status Kegiatan</p><Badge>{activityData.status}</Badge></div><Activity className="w-8 h-8 text-orange-500" /></div></CardContent></Card>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

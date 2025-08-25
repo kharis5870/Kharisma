@@ -13,8 +13,8 @@ export interface Dokumen {
 export interface PPL {
   id?: number; 
   kegiatanId?: number;
-  pplId?: string; // ID dari ppl_master
-  namaPPL: string;
+  ppl_master_id: string; // Menggunakan ID dari ppl_master
+  namaPPL?: string; // Nama untuk ditampilkan (dari JOIN)
   namaPML: string;
   bebanKerja: string;
   satuanBebanKerja: string;
@@ -30,10 +30,17 @@ export interface PPLMaster {
   namaPPL: string;
 }
 
+export interface KetuaTim {
+  id: number;
+  namaKetua: string;
+  nip?: string;
+}
+
 export interface Kegiatan {
   id: number;
   namaKegiatan: string;
-  ketuaTim: string;
+  ketua_tim_id: number; // Menggunakan ID dari ketua_tim
+  namaKetua?: string; // Nama untuk ditampilkan (dari JOIN)
   timKerja: string;
   adaListing: boolean;
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';

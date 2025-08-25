@@ -18,7 +18,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore from "@/stores/useInputKegiatanStore";
-import { Dokumen, PPLMaster } from "@shared/api";
+import { Dokumen, PPLMaster, KetuaTim } from "@shared/api";
 
 type DateFieldName = 
   | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
@@ -30,7 +30,7 @@ const createActivity = async (data: any) => {
     const sanitizedData = {
         ...data,
         documents: data.documents.map(({ id, ...rest }: any) => rest),
-        pplAllocations: data.pplAllocations.map(({ id, ...rest }: any) => rest),
+        pplAllocations: data.pplAllocations.map(({ id, namaPPL, ...rest }: any) => rest),
     };
     const res = await fetch('/api/kegiatan', {
         method: 'POST',
@@ -47,11 +47,18 @@ const fetchPPLs = async (): Promise<PPLMaster[]> => {
     return res.json();
 };
 
+const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
+    const res = await fetch('/api/ketua-tim');
+    if (!res.ok) throw new Error('Gagal memuat daftar Ketua Tim');
+    return res.json();
+};
+
 export default function InputKegiatan() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { selectedPPLsForActivity, clearSelectedPPLsForActivity } = usePPL();
   const { data: pplList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
+  const { data: ketuaTimList = [] } = useQuery({ queryKey: ['ketuaTim'], queryFn: fetchKetuaTim });
   
   const [activeTab, setActiveTab] = useState("persiapan");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -64,7 +71,7 @@ export default function InputKegiatan() {
     if (selectedPPLsForActivity.length > 0) {
         const newAllocations = selectedPPLsForActivity.map(ppl => ({
             id: `ppl-${ppl.id}-${Date.now()}`,
-            pplId: ppl.id,
+            ppl_master_id: ppl.id,
             namaPPL: ppl.namaPPL,
             bebanKerja: "",
             satuanBebanKerja: "",
@@ -88,12 +95,12 @@ export default function InputKegiatan() {
   });
 
   const validateForm = () => {
-    return store.namaKegiatan && store.ketuaTim && 
+    return store.namaKegiatan && store.ketua_tim_id && 
            store.tanggalMulaiPersiapan && store.tanggalSelesaiPersiapan &&
            store.tanggalMulaiPengumpulanData && store.tanggalSelesaiPengumpulanData &&
            store.tanggalMulaiPengolahanAnalisis && store.tanggalSelesaiPengolahanAnalisis &&
            store.tanggalMulaiDiseminasiEvaluasi && store.tanggalSelesaiDiseminasiEvaluasi &&
-           store.pplAllocations.every(ppl => ppl.pplId && ppl.bebanKerja && ppl.besaranHonor && ppl.namaPML);
+           store.pplAllocations.every(ppl => ppl.ppl_master_id && ppl.bebanKerja && ppl.besaranHonor && ppl.namaPML);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -116,7 +123,6 @@ export default function InputKegiatan() {
   };
 
   const handleSuccessAction = () => navigate('/dashboard');
-  const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
   
   const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
     const documents = store.documents?.filter(d => d.tipe === tipe) || [];
@@ -176,7 +182,12 @@ export default function InputKegiatan() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={store.namaKegiatan} onChange={(e) => store.updateFormField('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" /></div>
-                <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label><Select value={store.ketuaTim} onValueChange={(value) => store.updateFormField('ketuaTim', value)}><SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger><SelectContent>{ketuaTimOptions.map((nama) => (<SelectItem key={nama} value={nama}>{nama}</SelectItem>))}</SelectContent></Select></div>
+                <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
+                    <Select value={store.ketua_tim_id?.toString()} onValueChange={(value) => store.updateFormField('ketua_tim_id', parseInt(value))}>
+                        <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
+                        <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id.toString()}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
+                    </Select>
+                </div>
               </div>
               <div className="space-y-2"><Label htmlFor="timKerja">Tim Kerja</Label><Textarea id="timKerja" value={store.timKerja} onChange={(e) => store.updateFormField('timKerja', e.target.value)} placeholder="Deskripsikan tim kerja..." /></div>
             </CardContent>
@@ -225,8 +236,8 @@ export default function InputKegiatan() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Cari PPL..." /><CommandList><CommandEmpty>PPL tidak ditemukan.</CommandEmpty><CommandGroup>
                                         {pplList.map((pplOption) => (
-                                            <CommandItem key={pplOption.id} value={`${pplOption.id} ${pplOption.namaPPL}`} onSelect={() => { store.updatePPL(ppl.id, 'pplId', pplOption.id); store.updatePPL(ppl.id, 'namaPPL', pplOption.namaPPL); setPplComboboxStates(prev => ({ ...prev, [ppl.id]: false })); }}>
-                                                <Check className={cn("mr-2 h-4 w-4", ppl.pplId === pplOption.id ? "opacity-100" : "opacity-0")} />
+                                            <CommandItem key={pplOption.id} value={`${pplOption.id} ${pplOption.namaPPL}`} onSelect={() => { store.updatePPL(ppl.id, 'ppl_master_id', pplOption.id); store.updatePPL(ppl.id, 'namaPPL', pplOption.namaPPL); setPplComboboxStates(prev => ({ ...prev, [ppl.id]: false })); }}>
+                                                <Check className={cn("mr-2 h-4 w-4", ppl.ppl_master_id === pplOption.id ? "opacity-100" : "opacity-0")} />
                                                 <div className="flex flex-col"><span>{pplOption.namaPPL}</span><span className="text-xs text-gray-500">ID: {pplOption.id}</span></div>
                                             </CommandItem>
                                         ))}

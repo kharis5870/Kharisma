@@ -4,26 +4,39 @@ import { Kegiatan, Dokumen, PPL } from '@shared/api';
 
 interface KegiatanPacket extends Kegiatan, RowDataPacket {}
 
-export const getAllKegiatan = async (): Promise<Kegiatan[]> => {
-    const [kegiatanRows] = await db.query<KegiatanPacket[]>('SELECT * FROM kegiatan ORDER BY id DESC');
+const getKegiatanWithRelations = async (whereClause: string, params: any[]): Promise<Kegiatan[]> => {
+    const query = `
+        SELECT 
+            k.*, 
+            kt.nama_ketua AS namaKetua
+        FROM kegiatan k
+        LEFT JOIN ketua_tim kt ON k.ketua_tim_id = kt.id
+        ${whereClause}
+    `;
+    const [kegiatanRows] = await db.query<KegiatanPacket[]>(query, params);
+
     for (const kegiatan of kegiatanRows) {
         const [dokumenRows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE kegiatanId = ?', [kegiatan.id]);
-        const [pplRows] = await db.query<RowDataPacket[]>('SELECT * FROM ppl WHERE kegiatanId = ?', [kegiatan.id]);
+        const [pplRows] = await db.query<RowDataPacket[]>(`
+            SELECT p.*, pm.namaPPL 
+            FROM ppl p 
+            JOIN ppl_master pm ON p.ppl_master_id = pm.id 
+            WHERE p.kegiatanId = ?
+        `, [kegiatan.id]);
+        
         kegiatan.dokumen = dokumenRows as Dokumen[];
         kegiatan.ppl = pplRows as PPL[];
     }
     return kegiatanRows;
 };
 
+export const getAllKegiatan = async (): Promise<Kegiatan[]> => {
+    return getKegiatanWithRelations('ORDER BY k.id DESC', []);
+};
+
 export const getKegiatanById = async (id: number): Promise<Kegiatan | null> => {
-    const [kegiatanRows] = await db.query<KegiatanPacket[]>('SELECT * FROM kegiatan WHERE id = ?', [id]);
-    if (kegiatanRows.length === 0) return null;
-    const kegiatan = kegiatanRows[0];
-    const [dokumenRows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE kegiatanId = ?', [id]);
-    const [pplRows] = await db.query<RowDataPacket[]>('SELECT * FROM ppl WHERE kegiatanId = ?', [id]);
-    kegiatan.dokumen = dokumenRows as Dokumen[];
-    kegiatan.ppl = pplRows as PPL[];
-    return kegiatan;
+    const kegiatan = await getKegiatanWithRelations('WHERE k.id = ?', [id]);
+    return kegiatan.length > 0 ? kegiatan[0] : null;
 };
 
 export const createKegiatan = async (data: any): Promise<Kegiatan> => {
@@ -32,7 +45,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         await connection.beginTransaction();
 
         const {
-            namaKegiatan, ketuaTim, timKerja, adaListing,
+            namaKegiatan, ketua_tim_id, timKerja, adaListing,
             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
@@ -42,7 +55,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
 
         const kegiatanQuery = `
             INSERT INTO kegiatan 
-            (namaKegiatan, ketuaTim, timKerja, adaListing,
+            (namaKegiatan, ketua_tim_id, timKerja, adaListing,
              tanggalMulaiPersiapan, tanggalSelesaiPersiapan, 
              tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
              tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
@@ -51,7 +64,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
-            namaKegiatan, ketuaTim, timKerja, adaListing || false,
+            namaKegiatan, ketua_tim_id, timKerja, adaListing || false,
             tanggalMulaiPersiapan || null, tanggalSelesaiPersiapan || null,
             tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
             tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
@@ -60,18 +73,17 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         const kegiatanId = kegiatanResult.insertId;
 
         if (pplAllocations && pplAllocations.length > 0) {
-            const pplQuery = 'INSERT INTO ppl (kegiatanId, namaPPL, namaPML, bebanKerja, besaranHonor, satuanBebanKerja, progressOpen, progressSubmit, progressDiperiksa, progressApproved) VALUES ?';
+            const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, besaranHonor, satuanBebanKerja, progressOpen) VALUES ?';
             const pplValues = pplAllocations.map((ppl: PPL) => {
                 const bebanKerja = parseInt(ppl.bebanKerja) || 0;
                 return [
                     kegiatanId,
-                    ppl.namaPPL,
+                    ppl.ppl_master_id,
                     ppl.namaPML,
                     bebanKerja,
                     parseInt(ppl.besaranHonor) || 0,
                     ppl.satuanBebanKerja,
                     bebanKerja,
-                    0, 0, 0
                 ];
             });
             await connection.query(pplQuery, [pplValues]);
@@ -99,42 +111,13 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
     }
 }
 
-// ... (fungsi updatePplProgress tetap sama)
-export const updatePplProgress = async (pplId: number, progressData: { open: number; submit: number; diperiksa: number; approved: number; }) => {
-    const { open, submit, diperiksa, approved } = progressData;
-    const query = `
-        UPDATE ppl 
-        SET progressOpen = ?, progressSubmit = ?, progressDiperiksa = ?, progressApproved = ? 
-        WHERE id = ?
-    `;
-    await db.execute(query, [open, submit, diperiksa, approved, pplId]);
-    
-    const [pplRows] = await db.query<RowDataPacket[]>('SELECT kegiatanId FROM ppl WHERE id = ?', [pplId]);
-    if (pplRows.length > 0) {
-        const kegiatanId = pplRows[0].kegiatanId;
-        
-        const [allPplForKegiatan] = await db.query<RowDataPacket[]>('SELECT bebanKerja, progressApproved FROM ppl WHERE kegiatanId = ?', [kegiatanId]);
-        const totalBebanKerja = allPplForKegiatan.reduce((acc, p) => acc + (p.bebanKerja || 0), 0);
-        const totalApproved = allPplForKegiatan.reduce((acc, p) => acc + (p.progressApproved || 0), 0);
-        const progressKeseluruhan = totalBebanKerja > 0 ? Math.round((totalApproved / totalBebanKerja) * 100) : 0;
-
-        await db.execute(
-            'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, progressKeseluruhan = ? WHERE id = ?', 
-            [progressKeseluruhan, kegiatanId]
-        );
-    }
-
-    const [updatedPpl] = await db.query<RowDataPacket[]>('SELECT * FROM ppl WHERE id = ?', [pplId]);
-    return updatedPpl[0];
-};
-
 export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> => {
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
 
         const {
-            namaKegiatan, ketuaTim, timKerja, adaListing,
+            namaKegiatan, ketua_tim_id, timKerja, adaListing,
             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
@@ -144,7 +127,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
 
         const kegiatanQuery = `
             UPDATE kegiatan SET 
-            namaKegiatan = ?, ketuaTim = ?, timKerja = ?, adaListing = ?,
+            namaKegiatan = ?, ketua_tim_id = ?, timKerja = ?, adaListing = ?,
             tanggalMulaiPersiapan = ?, tanggalSelesaiPersiapan = ?, 
             tanggalMulaiPengumpulanData = ?, tanggalSelesaiPengumpulanData = ?,
             tanggalMulaiPengolahanAnalisis = ?, tanggalSelesaiPengolahanAnalisis = ?,
@@ -153,7 +136,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             WHERE id = ?
         `;
         await connection.execute(kegiatanQuery, [
-            namaKegiatan, ketuaTim, timKerja, adaListing || false,
+            namaKegiatan, ketua_tim_id, timKerja, adaListing || false,
             tanggalMulaiPersiapan || null, tanggalSelesaiPersiapan || null,
             tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
             tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
@@ -165,11 +148,11 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         await connection.execute('DELETE FROM dokumen WHERE kegiatanId = ?', [id]);
 
         if (ppl && ppl.length > 0) {
-            const pplQuery = 'INSERT INTO ppl (kegiatanId, namaPPL, namaPML, bebanKerja, besaranHonor, satuanBebanKerja, progressOpen, progressSubmit, progressDiperiksa, progressApproved) VALUES ?';
+            const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, besaranHonor, satuanBebanKerja, progressOpen, progressSubmit, progressDiperiksa, progressApproved) VALUES ?';
             const pplValues = ppl.map((p: PPL) => {
                  const bebanKerja = parseInt(p.bebanKerja) || 0;
                  return [
-                    id, p.namaPPL, p.namaPML,
+                    id, p.ppl_master_id, p.namaPML,
                     bebanKerja,
                     parseInt(p.besaranHonor) || 0,
                     p.satuanBebanKerja,
@@ -205,7 +188,35 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
     }
 }
 
-// ... (sisa fungsi tetap sama)
+// ... (sisa fungsi seperti deleteKegiatan, updatePplProgress, dll tetap sama)
+export const updatePplProgress = async (pplId: number, progressData: { open: number; submit: number; diperiksa: number; approved: number; }) => {
+    const { open, submit, diperiksa, approved } = progressData;
+    const query = `
+        UPDATE ppl 
+        SET progressOpen = ?, progressSubmit = ?, progressDiperiksa = ?, progressApproved = ? 
+        WHERE id = ?
+    `;
+    await db.execute(query, [open, submit, diperiksa, approved, pplId]);
+    
+    const [pplRows] = await db.query<RowDataPacket[]>('SELECT kegiatanId FROM ppl WHERE id = ?', [pplId]);
+    if (pplRows.length > 0) {
+        const kegiatanId = pplRows[0].kegiatanId;
+        
+        const [allPplForKegiatan] = await db.query<RowDataPacket[]>('SELECT bebanKerja, progressApproved FROM ppl WHERE kegiatanId = ?', [kegiatanId]);
+        const totalBebanKerja = allPplForKegiatan.reduce((acc, p) => acc + (p.bebanKerja || 0), 0);
+        const totalApproved = allPplForKegiatan.reduce((acc, p) => acc + (p.progressApproved || 0), 0);
+        const progressKeseluruhan = totalBebanKerja > 0 ? Math.round((totalApproved / totalBebanKerja) * 100) : 0;
+
+        await db.execute(
+            'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, progressKeseluruhan = ? WHERE id = ?', 
+            [progressKeseluruhan, kegiatanId]
+        );
+    }
+
+    const [updatedPpl] = await db.query<RowDataPacket[]>('SELECT * FROM ppl WHERE id = ?', [pplId]);
+    return updatedPpl[0];
+};
+
 export const deleteKegiatan = async (id: number): Promise<boolean> => {
     const connection = await db.getConnection();
     try {

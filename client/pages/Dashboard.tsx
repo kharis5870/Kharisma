@@ -289,7 +289,7 @@ export default function Dashboard() {
                     const { status, color, warnings } = getDynamicStatus(activity);
                     return (
                         <Card key={activity.id} className="hover:shadow-lg transition-shadow flex flex-col">
-                            <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.ketuaTim}</p></div><Badge className={cn("ml-2 whitespace-nowrap", warnings.length > 0 ? 'bg-red-100 text-red-700' : color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
+                            <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.namaKetua}</p></div><Badge className={cn("ml-2 whitespace-nowrap", warnings.length > 0 ? 'bg-red-100 text-red-700' : color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
                             <CardContent className="space-y-4 flex-grow flex flex-col justify-between">
                                 <div>
                                     <div className="flex justify-between items-center mb-2"><span className="text-sm font-medium">Progress Keseluruhan</span><span className="text-sm font-bold text-bps-blue-600">{activity.progressKeseluruhan || 0}%</span></div>
@@ -324,7 +324,7 @@ export default function Dashboard() {
                                     <h4 className="font-semibold text-gray-900 mb-3">Informasi Kegiatan</h4>
                                     <div className="space-y-3 text-sm">
                                     <div className="flex justify-between"><span className="text-gray-500">Nama Kegiatan:</span><span className="font-medium text-right max-w-xs">{selectedActivity.namaKegiatan}</span></div>
-                                    <div className="flex justify-between"><span className="text-gray-500">Ketua Tim:</span><span className="font-medium">{selectedActivity.ketuaTim}</span></div>
+                                    <div className="flex justify-between"><span className="text-gray-500">Ketua Tim:</span><span className="font-medium">{selectedActivity.namaKetua}</span></div>
                                     <div className="flex justify-between items-center"><span className="text-gray-500">Status:</span><Badge className={cn(getDynamicStatus(selectedActivity).color)}>{getDynamicStatus(selectedActivity).status}</Badge></div>
                                     <div className="flex justify-between"><span className="text-gray-500">Terakhir Update:</span><span className="font-medium text-bps-blue-600">{getRelativeTime(selectedActivity.lastUpdated)}</span></div>
                                     </div>
@@ -343,7 +343,7 @@ export default function Dashboard() {
                                 <div>
                                 <div className="flex items-center justify-between mb-4"><h4 className="font-semibold text-gray-900">Progress PPL</h4><div className="w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari nama PPL..." value={pplSearchView} onChange={(e) => setPplSearchView(e.target.value)} className="pl-10 h-8 text-sm" /></div></div></div>
                                 <div className="space-y-4">
-                                    {selectedActivity.ppl.filter(p => p.namaPPL.toLowerCase().includes(pplSearchView.toLowerCase())).map((ppl) => (
+                                    {selectedActivity.ppl.filter(p => (p.namaPPL || '').toLowerCase().includes(pplSearchView.toLowerCase())).map((ppl) => (
                                     <Card key={ppl.id} className="p-4 bg-gray-50">
                                         <div className="space-y-4">
                                         <div className="flex justify-between items-center">
@@ -354,7 +354,7 @@ export default function Dashboard() {
                                             <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
                                             </div>
                                             <div className="text-right">
-                                            <div className="text-lg font-bold text-bps-blue-600">{getProgressBarValue(ppl).toFixed(1)}%</div>
+                                            <div className="text-lg font-bold text-bps-blue-600">{getProgressBarValue(ppl as PPLWithProgress).toFixed(1)}%</div>
                                             <div className="text-xs text-gray-500">Progress Approved</div>
                                             </div>
                                         </div>
@@ -364,7 +364,7 @@ export default function Dashboard() {
                                             <div className="text-center"><Label className="text-xs text-gray-600">Diperiksa</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressDiperiksa || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressDiperiksa || 0} {ppl.satuanBebanKerja}</div></div>
                                             <div className="text-center"><Label className="text-xs text-gray-600">Approved</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressApproved || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressApproved || 0} {ppl.satuanBebanKerja}</div></div>
                                         </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-bps-green-600 h-2 rounded-full transition-all duration-300" style={{ width: `${getProgressBarValue(ppl)}%` }}></div></div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-bps-green-600 h-2 rounded-full transition-all duration-300" style={{ width: `${getProgressBarValue(ppl as PPLWithProgress)}%` }}></div></div>
                                         <div className="text-xs text-gray-500 text-center">Total: {(ppl.progressOpen ?? 0) + (ppl.progressSubmit ?? 0) + (ppl.progressDiperiksa ?? 0) + (ppl.progressApproved ?? 0)} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
                                         </div>
                                     </Card>
@@ -382,7 +382,7 @@ export default function Dashboard() {
                         <DialogHeader><DialogTitle>Update Progress: {updateModalActivity?.namaKegiatan}</DialogTitle></DialogHeader>
                         <div className="p-4">
                         <div className="flex items-center justify-between mb-4"><h4 className="font-semibold text-gray-900">Update Progress PPL</h4><div className="w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari nama PPL..." value={pplSearchUpdate} onChange={(e) => setPplSearchUpdate(e.target.value)} className="pl-10 h-8 text-sm"/></div></div></div>
-                            {localPplProgress.filter(p => p.namaPPL.toLowerCase().includes(pplSearchUpdate.toLowerCase())).map(ppl => (
+                            {localPplProgress.filter(p => (p.namaPPL || '').toLowerCase().includes(pplSearchUpdate.toLowerCase())).map(ppl => (
                                 <Card key={ppl.id} className="p-4 mb-4">
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center">

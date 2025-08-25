@@ -3,9 +3,9 @@ import { persist } from 'zustand/middleware';
 import { Dokumen, PPL } from "@shared/api";
 
 // --- Tipe Data Frontend ---
-interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId' | 'pplId'> {
-  id: string;
-  pplId: string;
+interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId' | 'namaPPL'> {
+  id: string; // Ini adalah ID unik untuk state di frontend, bukan ID database
+  namaPPL: string; // Nama tetap disimpan untuk tampilan di UI
 }
 
 interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'uploadedAt'> {
@@ -14,7 +14,7 @@ interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'u
 
 export type State = {
   namaKegiatan: string;
-  ketuaTim: string;
+  ketua_tim_id?: number;
   timKerja: string;
   adaListing: boolean;
   pplAllocations: PPLItem[];
@@ -35,7 +35,7 @@ export type Actions = {
   updateFormField: (field: keyof State, value: any) => void;
   addPPL: () => void;
   removePPL: (id: string) => void;
-  updatePPL: (id: string, field: keyof Omit<PPLItem, 'id'>, value: string) => void;
+  updatePPL: (id: string, field: keyof PPLItem, value: string | number) => void;
   addDocumentLink: (tipe: Dokumen['tipe']) => void;
   updateDocument: (id: string, field: 'nama' | 'link', value: string) => void;
   removeDocument: (id: string) => void;
@@ -53,10 +53,10 @@ const mandatoryDocs: Omit<DocumentItem, 'id' | 'link'>[] = [
 
 const initialState: State = {
   namaKegiatan: "",
-  ketuaTim: "",
+  ketua_tim_id: undefined,
   timKerja: "",
   adaListing: false,
-  pplAllocations: [{ id: "1", pplId: "", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }],
+  pplAllocations: [{ id: "1", ppl_master_id: "", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }],
   documents: mandatoryDocs.map((doc, i) => ({ ...doc, id: `wajib-initial-${i}`, link: '' })),
   tanggalMulaiPersiapan: undefined,
   tanggalSelesaiPersiapan: undefined,
@@ -73,9 +73,9 @@ const useInputKegiatanStore = create<State & Actions>()(
     (set): State & Actions => ({
       ...initialState,
       updateFormField: (field: keyof State, value: any) => set({ [field as any]: value }),
-      addPPL: () => set((state: State) => ({ pplAllocations: [...state.pplAllocations, { id: Date.now().toString(), pplId: "", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }] })),
+      addPPL: () => set((state: State) => ({ pplAllocations: [...state.pplAllocations, { id: Date.now().toString(), ppl_master_id: "", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }] })),
       removePPL: (id: string) => set((state: State) => ({ pplAllocations: state.pplAllocations.filter((ppl: PPLItem) => ppl.id !== id) })),
-      updatePPL: (id: string, field: keyof Omit<PPLItem, 'id'>, value: string) => set((state: State) => ({
+      updatePPL: (id: string, field: keyof PPLItem, value: string | number) => set((state: State) => ({
         pplAllocations: state.pplAllocations.map((ppl: PPLItem) =>
           ppl.id === id ? { ...ppl, [field]: value } : ppl
         )

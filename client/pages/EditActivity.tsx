@@ -15,15 +15,14 @@ import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook, 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format, parseISO, isValid } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Kegiatan, PPL, Dokumen, PPLMaster } from "@shared/api";
+import { Kegiatan, PPL, Dokumen, PPLMaster, KetuaTim } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
-// --- Tipe Data Frontend ---
 type ClientPPL = PPL & { clientId: string };
 type ClientDokumen = Dokumen & { clientId: string };
 
-type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan' | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData' | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis' | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi'> & {
+type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'namaKetua' | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan' | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData' | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis' | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi'> & {
     tanggalMulaiPersiapan?: Date;
     tanggalSelesaiPersiapan?: Date;
     tanggalMulaiPengumpulanData?: Date;
@@ -42,7 +41,6 @@ type DateFieldName =
   | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
   | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
-// --- API Functions ---
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     const res = await fetch(`/api/kegiatan/${id}`);
     if (!res.ok) throw new Error("Kegiatan tidak ditemukan");
@@ -55,11 +53,17 @@ const fetchPPLs = async (): Promise<PPLMaster[]> => {
     return res.json();
 };
 
+const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
+    const res = await fetch('/api/ketua-tim');
+    if (!res.ok) throw new Error('Gagal memuat daftar Ketua Tim');
+    return res.json();
+};
+
 const updateActivity = async (kegiatan: Partial<Kegiatan> & {id: number}): Promise<Kegiatan> => {
     const sanitizedData = {
         ...kegiatan,
         dokumen: kegiatan.dokumen?.map(({ clientId, ...rest }: any) => rest),
-        ppl: kegiatan.ppl?.map(({ clientId, ...rest }: any) => rest)
+        ppl: kegiatan.ppl?.map(({ clientId, namaPPL, ...rest }: any) => rest)
     };
     const res = await fetch(`/api/kegiatan/${kegiatan.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sanitizedData) });
     if (!res.ok) {
@@ -86,6 +90,7 @@ export default function EditActivity() {
     });
 
     const { data: pplList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
+    const { data: ketuaTimList = [] } = useQuery({ queryKey: ['ketuaTim'], queryFn: fetchKetuaTim });
 
     useEffect(() => {
         if (initialData) {
@@ -158,7 +163,7 @@ export default function EditActivity() {
     };
 
     const addPPL = () => {
-        const newPPL: ClientPPL = { clientId: `new-ppl-${Date.now()}`, namaPPL: "", namaPML: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "" };
+        const newPPL: ClientPPL = { clientId: `new-ppl-${Date.now()}`, ppl_master_id: "", namaPPL: "", namaPML: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "" };
         setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), newPPL]}));
     };
 
@@ -270,8 +275,6 @@ export default function EditActivity() {
     if (isLoading) return <Layout><div>Memuat data kegiatan...</div></Layout>;
     if (isError) return <Layout><div>Gagal memuat data. Silakan coba lagi.</div></Layout>;
     
-    const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
-
     return (
         <Layout>
             <div className="max-w-4xl mx-auto">
@@ -305,9 +308,9 @@ export default function EditActivity() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
-                                    <Select value={formData.ketuaTim || ''} onValueChange={(value) => handleFormFieldChange('ketuaTim', value)}>
+                                    <Select value={formData.ketua_tim_id?.toString()} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', parseInt(value))}>
                                         <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
-                                        <SelectContent>{ketuaTimOptions.map((nama) => (<SelectItem key={nama} value={nama}>{nama}</SelectItem>))}</SelectContent>
+                                        <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id.toString()}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
                                     </Select>
                                 </div>
                               </div>
@@ -370,8 +373,8 @@ export default function EditActivity() {
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Cari PPL..." /><CommandList><CommandEmpty>PPL tidak ditemukan.</CommandEmpty><CommandGroup>
                                                         {pplList.map((pplOption) => (
-                                                            <CommandItem key={pplOption.id} value={`${pplOption.id} ${pplOption.namaPPL}`} onSelect={() => { updatePPL(ppl.clientId, 'pplId', pplOption.id); updatePPL(ppl.clientId, 'namaPPL', pplOption.namaPPL); setPplComboboxStates(prev => ({ ...prev, [ppl.clientId]: false })); }}>
-                                                                <Check className={cn("mr-2 h-4 w-4", ppl.pplId === pplOption.id ? "opacity-100" : "opacity-0")} />
+                                                            <CommandItem key={pplOption.id} value={`${pplOption.id} ${pplOption.namaPPL}`} onSelect={() => { updatePPL(ppl.clientId, 'ppl_master_id', pplOption.id); updatePPL(ppl.clientId, 'namaPPL', pplOption.namaPPL); setPplComboboxStates(prev => ({ ...prev, [ppl.clientId]: false })); }}>
+                                                                <Check className={cn("mr-2 h-4 w-4", ppl.ppl_master_id === pplOption.id ? "opacity-100" : "opacity-0")} />
                                                                 <div className="flex flex-col"><span>{pplOption.namaPPL}</span><span className="text-xs text-gray-500">ID: {pplOption.id}</span></div>
                                                             </CommandItem>
                                                         ))}
