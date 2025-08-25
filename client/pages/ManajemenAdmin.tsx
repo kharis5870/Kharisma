@@ -1,8 +1,10 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useAdmin } from "@/contexts/AdminContext";
+import { UserData, KetuaTimData, PPLAdminData } from "@shared/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,136 +14,258 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Edit, Users, UserCheck, Search, ChevronUp, ChevronDown, Save, Shield, Crown, Eye, EyeOff } from "lucide-react";
-import { UserData, KetuaTimData, PPLAdminData } from "@shared/api";
+import {
+  Plus,
+  Trash2,
+  Edit,
+  Users,
+  UserCheck,
+  Search,
+  ChevronUp,
+  ChevronDown,
+  Save,
+  X,
+  Shield,
+  Crown,
+  Eye,
+  EyeOff,
+  MapPin,
+  Phone,
+  Activity
+} from "lucide-react";
 
 export default function ManajemenAdmin() {
+  const navigate = useNavigate();
   const {
-    userList, addUser, removeUser, updateUser,
-    ketuaTimList, addKetuaTim, removeKetuaTim, updateKetuaTim,
-    pplAdminList, addPPLAdmin, removePPLAdmin, updatePPLAdmin,
-    isLoading
+    userList,
+    addUser,
+    removeUser,
+    updateUser,
+    ketuaTimList,
+    addKetuaTim,
+    removeKetuaTim,
+    updateKetuaTim,
+    pplAdminList,
+    addPPLAdmin,
+    removePPLAdmin,
+    updatePPLAdmin
   } = useAdmin();
   
+  // Modal states
   const [activeTab, setActiveTab] = useState("users");
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
+  const [showAddKetuaTimModal, setShowAddKetuaTimModal] = useState(false);
+  const [showAddPPLModal, setShowAddPPLModal] = useState(false);
+  const [showEditPPLModal, setShowEditPPLModal] = useState(false);
+  const [showDeletePPLModal, setShowDeletePPLModal] = useState(false);
+  const [showEditKetuaTimModal, setShowEditKetuaTimModal] = useState(false);
+  const [showDeleteKetuaTimModal, setShowDeleteKetuaTimModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   
-  // User States
-  const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [showEditUserModal, setShowEditUserModal] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<UserData | null>(null);
-  const [newUserData, setNewUserData] = useState<UserData>({ id: '', username: '', password: '', namaLengkap: '', role: 'user' });
+  // User form states
+  const [newUserData, setNewUserData] = useState<UserData>({
+    id: "",
+    username: "",
+    password: "",
+    namaLengkap: "",
+    role: "user" as const
+  });
   const [editUserData, setEditUserData] = useState<UserData | null>(null);
-  const [userSearchTerm, setUserSearchTerm] = useState("");
-  const [userSortConfig, setUserSortConfig] = useState<{ key: keyof UserData; direction: 'asc' | 'desc' } | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Ketua Tim States
-  const [showAddKetuaTimModal, setShowAddKetuaTimModal] = useState(false);
-  const [showEditKetuaTimModal, setShowEditKetuaTimModal] = useState(false);
-  const [ketuaTimToDelete, setKetuaTimToDelete] = useState<KetuaTimData | null>(null);
-  const [newKetuaTimData, setNewKetuaTimData] = useState<KetuaTimData>({ id: '', nama: '', nip: '' });
-  const [editKetuaTimData, setEditKetuaTimData] = useState<KetuaTimData | null>(null);
-  const [ketuaTimSearchTerm, setKetuaTimSearchTerm] = useState("");
-  const [ketuaTimSortConfig, setKetuaTimSortConfig] = useState<{ key: keyof KetuaTimData; direction: 'asc' | 'desc' } | null>(null);
-
-  // PPL States
-  const [showAddPPLModal, setShowAddPPLModal] = useState(false);
-  const [showEditPPLModal, setShowEditPPLModal] = useState(false);
-  const [pplToDelete, setPPLToDelete] = useState<PPLAdminData | null>(null);
-  const [newPPLData, setNewPPLData] = useState<Omit<PPLAdminData, 'totalKegiatan'>>({ id: '', namaPPL: '', alamat: '', noTelepon: '' });
-  const [editPPLData, setEditPPLData] = useState<PPLAdminData | null>(null);
-  const [pplSearchTerm, setPplSearchTerm] = useState("");
-  const [pplSortConfig, setPplSortConfig] = useState<{ key: keyof PPLAdminData; direction: 'asc' | 'desc' } | null>(null);
+  const [deleteUserId, setDeleteUserId] = useState("");
+  const [deleteUserName, setDeleteUserName] = useState("");
   
-  const handleSuccess = (message: string) => {
-    setSuccessMessage(message);
+  // Ketua Tim form states
+  const [newKetuaTimData, setNewKetuaTimData] = useState<KetuaTimData>({
+    id: "",
+    nama: "",
+    nip: ""
+  });
+  const [editKetuaTimData, setEditKetuaTimData] = useState<KetuaTimData | null>(null);
+  const [deleteKetuaTimId, setDeleteKetuaTimId] = useState("");
+  const [deleteKetuaTimName, setDeleteKetuaTimName] = useState("");
+
+  // PPL form states
+  const [newPPLData, setNewPPLData] = useState<PPLAdminData>({
+    id: "",
+    namaPPL: "",
+    totalKegiatan: 0,
+    alamat: "",
+    noTelepon: ""
+  });
+  const [editPPLData, setEditPPLData] = useState<PPLAdminData | null>(null);
+  const [deletePPLId, setDeletePPLId] = useState("");
+  const [deletePPLName, setDeletePPLName] = useState("");
+  
+  // Search and sort states
+  const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [ketuaTimSearchTerm, setKetuaTimSearchTerm] = useState("");
+  const [pplSearchTerm, setPplSearchTerm] = useState("");
+  const [userSortConfig, setUserSortConfig] = useState<{ key: keyof UserData; direction: 'asc' | 'desc'; } | null>(null);
+  const [ketuaTimSortConfig, setKetuaTimSortConfig] = useState<{ key: keyof KetuaTimData; direction: 'asc' | 'desc'; } | null>(null);
+  const [pplSortConfig, setPplSortConfig] = useState<{ key: keyof PPLAdminData; direction: 'asc' | 'desc'; } | null>(null);
+  
+  // Password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  
+  // Validation functions
+  const isValidUserId = (id: string) => id.trim().length >= 1;
+  const isValidUsername = (username: string) => username.trim().length >= 3;
+  const isValidPassword = (password?: string) => !password || password.trim().length >= 6;
+  const isValidNamaLengkap = (nama: string) => nama.trim().length >= 2;
+  const isValidNip = (nip: string) => nip.trim().length >= 10;
+  const isValidTelepon = (telepon: string) => telepon.trim().length >= 10;
+  const isValidAlamat = (alamat: string) => alamat.trim().length >= 5;
+  
+  const isDuplicateUserId = (id: string, excludeId?: string) => userList.some(user => user.id.toLowerCase() === id.toLowerCase() && user.id !== excludeId);
+  const isDuplicateUsername = (username: string, excludeId?: string) => userList.some(user => user.username.toLowerCase() === username.toLowerCase() && user.id !== excludeId);
+  const isDuplicateKetuaTimId = (id: string, excludeId?: string) => ketuaTimList.some(kt => kt.id.toLowerCase() === id.toLowerCase() && kt.id !== excludeId);
+  const isDuplicateNip = (nip: string, excludeId?: string) => ketuaTimList.some(kt => kt.nip === nip && kt.id !== excludeId);
+  const isDuplicatePPLId = (id: string, excludeId?: string) => pplAdminList.some(ppl => ppl.id.toLowerCase() === id.toLowerCase() && ppl.id !== excludeId);
+  const isDuplicatePPLTelepon = (telepon: string, excludeId?: string) => pplAdminList.some(ppl => ppl.noTelepon === telepon && ppl.id !== excludeId);
+  
+  const handleAddUser = () => {
+    const { id, username, password, namaLengkap, role } = newUserData;
+    if (!isValidUserId(id)) { alert("ID User harus diisi!"); return; }
+    if (!isValidUsername(username)) { alert("Username harus minimal 3 karakter!"); return; }
+    if (!password || !isValidPassword(password)) { alert("Password harus minimal 6 karakter!"); return; }
+    if (!isValidNamaLengkap(namaLengkap)) { alert("Nama lengkap harus minimal 2 karakter!"); return; }
+    if (isDuplicateUserId(id)) { alert("ID User sudah ada!"); return; }
+    if (isDuplicateUsername(username)) { alert("Username sudah ada!"); return; }
+    
+    addUser({ id: id.trim(), username: username.trim(), password, namaLengkap: namaLengkap.trim(), role });
+    setNewUserData({ id: "", username: "", password: "", namaLengkap: "", role: "user" });
+    setShowAddUserModal(false);
+    setSuccessMessage(`User "${username}" berhasil ditambahkan!`);
+    setShowSuccessModal(true);
+  };
+  
+  const handleEditUser = () => {
+    if (!editUserData) return;
+    const { id, username, password, namaLengkap, role } = editUserData;
+    if (!isValidUsername(username)) { alert("Username harus minimal 3 karakter!"); return; }
+    if (!isValidPassword(password)) { alert("Password baru harus minimal 6 karakter!"); return; }
+    if (!isValidNamaLengkap(namaLengkap)) { alert("Nama lengkap harus minimal 2 karakter!"); return; }
+    if (isDuplicateUsername(username, editUserData.id)) { alert("Username sudah ada!"); return; }
+    
+    updateUser(editUserData.id, { ...editUserData, username: username.trim(), namaLengkap: namaLengkap.trim() });
+    setShowEditUserModal(false);
+    setSuccessMessage(`User "${username}" berhasil diperbarui!`);
+    setShowSuccessModal(true);
+  };
+  
+  const handleDeleteUser = () => { removeUser(deleteUserId); setShowDeleteUserModal(false); setSuccessMessage(`User "${deleteUserName}" berhasil dihapus!`); setShowSuccessModal(true); };
+  
+  const handleAddKetuaTim = () => {
+    const { id, nama, nip } = newKetuaTimData;
+    if (!isValidUserId(id)) { alert("ID Ketua Tim harus diisi!"); return; }
+    if (!isValidNamaLengkap(nama)) { alert("Nama harus minimal 2 karakter!"); return; }
+    if (!isValidNip(nip)) { alert("NIP harus minimal 10 karakter!"); return; }
+    if (isDuplicateKetuaTimId(id)) { alert("ID Ketua Tim sudah ada!"); return; }
+    if (isDuplicateNip(nip)) { alert("NIP sudah ada!"); return; }
+    
+    addKetuaTim({ id: id.trim(), nama: nama.trim(), nip: nip.trim() });
+    setNewKetuaTimData({ id: "", nama: "", nip: "" });
+    setShowAddKetuaTimModal(false);
+    setSuccessMessage(`Ketua Tim "${nama}" berhasil ditambahkan!`);
+    setShowSuccessModal(true);
+  };
+  
+  const handleEditKetuaTim = () => {
+    if (!editKetuaTimData) return;
+    const { id, nama, nip } = editKetuaTimData;
+    
+    if (!isValidNamaLengkap(nama)) { alert("Nama harus minimal 2 karakter!"); return; }
+    if (!isValidNip(nip)) { alert("NIP harus minimal 10 karakter!"); return; }
+    if (isDuplicateNip(nip, editKetuaTimData.id)) { alert("NIP sudah ada!"); return; }
+    
+    updateKetuaTim(editKetuaTimData.id, { ...editKetuaTimData, nama: nama.trim(), nip: nip.trim() });
+    setShowEditKetuaTimModal(false);
+    setSuccessMessage(`Ketua Tim "${nama}" berhasil diperbarui!`);
+    setShowSuccessModal(true);
+  };
+  
+  const handleDeleteKetuaTim = () => {
+    removeKetuaTim(deleteKetuaTimId);
+    setShowDeleteKetuaTimModal(false);
+    setSuccessMessage(`Ketua Tim "${deleteKetuaTimName}" berhasil dihapus!`);
     setShowSuccessModal(true);
   };
 
-  const handleAddUser = () => {
-    addUser(newUserData);
-    setShowAddUserModal(false);
-    setNewUserData({ id: '', username: '', password: '', namaLengkap: '', role: 'user' });
-    handleSuccess(`User "${newUserData.username}" berhasil ditambahkan.`);
-  };
-  const handleEditUser = () => {
-    if (editUserData) {
-      updateUser(editUserData.id, editUserData);
-      setShowEditUserModal(false);
-      handleSuccess(`User "${editUserData.username}" berhasil diperbarui.`);
-    }
-  };
-  const handleDeleteUser = () => {
-    if (userToDelete) {
-      removeUser(userToDelete.id);
-      setUserToDelete(null);
-      handleSuccess(`User "${userToDelete.username}" berhasil dihapus.`);
-    }
-  };
-
-  const handleAddKetuaTim = () => {
-    addKetuaTim(newKetuaTimData);
-    setShowAddKetuaTimModal(false);
-    setNewKetuaTimData({ id: '', nama: '', nip: '' });
-    handleSuccess(`Ketua Tim "${newKetuaTimData.nama}" berhasil ditambahkan.`);
-  };
-  const handleEditKetuaTim = () => {
-    if (editKetuaTimData) {
-      updateKetuaTim(editKetuaTimData.id, editKetuaTimData);
-      setShowEditKetuaTimModal(false);
-      handleSuccess(`Ketua Tim "${editKetuaTimData.nama}" berhasil diperbarui.`);
-    }
-  };
-  const handleDeleteKetuaTim = () => {
-    if (ketuaTimToDelete) {
-      removeKetuaTim(ketuaTimToDelete.id);
-      setKetuaTimToDelete(null);
-      handleSuccess(`Ketua Tim "${ketuaTimToDelete.nama}" berhasil dihapus.`);
-    }
-  };
-
   const handleAddPPL = () => {
-    addPPLAdmin({ ...newPPLData, totalKegiatan: 0 });
+    const { id, namaPPL, totalKegiatan, alamat, noTelepon } = newPPLData;
+
+    if (!isValidUserId(id)) { alert("ID PPL harus diisi!"); return; }
+    if (!isValidNamaLengkap(namaPPL)) { alert("Nama PPL harus minimal 2 karakter!"); return; }
+    if (!isValidAlamat(alamat)) { alert("Alamat harus minimal 5 karakter!"); return; }
+    if (!isValidTelepon(noTelepon)) { alert("No. telepon harus minimal 10 karakter!"); return; }
+    if (isDuplicatePPLId(id)) { alert("ID PPL sudah ada!"); return; }
+    if (isDuplicatePPLTelepon(noTelepon)) { alert("No. telepon sudah ada!"); return; }
+
+    addPPLAdmin({
+      id: id.trim(),
+      namaPPL: namaPPL.trim(),
+      totalKegiatan: 0,
+      alamat: alamat.trim(),
+      noTelepon: noTelepon.trim()
+    });
+    setNewPPLData({ id: "", namaPPL: "", totalKegiatan: 0, alamat: "", noTelepon: "" });
     setShowAddPPLModal(false);
-    setNewPPLData({ id: '', namaPPL: '', alamat: '', noTelepon: '' });
-    handleSuccess(`PPL "${newPPLData.namaPPL}" berhasil ditambahkan.`);
+    setSuccessMessage(`PPL "${namaPPL}" berhasil ditambahkan!`);
+    setShowSuccessModal(true);
   };
+
   const handleEditPPL = () => {
-    if (editPPLData) {
-      updatePPLAdmin(editPPLData.id, editPPLData);
-      setShowEditPPLModal(false);
-      handleSuccess(`PPL "${editPPLData.namaPPL}" berhasil diperbarui.`);
-    }
+    if (!editPPLData) return;
+    const { id, namaPPL, alamat, noTelepon } = editPPLData;
+    
+    if (!isValidNamaLengkap(namaPPL)) { alert("Nama PPL harus minimal 2 karakter!"); return; }
+    if (!isValidAlamat(alamat)) { alert("Alamat harus minimal 5 karakter!"); return; }
+    if (!isValidTelepon(noTelepon)) { alert("No. telepon harus minimal 10 karakter!"); return; }
+    if (isDuplicatePPLTelepon(noTelepon, editPPLData.id)) { alert("No. telepon sudah ada!"); return; }
+
+    updatePPLAdmin(editPPLData.id, { ...editPPLData, namaPPL: namaPPL.trim(), alamat: alamat.trim(), noTelepon: noTelepon.trim() });
+    setShowEditPPLModal(false);
+    setSuccessMessage(`PPL "${namaPPL}" berhasil diperbarui!`);
+    setShowSuccessModal(true);
   };
+
   const handleDeletePPL = () => {
-    if (pplToDelete) {
-      removePPLAdmin(pplToDelete.id);
-      setPPLToDelete(null);
-      handleSuccess(`PPL "${pplToDelete.namaPPL}" berhasil dihapus.`);
-    }
+    removePPLAdmin(deletePPLId);
+    setShowDeletePPLModal(false);
+    setSuccessMessage(`PPL "${deletePPLName}" berhasil dihapus!`);
+    setShowSuccessModal(true);
   };
 
-  const filteredAndSortedUsers = useMemo(() => { return userList; }, [userList]);
-  const filteredAndSortedKetuaTim = useMemo(() => { return ketuaTimList; }, [ketuaTimList]);
-  const filteredAndSortedPPL = useMemo(() => { return pplAdminList; }, [pplAdminList]);
+  const openEditUserModal = (user: UserData) => { setEditUserData({...user, password: ''}); setShowEditUserModal(true); };
+  const openDeleteUserModal = (user: UserData) => { setDeleteUserId(user.id); setDeleteUserName(user.username); setShowDeleteUserModal(true); };
+  const openEditKetuaTimModal = (ketuaTim: KetuaTimData) => { setEditKetuaTimData(ketuaTim); setShowEditKetuaTimModal(true); };
+  const openDeleteKetuaTimModal = (ketuaTim: KetuaTimData) => { setDeleteKetuaTimId(ketuaTim.id); setDeleteKetuaTimName(ketuaTim.nama); setShowDeleteKetuaTimModal(true); };
+  const openEditPPLModal = (ppl: PPLAdminData) => { setEditPPLData(ppl); setShowEditPPLModal(true); };
+  const openDeletePPLModal = (ppl: PPLAdminData) => { setDeletePPLId(ppl.id); setDeletePPLName(ppl.namaPPL); setShowDeletePPLModal(true); };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-        case 'admin': return 'bg-red-600';
-        case 'supervisor': return 'bg-blue-600';
-        case 'user': return 'bg-green-600';
-        default: return 'bg-gray-600';
-    }
+  const handleUserSort = (key: keyof UserData) => { let direction: 'asc' | 'desc' = 'asc'; if (userSortConfig?.key === key && userSortConfig.direction === 'asc') { direction = 'desc'; } setUserSortConfig({ key, direction }); };
+  const handleKetuaTimSort = (key: keyof KetuaTimData) => { let direction: 'asc' | 'desc' = 'asc'; if (ketuaTimSortConfig?.key === key && ketuaTimSortConfig.direction === 'asc') { direction = 'desc'; } setKetuaTimSortConfig({ key, direction }); };
+  const handlePPLSort = (key: keyof PPLAdminData) => { let direction: 'asc' | 'desc' = 'asc'; if (pplSortConfig?.key === key && pplSortConfig.direction === 'asc') { direction = 'desc'; } setPplSortConfig({ key, direction }); };
+  
+  const getSortIcon = (columnKey: string, sortConfig: any) => {
+    if (!sortConfig || sortConfig.key !== columnKey) { return <ChevronUp className="w-4 h-4 text-gray-300" />; }
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />;
   };
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-        case 'admin': return <Shield className="w-3 h-3" />;
-        case 'supervisor': return <Crown className="w-3 h-3" />;
-        default: return <Users className="w-3 h-3" />;
-    }
-  };
+  
+  const filteredAndSortedUsers = useMemo(() => userList.filter(user => user.username.toLowerCase().includes(userSearchTerm.toLowerCase()) || user.namaLengkap.toLowerCase().includes(userSearchTerm.toLowerCase())).sort((a, b) => { if (!userSortConfig) return 0; const { key, direction } = userSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [userList, userSearchTerm, userSortConfig]);
+  const filteredAndSortedKetuaTim = useMemo(() => ketuaTimList.filter(kt => kt.nama.toLowerCase().includes(ketuaTimSearchTerm.toLowerCase()) || kt.nip.includes(ketuaTimSearchTerm)).sort((a, b) => { if (!ketuaTimSortConfig) return 0; const { key, direction } = ketuaTimSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [ketuaTimList, ketuaTimSearchTerm, ketuaTimSortConfig]);
+  const filteredAndSortedPPL = useMemo(() => pplAdminList.filter(ppl => ppl.namaPPL.toLowerCase().includes(pplSearchTerm.toLowerCase()) || ppl.id.toLowerCase().includes(pplSearchTerm.toLowerCase()) || ppl.alamat.toLowerCase().includes(pplSearchTerm.toLowerCase()) || ppl.noTelepon.includes(pplSearchTerm)).sort((a, b) => { if (!pplSortConfig) return 0; const { key, direction } = pplSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [pplAdminList, pplSearchTerm, pplSortConfig]);
+
+  const getRoleBadgeColor = (role: string) => { switch (role) { case 'admin': return 'bg-red-600'; case 'supervisor': return 'bg-blue-600'; case 'user': return 'bg-green-600'; default: return 'bg-gray-600'; } };
+  const getRoleIcon = (role: string) => { switch (role) { case 'admin': return <Shield className="w-3 h-3" />; case 'supervisor': return <Crown className="w-3 h-3" />; default: return <Users className="w-3 h-3" />; } };
+  
+  const userStats = useMemo(() => ({ totalUsers: userList.length, adminUsers: userList.filter(u => u.role === 'admin').length, supervisorUsers: userList.filter(u => u.role === 'supervisor').length, regularUsers: userList.filter(u => u.role === 'user').length }), [userList]);
+  const ketuaTimStats = useMemo(() => ({ totalKetuaTim: ketuaTimList.length }), [ketuaTimList]);
+  const pplStats = useMemo(() => ({ totalPPL: pplAdminList.length, totalKegiatan: pplAdminList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0), avgKegiatan: pplAdminList.length > 0 ? Math.round(pplAdminList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0) / pplAdminList.length) : 0 }), [pplAdminList]);
 
   return (
     <Layout>
@@ -150,105 +274,169 @@ export default function ManajemenAdmin() {
           <h1 className="text-3xl font-bold text-gray-900">Manajemen Admin</h1>
           <p className="text-gray-600 mt-1">Kelola pengguna sistem, ketua tim, dan PPL</p>
         </div>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+
+        <Tabs defaultValue="users" onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="users">Manajemen Users</TabsTrigger>
             <TabsTrigger value="ketua-tim">Manajemen Ketua Tim</TabsTrigger>
             <TabsTrigger value="ppl">Manajemen PPL</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="users" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total Users</p><p className="text-2xl font-bold text-gray-900">{userStats.totalUsers}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
+              <Card className="border-l-4 border-l-red-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Admin</p><p className="text-2xl font-bold text-gray-900">{userStats.adminUsers}</p></div><Shield className="w-8 h-8 text-red-500" /></div></CardContent></Card>
+              <Card className="border-l-4 border-l-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Supervisor</p><p className="text-2xl font-bold text-gray-900">{userStats.supervisorUsers}</p></div><Crown className="w-8 h-8 text-blue-500" /></div></CardContent></Card>
+              <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">User Biasa</p><p className="text-2xl font-bold text-gray-900">{userStats.regularUsers}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
+            </div>
             <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <CardTitle>Daftar Users</CardTitle>
-                        <Button onClick={() => setShowAddUserModal(true)}><Plus className="w-4 h-4 mr-2"/>Tambah User</Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader><TableRow><TableHead>Username</TableHead><TableHead>Nama Lengkap</TableHead><TableHead>Role</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {filteredAndSortedUsers.map(user => (
-                                <TableRow key={user.id}>
-                                    <TableCell>{user.username}</TableCell>
-                                    <TableCell>{user.namaLengkap}</TableCell>
-                                    <TableCell><Badge className={getRoleBadgeColor(user.role)}>{getRoleIcon(user.role)} {user.role}</Badge></TableCell>
-                                    <TableCell className="flex gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => {setEditUserData(user); setShowEditUserModal(true);}}><Edit className="w-4 h-4"/></Button>
-                                        <Button variant="destructive" size="sm" onClick={() => setUserToDelete(user)}><Trash2 className="w-4 h-4"/></Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <CardTitle>Daftar Users</CardTitle>
+                  <div className="flex gap-4">
+                    <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari username atau nama..." value={userSearchTerm} onChange={(e) => setUserSearchTerm(e.target.value)} className="pl-10"/></div></div>
+                    <Button onClick={() => setShowAddUserModal(true)} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2" />Tambah User</Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-24"><button onClick={() => handleUserSort('id')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">ID User{getSortIcon('id', userSortConfig)}</button></TableHead>
+                        <TableHead className="min-w-32"><button onClick={() => handleUserSort('username')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Username{getSortIcon('username', userSortConfig)}</button></TableHead>
+                        <TableHead className="min-w-48"><button onClick={() => handleUserSort('namaLengkap')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama Lengkap{getSortIcon('namaLengkap', userSortConfig)}</button></TableHead>
+                        <TableHead className="min-w-24"><button onClick={() => handleUserSort('role')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Role{getSortIcon('role', userSortConfig)}</button></TableHead>
+                        <TableHead className="min-w-32">Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAndSortedUsers.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{userSearchTerm ? `Tidak ada user yang cocok dengan "${userSearchTerm}"` : 'Belum ada data user'}</TableCell></TableRow>) : (filteredAndSortedUsers.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">{user.id}</TableCell>
+                            <TableCell className="font-medium">{user.username}</TableCell>
+                            <TableCell>{user.namaLengkap}</TableCell>
+                            <TableCell><Badge variant="default" className={`${getRoleBadgeColor(user.role)} flex items-center gap-1 w-fit`}>{getRoleIcon(user.role)}{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</Badge></TableCell>
+                            <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEditUserModal(user)} className="text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4" /></Button><Button variant="outline" size="sm" onClick={() => openDeleteUserModal(user)} className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4" /></Button></div></TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="ketua-tim" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total Ketua Tim</p><p className="text-2xl font-bold text-gray-900">{ketuaTimStats.totalKetuaTim}</p></div><Crown className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
+                <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Ketua Tim Aktif</p><p className="text-2xl font-bold text-gray-900">{ketuaTimStats.totalKetuaTim}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
+            </div>
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <CardTitle>Daftar Ketua Tim</CardTitle>
-                        <Button onClick={() => setShowAddKetuaTimModal(true)}><Plus className="w-4 h-4 mr-2"/>Tambah Ketua Tim</Button>
+                        <div className="flex gap-4">
+                            <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari nama atau NIP..." value={ketuaTimSearchTerm} onChange={(e) => setKetuaTimSearchTerm(e.target.value)} className="pl-10"/></div></div>
+                            <Button onClick={() => setShowAddKetuaTimModal(true)} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah Ketua Tim</Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader><TableRow><TableHead>Nama</TableHead><TableHead>NIP</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {filteredAndSortedKetuaTim.map(kt => (
-                                <TableRow key={kt.id}>
-                                    <TableCell>{kt.nama}</TableCell>
-                                    <TableCell>{kt.nip}</TableCell>
-                                    <TableCell className="flex gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => {setEditKetuaTimData(kt); setShowEditKetuaTimModal(true);}}><Edit className="w-4 h-4"/></Button>
-                                        <Button variant="destructive" size="sm" onClick={() => setKetuaTimToDelete(kt)}><Trash2 className="w-4 h-4"/></Button>
-                                    </TableCell>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="min-w-24"><button onClick={() => handleKetuaTimSort('id')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">ID{getSortIcon('id', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="min-w-60"><button onClick={() => handleKetuaTimSort('nama')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama{getSortIcon('nama', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="min-w-48"><button onClick={() => handleKetuaTimSort('nip')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">NIP{getSortIcon('nip', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="min-w-32">Status</TableHead>
+                                    <TableHead className="min-w-32">Aksi</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredAndSortedKetuaTim.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{ketuaTimSearchTerm ? `Tidak ada ketua tim yang cocok dengan "${ketuaTimSearchTerm}"` : 'Belum ada data ketua tim'}</TableCell></TableRow>) : (filteredAndSortedKetuaTim.map((ketuaTim) => (
+                                    <TableRow key={ketuaTim.id}>
+                                        <TableCell className="font-medium">{ketuaTim.id}</TableCell>
+                                        <TableCell className="font-medium">{ketuaTim.nama}</TableCell>
+                                        <TableCell>{ketuaTim.nip}</TableCell>
+                                        <TableCell><Badge variant="default" className="bg-bps-green-600">Aktif</Badge></TableCell>
+                                        <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEditKetuaTimModal(ketuaTim)} className="text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4"/></Button><Button variant="outline" size="sm" onClick={() => openDeleteKetuaTimModal(ketuaTim)} className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4"/></Button></div></TableCell>
+                                    </TableRow>
+                                )))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+          </TabsContent>
+          
+           <TabsContent value="ppl" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total PPL</p><p className="text-2xl font-bold text-gray-900">{pplStats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
+                <Card className="border-l-4 border-l-orange-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total Kegiatan</p><p className="text-2xl font-bold text-gray-900">{pplStats.totalKegiatan}</p></div><Activity className="w-8 h-8 text-orange-500" /></div></CardContent></Card>
+                <Card className="border-l-4 border-l-purple-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Rata-rata Kegiatan</p><p className="text-2xl font-bold text-gray-900">{pplStats.avgKegiatan}</p></div><Activity className="w-8 h-8 text-purple-500" /></div></CardContent></Card>
+            </div>
+            <Card>
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <CardTitle>Daftar PPL</CardTitle>
+                        <div className="flex gap-4">
+                            <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari PPL..." value={pplSearchTerm} onChange={(e) => setPplSearchTerm(e.target.value)} className="pl-10"/></div></div>
+                            <Button onClick={() => setShowAddPPLModal(true)} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah PPL</Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead><button onClick={() => handlePPLSort('id')} className="flex items-center gap-1">ID{getSortIcon('id', pplSortConfig)}</button></TableHead>
+                                    <TableHead><button onClick={() => handlePPLSort('namaPPL')} className="flex items-center gap-1">Nama{getSortIcon('namaPPL', pplSortConfig)}</button></TableHead>
+                                    <TableHead><button onClick={() => handlePPLSort('totalKegiatan')} className="flex items-center gap-1">Kegiatan{getSortIcon('totalKegiatan', pplSortConfig)}</button></TableHead>
+                                    <TableHead><button onClick={() => handlePPLSort('alamat')} className="flex items-center gap-1">Alamat{getSortIcon('alamat', pplSortConfig)}</button></TableHead>
+                                    <TableHead><button onClick={() => handlePPLSort('noTelepon')} className="flex items-center gap-1">Telepon{getSortIcon('noTelepon', pplSortConfig)}</button></TableHead>
+                                    <TableHead>Aksi</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredAndSortedPPL.map(ppl => (
+                                    <TableRow key={ppl.id}>
+                                        <TableCell className="font-medium">{ppl.id}</TableCell>
+                                        <TableCell className="font-medium">{ppl.namaPPL}</TableCell>
+                                        <TableCell>{ppl.totalKegiatan}</TableCell>
+                                        <TableCell>{ppl.alamat}</TableCell>
+                                        <TableCell>{ppl.noTelepon}</TableCell>
+                                        <TableCell className="flex gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => openEditPPLModal(ppl)} className="text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4"/></Button>
+                                            <Button variant="outline" size="sm" onClick={() => openDeletePPLModal(ppl)} className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4"/></Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="ppl" className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <CardTitle>Daftar PPL</CardTitle>
-                        <Button onClick={() => setShowAddPPLModal(true)}><Plus className="w-4 h-4 mr-2"/>Tambah PPL</Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader><TableRow><TableHead>Nama PPL</TableHead><TableHead>Alamat</TableHead><TableHead>Telepon</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {filteredAndSortedPPL.map(ppl => (
-                                <TableRow key={ppl.id}>
-                                    <TableCell>{ppl.namaPPL}</TableCell>
-                                    <TableCell>{ppl.alamat}</TableCell>
-                                    <TableCell>{ppl.noTelepon}</TableCell>
-                                    <TableCell className="flex gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => {setEditPPLData(ppl); setShowEditPPLModal(true);}}><Edit className="w-4 h-4"/></Button>
-                                        <Button variant="destructive" size="sm" onClick={() => setPPLToDelete(ppl)}><Trash2 className="w-4 h-4"/></Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
         
-        <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} title="Berhasil!" description={successMessage} />
-        <ConfirmationModal isOpen={!!userToDelete} onClose={() => setUserToDelete(null)} onConfirm={handleDeleteUser} title="Hapus User?" description={`Yakin ingin menghapus user "${userToDelete?.username}"?`} variant="danger" />
-        <ConfirmationModal isOpen={!!ketuaTimToDelete} onClose={() => setKetuaTimToDelete(null)} onConfirm={handleDeleteKetuaTim} title="Hapus Ketua Tim?" description={`Yakin ingin menghapus ketua tim "${ketuaTimToDelete?.nama}"?`} variant="danger" />
-        <ConfirmationModal isOpen={!!pplToDelete} onClose={() => setPPLToDelete(null)} onConfirm={handleDeletePPL} title="Hapus PPL?" description={`Yakin ingin menghapus PPL "${pplToDelete?.namaPPL}"?`} variant="danger" />
-
+        <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} title="Berhasil!" description={successMessage} actionLabel="OK" onAction={() => setShowSuccessModal(false)} />
+        <ConfirmationModal isOpen={showDeleteUserModal} onClose={() => setShowDeleteUserModal(false)} onConfirm={handleDeleteUser} title="Konfirmasi Hapus User" description={`Apakah Anda yakin ingin menghapus user "${deleteUserName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
+        <ConfirmationModal isOpen={showDeleteKetuaTimModal} onClose={() => setShowDeleteKetuaTimModal(false)} onConfirm={handleDeleteKetuaTim} title="Konfirmasi Hapus Ketua Tim" description={`Apakah Anda yakin ingin menghapus ketua tim "${deleteKetuaTimName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
+        <ConfirmationModal isOpen={showDeletePPLModal} onClose={() => setShowDeletePPLModal(false)} onConfirm={handleDeletePPL} title="Konfirmasi Hapus PPL" description={`Apakah Anda yakin ingin menghapus PPL "${deletePPLName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
+        
+        {showAddUserModal && <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Tambah User Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="newUserId">ID User *</Label><Input id="newUserId" value={newUserData.id} onChange={(e) => setNewUserData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID User (contoh: USR001)"/></div><div className="space-y-2"><Label htmlFor="newUsername">Username *</Label><Input id="newUsername" value={newUserData.username} onChange={(e) => setNewUserData(prev => ({ ...prev, username: e.target.value }))} placeholder="Masukkan username"/></div><div className="space-y-2"><Label htmlFor="newPassword">Password *</Label><div className="relative"><Input id="newPassword" type={showPassword ? "text" : "password"} value={newUserData.password} onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))} placeholder="Masukkan password (minimal 6 karakter)"/><Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div><div className="space-y-2"><Label htmlFor="newNamaLengkap">Nama Lengkap *</Label><Input id="newNamaLengkap" value={newUserData.namaLengkap} onChange={(e) => setNewUserData(prev => ({ ...prev, namaLengkap: e.target.value }))} placeholder="Masukkan nama lengkap"/></div><div className="space-y-2"><Label htmlFor="newRole">Role *</Label><Select value={newUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setNewUserData(prev => ({ ...prev, role: value }))}><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddUserModal(false)}>Batal</Button><Button onClick={handleAddUser} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+        {showAddKetuaTimModal && <Dialog open={showAddKetuaTimModal} onOpenChange={setShowAddKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Tambah Ketua Tim Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="newKetuaTimId">ID Ketua Tim *</Label><Input id="newKetuaTimId" value={newKetuaTimData.id} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID Ketua Tim (contoh: KT001)"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNama">Nama *</Label><Input id="newKetuaTimNama" value={newKetuaTimData.nama} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nama: e.target.value }))} placeholder="Masukkan nama ketua tim"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNip">NIP *</Label><Input id="newKetuaTimNip" value={newKetuaTimData.nip} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nip: e.target.value }))} placeholder="Masukkan NIP (minimal 10 karakter)"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddKetuaTimModal(false)}>Batal</Button><Button onClick={handleAddKetuaTim} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+        {showAddPPLModal && <Dialog open={showAddPPLModal} onOpenChange={setShowAddPPLModal}><DialogContent><DialogHeader><DialogTitle>Tambah PPL Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="newPPLId">ID PPL *</Label><Input id="newPPLId" value={newPPLData.id} onChange={(e) => setNewPPLData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID PPL (contoh: PPL001)"/></div><div className="space-y-2"><Label htmlFor="newPPLNama">Nama PPL *</Label><Input id="newPPLNama" value={newPPLData.namaPPL} onChange={(e) => setNewPPLData(prev => ({ ...prev, namaPPL: e.target.value }))} placeholder="Masukkan nama PPL"/></div><div className="space-y-2"><Label htmlFor="newPPLAlamat">Alamat *</Label><Input id="newPPLAlamat" value={newPPLData.alamat} onChange={(e) => setNewPPLData(prev => ({ ...prev, alamat: e.target.value }))} placeholder="Masukkan alamat"/></div><div className="space-y-2"><Label htmlFor="newPPLTelepon">No. Telepon *</Label><Input id="newPPLTelepon" value={newPPLData.noTelepon} onChange={(e) => setNewPPLData(prev => ({ ...prev, noTelepon: e.target.value }))} placeholder="Masukkan no. telepon"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddPPLModal(false)}>Batal</Button><Button onClick={handleAddPPL} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+        
+        {editUserData && <Dialog open={showEditUserModal} onOpenChange={setShowEditUserModal}><DialogContent><DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="editUsername">Username *</Label><Input id="editUsername" value={editUserData.username} onChange={e => setEditUserData({...editUserData, username: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editNamaLengkap">Nama Lengkap *</Label><Input id="editNamaLengkap" value={editUserData.namaLengkap} onChange={e => setEditUserData({...editUserData, namaLengkap: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPassword">Password (kosongkan jika tidak diubah)</Label><Input id="editPassword" type="password" onChange={e => setEditUserData({...editUserData, password: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editRole">Role *</Label><Select value={editUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setEditUserData({...editUserData, role: value})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditUserModal(false)}>Batal</Button><Button onClick={handleEditUser}>Simpan</Button></div></div></DialogContent></Dialog>}
+        {editKetuaTimData && <Dialog open={showEditKetuaTimModal} onOpenChange={setShowEditKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Edit Ketua Tim</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="editKtNama">Nama *</Label><Input id="editKtNama" value={editKetuaTimData.nama} onChange={e => setEditKetuaTimData({...editKetuaTimData, nama: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editKtNip">NIP *</Label><Input id="editKtNip" value={editKetuaTimData.nip} onChange={e => setEditKetuaTimData({...editKetuaTimData, nip: e.target.value})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditKetuaTimModal(false)}>Batal</Button><Button onClick={handleEditKetuaTim}>Simpan</Button></div></div></DialogContent></Dialog>}
+        {editPPLData && <Dialog open={showEditPPLModal} onOpenChange={setShowEditPPLModal}><DialogContent><DialogHeader><DialogTitle>Edit PPL</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="editPplNama">Nama PPL *</Label><Input id="editPplNama" value={editPPLData.namaPPL} onChange={e => setEditPPLData({...editPPLData, namaPPL: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPplAlamat">Alamat *</Label><Input id="editPplAlamat" value={editPPLData.alamat} onChange={e => setEditPPLData({...editPPLData, alamat: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPplTelepon">No. Telepon *</Label><Input id="editPplTelepon" value={editPPLData.noTelepon} onChange={e => setEditPPLData({...editPPLData, noTelepon: e.target.value})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditPPLModal(false)}>Batal</Button><Button onClick={handleEditPPL}>Simpan</Button></div></div></DialogContent></Dialog>}
       </div>
     </Layout>
   );

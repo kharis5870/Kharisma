@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -9,7 +9,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Users, UserCheck, Search, ChevronUp, ChevronDown, UserPlus, Activity } from "lucide-react";
+import { 
+  Users, 
+  UserCheck, 
+  Search,
+  ChevronUp,
+  ChevronDown,
+  UserPlus,
+  MapPin,
+  Phone,
+  Activity
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLAdminData } from "@shared/api";
 
@@ -38,8 +48,8 @@ export default function DaftarPPL() {
     );
     if (sortConfig) {
         data.sort((a, b) => {
-            const aValue = a[sortConfig.key];
-            const bValue = b[sortConfig.key];
+            const aValue = a[sortConfig.key] as any;
+            const bValue = b[sortConfig.key] as any;
             if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
@@ -76,12 +86,12 @@ export default function DaftarPPL() {
     return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />;
   };
 
-  const stats = {
+  const stats = useMemo(() => ({
     totalPPL: pplList.length,
     activePPL: pplList.length,
     totalKegiatan: pplList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0),
     avgKegiatan: pplList.length > 0 ? Math.round(pplList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0) / pplList.length) : 0
-  };
+  }), [pplList]);
 
   return (
     <Layout>
@@ -112,7 +122,7 @@ export default function DaftarPPL() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12"><Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} /></TableHead>
+                    <TableHead className="w-12"><Checkbox checked={isAllSelected} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead>
                     <TableHead><button onClick={() => handleSort('id')} className="flex items-center gap-1">ID{getSortIcon('id')}</button></TableHead>
                     <TableHead><button onClick={() => handleSort('namaPPL')} className="flex items-center gap-1">Nama{getSortIcon('namaPPL')}</button></TableHead>
                     <TableHead><button onClick={() => handleSort('totalKegiatan')} className="flex items-center gap-1">Kegiatan{getSortIcon('totalKegiatan')}</button></TableHead>
@@ -131,9 +141,23 @@ export default function DaftarPPL() {
                               <TableCell><Checkbox checked={selectedPPLs.includes(ppl.id)} onCheckedChange={(checked) => handleSelectPPL(ppl.id, !!checked)} /></TableCell>
                               <TableCell className="font-medium">{ppl.id}</TableCell>
                               <TableCell className="font-medium">{ppl.namaPPL}</TableCell>
-                              <TableCell>{ppl.totalKegiatan}</TableCell>
-                              <TableCell>{ppl.alamat}</TableCell>
-                              <TableCell>{ppl.noTelepon}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                  {ppl.totalKegiatan} kegiatan
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-4 h-4 text-gray-400" />
+                                  <span>{ppl.alamat}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Phone className="w-4 h-4 text-gray-400" />
+                                  <span>{ppl.noTelepon}</span>
+                                </div>
+                              </TableCell>
                               <TableCell><Badge variant="default" className="bg-bps-green-600">Aktif</Badge></TableCell>
                           </TableRow>
                       ))
@@ -143,7 +167,14 @@ export default function DaftarPPL() {
             </div>
           </CardContent>
         </Card>
-        <SuccessModal isOpen={showBulkSuccessModal} onClose={() => setShowBulkSuccessModal(false)} onAction={() => { setShowBulkSuccessModal(false); navigate('/input-kegiatan'); }} title="PPL Berhasil Ditambahkan!" description={`${selectedPPLs.length} PPL yang dipilih telah ditambahkan ke form Input Kegiatan.`} actionLabel="Ke Input Kegiatan" />
+        <SuccessModal 
+            isOpen={showBulkSuccessModal} 
+            onClose={() => setShowBulkSuccessModal(false)} 
+            onAction={() => { setShowBulkSuccessModal(false); navigate('/input-kegiatan'); }} 
+            title="PPL Berhasil Ditambahkan!" 
+            description={`${selectedPPLs.length} PPL yang dipilih telah ditambahkan ke form Input Kegiatan.`} 
+            actionLabel="Ke Input Kegiatan" 
+        />
       </div>
     </Layout>
   );
