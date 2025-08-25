@@ -4,21 +4,21 @@ import cors from "cors";
 import kegiatanRoutes from './routes/kegiatan';
 import honorRoutes from './routes/honor';
 import pplRoutes from './routes/ppl';
-import ketuaTimRoutes from './routes/ketuaTim'; 
+import ketuaTimRoutes from './routes/ketuaTim';
+import adminRoutes from './routes/admin'; // <-- Impor rute admin baru
 
 export function createServer() {
   const app = express();
   
-  // Middleware
   app.use(cors());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // API routes
   app.use('/api/kegiatan', kegiatanRoutes);
   app.use('/api/honor', honorRoutes);
   app.use('/api/ppl', pplRoutes);
-  app.use('/api/ketua-tim', ketuaTimRoutes); 
+  app.use('/api/ketua-tim', ketuaTimRoutes);
+  app.use('/api/admin', adminRoutes); // <-- Daftarkan rute admin baru
 
   return app;
 }

@@ -16,7 +16,8 @@ export default function Header() {
     { name: "Input Kegiatan", href: "/input-kegiatan" },
     { name: "Dashboard", href: "/dashboard" },
     { name: "Manajemen Honor", href: "/manajemen-honor" },
-    { name: "Manajemen PPL", href: "/manajemen-ppl" }, // <-- Tambah link baru
+    { name: "Daftar PPL", href: "/daftar-ppl" }, // <-- Ubah nama link
+    { name: "Manajemen Admin", href: "/manajemen-admin" }, // <-- Tambah link baru
   ];
 
   const handleLogoutClick = () => {
