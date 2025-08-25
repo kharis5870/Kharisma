@@ -43,6 +43,20 @@ type DateFieldName =
   | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
   | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
+// --- Helper Functions untuk Format Angka ---
+const formatHonor = (value: string | number): string => {
+  if (value === '' || value === null || value === undefined) return '';
+  const numString = String(value).replace(/\./g, '');
+  const num = Number(numString);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('id-ID');
+};
+
+const parseHonor = (value: string): string => {
+  return value.replace(/\./g, '');
+};
+// --- Akhir Helper Functions ---
+
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     const res = await fetch(`/api/kegiatan/${id}`);
     if (!res.ok) throw new Error("Kegiatan tidak ditemukan");
@@ -310,9 +324,9 @@ export default function EditActivity() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
-                                    <Select value={formData.ketua_tim_id?.toString()} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
+                                    <Select value={formData.ketua_tim_id} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
                                         <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
-                                        <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id.toString()}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
+                                        <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
                                     </Select>
                                 </div>
                               </div>
@@ -385,7 +399,21 @@ export default function EditActivity() {
                                             </div>
                                             <div className="space-y-2"><Label>Beban Kerja *</Label><Input placeholder="Beban Kerja" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} /></div>
                                             <div className="space-y-2"><Label>Satuan</Label><Input placeholder="Contoh: Hari" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} /></div>
-                                            <div className="space-y-2"><Label>Honor (Rp) *</Label><Input placeholder="Contoh: 2000000" value={ppl.besaranHonor} onChange={e => updatePPL(ppl.clientId, 'besaranHonor', e.target.value)} /></div>
+                                            <div className="space-y-2">
+                                                <Label>Honor (Rp) *</Label>
+                                                {/* PERBAIKAN: Terapkan format honor */}
+                                                <Input 
+                                                    placeholder="Contoh: 2.000.000" 
+                                                    value={formatHonor(ppl.besaranHonor)} 
+                                                    onChange={e => {
+                                                        const parsedValue = parseHonor(e.target.value);
+                                                        if (/^\d*$/.test(parsedValue)) { // Hanya izinkan angka
+                                                            updatePPL(ppl.clientId, 'besaranHonor', parsedValue);
+                                                        }
+                                                    }}
+                                                    inputMode="numeric" 
+                                                />
+                                            </div>
                                             <div className="space-y-2 md:col-span-2 lg:col-span-3"><Label>Nama PML *</Label><Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => updatePPL(ppl.clientId, 'namaPML', e.target.value)} /></div>
                                         </div>
                                     </div>

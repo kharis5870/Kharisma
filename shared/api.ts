@@ -13,10 +13,10 @@ export interface Dokumen {
 }
 
 export interface PPL {
-  id?: number;
+  id?: number; 
   kegiatanId?: number;
-  ppl_master_id: string;
-  namaPPL?: string;
+  ppl_master_id: string; 
+  namaPPL?: string; 
   namaPML: string;
   bebanKerja: string;
   satuanBebanKerja: string;
@@ -42,7 +42,7 @@ export interface Kegiatan {
   id: number;
   namaKegiatan: string;
   ketua_tim_id: string;
-  namaKetua?: string;
+  namaKetua?: string; 
   timKerja: string;
   adaListing: boolean;
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';
@@ -66,15 +66,16 @@ export interface PPLHonorData {
   honorBulanIni: number;
   activitiesCount: number;
   kegiatanNames: string[];
-  honorPerBulan: number[];
+  honorPerBulan: number[]; 
 }
+
 
 // --- Tipe Data Baru untuk Halaman Admin ---
 
 export interface UserData {
     id: string;
     username: string;
-    password?: string;
+    password?: string; // Password bersifat opsional saat mengambil data
     namaLengkap: string;
     role: 'admin' | 'supervisor' | 'user';
 }
@@ -91,4 +92,5 @@ export interface PPLAdminData {
     totalKegiatan: number;
     alamat: string;
     noTelepon: string;
+    kegiatanNames: string[]; // <-- Tambahkan properti ini
 }

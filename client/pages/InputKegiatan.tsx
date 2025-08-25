@@ -22,11 +22,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore from "@/stores/useInputKegiatanStore";
 import { Dokumen, PPLMaster, KetuaTim } from "@shared/api";
 
-type DateFieldName =
+type DateFieldName = 
   | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
   | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData'
   | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
   | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
+
+// --- Helper Functions untuk Format Angka ---
+const formatHonor = (value: string | number): string => {
+  if (value === '' || value === null || value === undefined) return '';
+  const numString = String(value).replace(/\./g, '');
+  const num = Number(numString);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('id-ID');
+};
+
+const parseHonor = (value: string): string => {
+  return value.replace(/\./g, '');
+};
+// --- Akhir Helper Functions ---
 
 const createActivity = async (data: any) => {
     const sanitizedData = {
@@ -61,7 +75,7 @@ export default function InputKegiatan() {
   const { selectedPPLsForActivity, clearSelectedPPLsForActivity } = usePPL();
   const { data: pplList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
   const { data: ketuaTimList = [] } = useQuery({ queryKey: ['ketuaTim'], queryFn: fetchKetuaTim });
-
+  
   const [activeTab, setActiveTab] = useState("persiapan");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
@@ -97,7 +111,7 @@ export default function InputKegiatan() {
   });
 
   const validateForm = () => {
-    return store.namaKegiatan && store.ketua_tim_id &&
+    return store.namaKegiatan && store.ketua_tim_id && 
            store.tanggalMulaiPersiapan && store.tanggalSelesaiPersiapan &&
            store.tanggalMulaiPengumpulanData && store.tanggalSelesaiPengumpulanData &&
            store.tanggalMulaiPengolahanAnalisis && store.tanggalSelesaiPengolahanAnalisis &&
@@ -125,7 +139,7 @@ export default function InputKegiatan() {
   };
 
   const handleSuccessAction = () => navigate('/dashboard');
-
+  
   const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
     const documents = store.documents?.filter(d => d.tipe === tipe) || [];
     return (
@@ -197,8 +211,8 @@ export default function InputKegiatan() {
           <Card>
             <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                {([
-                    {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'},
+                {([ 
+                    {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, 
                     {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},
                     {label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'},
                     {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'},
@@ -214,7 +228,7 @@ export default function InputKegiatan() {
                 ))}
             </CardContent>
           </Card>
-
+          
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
               <TabsList className="grid w-full grid-cols-4"><TabsTrigger value="persiapan">Persiapan</TabsTrigger><TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger><TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger><TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger></TabsList>
               <TabsContent value="persiapan">{renderDocumentSection('persiapan', 'Persiapan')}</TabsContent>
@@ -248,7 +262,21 @@ export default function InputKegiatan() {
                             </div>
                             <div className="space-y-2"><Label>Beban Kerja *</Label><Input placeholder="Beban Kerja" value={ppl.bebanKerja} onChange={e => store.updatePPL(ppl.id, 'bebanKerja', e.target.value)} /></div>
                             <div className="space-y-2"><Label>Satuan</Label><Input placeholder="Contoh: Hari" value={ppl.satuanBebanKerja} onChange={e => store.updatePPL(ppl.id, 'satuanBebanKerja', e.target.value)} /></div>
-                            <div className="space-y-2"><Label>Honor (Rp) *</Label><Input placeholder="Contoh: 2000000" value={ppl.besaranHonor} onChange={e => store.updatePPL(ppl.id, 'besaranHonor', e.target.value)} /></div>
+                            <div className="space-y-2">
+                                <Label>Honor (Rp) *</Label>
+                                {/* PERBAIKAN: Terapkan format honor */}
+                                <Input 
+                                    placeholder="Contoh: 2.000.000" 
+                                    value={formatHonor(ppl.besaranHonor)} 
+                                    onChange={e => {
+                                        const parsedValue = parseHonor(e.target.value);
+                                        if (/^\d*$/.test(parsedValue)) { // Hanya izinkan angka
+                                            store.updatePPL(ppl.id, 'besaranHonor', parsedValue);
+                                        }
+                                    }}
+                                    inputMode="numeric" 
+                                />
+                            </div>
                             <div className="space-y-2 md:col-span-2 lg:col-span-3"><Label>Nama PML *</Label><Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => store.updatePPL(ppl.id, 'namaPML', e.target.value)} /></div>
                         </div>
                     </div>

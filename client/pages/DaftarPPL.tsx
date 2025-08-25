@@ -1,3 +1,5 @@
+// client/pages/DaftarPPL.tsx
+
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -9,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { 
   Users, 
   UserCheck, 
@@ -18,7 +21,8 @@ import {
   UserPlus,
   MapPin,
   Phone,
-  Activity
+  Activity,
+  List
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLAdminData } from "@shared/api";
@@ -29,6 +33,42 @@ const fetchPPLs = async (): Promise<PPLAdminData[]> => {
     return res.json();
 };
 
+// Komponen baru untuk Modal Detail Kegiatan
+const ActivityDetailModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, onClose: () => void, pplData: PPLAdminData | null }) => {
+    if (!pplData) return null;
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Detail Kegiatan: {pplData.namaPPL}</DialogTitle>
+                    <DialogDescription>
+                        Berikut adalah daftar semua kegiatan yang pernah diikuti.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="mt-4 max-h-80 overflow-y-auto">
+                    {pplData.kegiatanNames && pplData.kegiatanNames.length > 0 ? (
+                        <ul className="space-y-2">
+                            {pplData.kegiatanNames.map((kegiatan, index) => (
+                                <li key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-md">
+                                    <List className="w-4 h-4 text-bps-blue-500 mt-1 flex-shrink-0" />
+                                    <span>{kegiatan}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-gray-500 text-center py-4">Tidak ada kegiatan tercatat.</p>
+                    )}
+                </div>
+                <div className="mt-6 flex justify-end">
+                    <Button variant="outline" onClick={onClose}>Tutup</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
 export default function DaftarPPL() {
   const navigate = useNavigate();
   const { setSelectedPPLsForActivity } = usePPL();
@@ -38,6 +78,10 @@ export default function DaftarPPL() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{ key: keyof PPLAdminData; direction: 'asc' | 'desc'; } | null>(null);
   const [selectedPPLs, setSelectedPPLs] = useState<string[]>([]);
+  
+  // State untuk modal detail
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedPplDetails, setSelectedPplDetails] = useState<PPLAdminData | null>(null);
 
   const filteredAndSortedData = useMemo(() => {
     let data = [...pplList].filter(ppl => 
@@ -84,6 +128,11 @@ export default function DaftarPPL() {
   const getSortIcon = (columnKey: string) => {
     if (!sortConfig || sortConfig.key !== columnKey) return <ChevronUp className="w-4 h-4 text-gray-300" />;
     return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />;
+  };
+
+  const handleOpenDetailModal = (ppl: PPLAdminData) => {
+    setSelectedPplDetails(ppl);
+    setIsDetailModalOpen(true);
   };
 
   const stats = useMemo(() => ({
@@ -142,9 +191,9 @@ export default function DaftarPPL() {
                               <TableCell className="font-medium">{ppl.id}</TableCell>
                               <TableCell className="font-medium">{ppl.namaPPL}</TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                                  {ppl.totalKegiatan} kegiatan
-                                </Badge>
+                                <Button variant="link" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailModal(ppl)}>
+                                    {ppl.totalKegiatan} Kegiatan
+                                </Button>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
@@ -174,6 +223,11 @@ export default function DaftarPPL() {
             title="PPL Berhasil Ditambahkan!" 
             description={`${selectedPPLs.length} PPL yang dipilih telah ditambahkan ke form Input Kegiatan.`} 
             actionLabel="Ke Input Kegiatan" 
+        />
+        <ActivityDetailModal 
+            isOpen={isDetailModalOpen}
+            onClose={() => setIsDetailModalOpen(false)}
+            pplData={selectedPplDetails}
         />
       </div>
     </Layout>

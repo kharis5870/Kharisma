@@ -1,3 +1,5 @@
+// client/pages/ManajemenHonor.tsx
+
 import { useState, useMemo } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";

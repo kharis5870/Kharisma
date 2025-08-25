@@ -4,22 +4,18 @@ import { RowDataPacket, OkPacket } from 'mysql2';
 import db from '../db';
 import { UserData, KetuaTimData, PPLAdminData } from '@shared/api';
 
-// --- User Management ---
+// --- User Management --- (Tidak ada perubahan)
 export const getAllUsers = async (): Promise<UserData[]> => {
-    // Perbaikan: Menggunakan nama kolom 'nama_lengkap' dari database
     const [rows] = await db.query<RowDataPacket[]>('SELECT id, username, nama_lengkap AS namaLengkap, role FROM users ORDER BY nama_lengkap ASC');
     return rows as UserData[];
 };
 export const createUser = async (user: UserData): Promise<UserData> => {
-    // Di aplikasi nyata, password harus di-hash! Contoh: bcrypt.hash(user.password, 10)
     const { id, username, password, namaLengkap, role } = user;
-    // Perbaikan: Menggunakan nama kolom 'nama_lengkap' saat INSERT
     await db.execute('INSERT INTO users (id, username, password, nama_lengkap, role) VALUES (?, ?, ?, ?, ?)', [id, username, password, namaLengkap, role]);
     return user;
 };
 export const updateUser = async (id: string, user: UserData): Promise<UserData> => {
     const { username, password, namaLengkap, role } = user;
-    // Perbaikan: Menggunakan nama kolom 'nama_lengkap' saat UPDATE dan tidak mengubah Primary Key (id)
     if (password) {
         await db.execute('UPDATE users SET username = ?, password = ?, nama_lengkap = ?, role = ? WHERE id = ?', [username, password, namaLengkap, role, id]);
     } else {
@@ -32,7 +28,7 @@ export const deleteUser = async (id: string): Promise<boolean> => {
     return result.affectedRows > 0;
 };
 
-// --- Ketua Tim Management ---
+// --- Ketua Tim Management --- (Tidak ada perubahan)
 export const getAllKetuaTim = async (): Promise<KetuaTimData[]> => {
     const [rows] = await db.query<RowDataPacket[]>('SELECT id, nama_ketua AS nama, nip FROM ketua_tim ORDER BY nama_ketua ASC');
     return rows as KetuaTimData[];
@@ -44,7 +40,6 @@ export const createKetuaTim = async (data: KetuaTimData): Promise<KetuaTimData> 
 };
 export const updateKetuaTim = async (id: string, data: KetuaTimData): Promise<KetuaTimData> => {
     const { nama, nip } = data;
-    // Perbaikan: Tidak mengubah Primary Key (id)
     await db.execute('UPDATE ketua_tim SET nama_ketua = ?, nip = ? WHERE id = ?', [nama, nip, id]);
     return data;
 };
@@ -55,20 +50,27 @@ export const deleteKetuaTim = async (id: string): Promise<boolean> => {
 
 // --- PPL Management ---
 export const getAllPPLAdmin = async (): Promise<PPLAdminData[]> => {
+    // PERBAIKAN: Menambahkan JOIN dan GROUP_CONCAT untuk mengambil nama kegiatan
     const query = `
         SELECT 
             pm.id, 
             pm.namaPPL, 
             pm.alamat, 
             pm.noTelepon,
-            COUNT(p.kegiatanId) AS totalKegiatan
+            COUNT(DISTINCT p.kegiatanId) AS totalKegiatan,
+            GROUP_CONCAT(DISTINCT k.namaKegiatan SEPARATOR ';;') as kegiatanNames
         FROM ppl_master pm
         LEFT JOIN ppl p ON pm.id = p.ppl_master_id
+        LEFT JOIN kegiatan k ON p.kegiatanId = k.id
         GROUP BY pm.id, pm.namaPPL, pm.alamat, pm.noTelepon
         ORDER BY pm.namaPPL ASC
     `;
     const [rows] = await db.query<RowDataPacket[]>(query);
-    return rows as PPLAdminData[];
+    // PERBAIKAN: Memproses kegiatanNames menjadi array
+    return rows.map(row => ({
+        ...row,
+        kegiatanNames: row.kegiatanNames ? row.kegiatanNames.split(';;') : []
+    })) as PPLAdminData[];
 };
 export const createPPLAdmin = async (data: PPLAdminData): Promise<PPLAdminData> => {
     const { id, namaPPL, alamat, noTelepon } = data;
@@ -77,7 +79,6 @@ export const createPPLAdmin = async (data: PPLAdminData): Promise<PPLAdminData> 
 };
 export const updatePPLAdmin = async (id: string, data: PPLAdminData): Promise<PPLAdminData> => {
     const { namaPPL, alamat, noTelepon } = data;
-    // Perbaikan: Tidak mengubah Primary Key (id)
     await db.execute('UPDATE ppl_master SET namaPPL = ?, alamat = ?, noTelepon = ? WHERE id = ?', [namaPPL, alamat, noTelepon, id]);
     return data;
 };
