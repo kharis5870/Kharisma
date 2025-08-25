@@ -3,8 +3,9 @@ import { persist } from 'zustand/middleware';
 import { Dokumen, PPL } from "@shared/api";
 
 // --- Tipe Data Frontend ---
-interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId'> {
+interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId' | 'pplId'> {
   id: string;
+  pplId: string;
 }
 
 interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'uploadedAt'> {
@@ -17,11 +18,17 @@ export type State = {
   timKerja: string;
   adaListing: boolean;
   pplAllocations: PPLItem[];
-  tanggalMulaiPelatihan?: Date;
-  tanggalSelesaiPelatihan?: Date;
-  tanggalMulaiPendataan?: Date;
-  tanggalSelesaiPendataan?: Date;
   documents: DocumentItem[];
+
+  // Jadwal baru per tahapan
+  tanggalMulaiPersiapan?: Date;
+  tanggalSelesaiPersiapan?: Date;
+  tanggalMulaiPengumpulanData?: Date;
+  tanggalSelesaiPengumpulanData?: Date;
+  tanggalMulaiPengolahanAnalisis?: Date;
+  tanggalSelesaiPengolahanAnalisis?: Date;
+  tanggalMulaiDiseminasiEvaluasi?: Date;
+  tanggalSelesaiDiseminasiEvaluasi?: Date;
 };
 
 export type Actions = {
@@ -38,18 +45,9 @@ export type Actions = {
 };
 
 const mandatoryDocs: Omit<DocumentItem, 'id' | 'link'>[] = [
-    { nama: 'Surat Tugas', tipe: 'persiapan', isWajib: true, jenis: 'link' },
-    { nama: 'Undangan', tipe: 'persiapan', isWajib: true, jenis: 'link' },
-    { nama: 'Daftar Hadir', tipe: 'persiapan', isWajib: true, jenis: 'link' },
-    { nama: 'Notulensi', tipe: 'persiapan', isWajib: true, jenis: 'link' },
-    { nama: 'KAK', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
-    { nama: 'SK', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
-    { nama: 'ST', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
-    { nama: 'Visum', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
-    { nama: 'Laporan Pengumpulan Data', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+    { nama: 'Dokumen Persiapan Wajib 1', tipe: 'persiapan', isWajib: true, jenis: 'link' },
+    { nama: 'Laporan Pengumpulan Data Wajib', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
     { nama: 'Laporan Pengolahan & Analisis Wajib', tipe: 'pengolahan-analisis', isWajib: true, jenis: 'link' },
-    { nama: 'Laporan Kegiatan', tipe: 'diseminasi-evaluasi', isWajib: true, jenis: 'link' },
-    { nama: 'Publikasi', tipe: 'diseminasi-evaluasi', isWajib: true, jenis: 'link' },
     { nama: 'Laporan Diseminasi & Evaluasi Wajib', tipe: 'diseminasi-evaluasi', isWajib: true, jenis: 'link' },
 ];
 
@@ -58,12 +56,16 @@ const initialState: State = {
   ketuaTim: "",
   timKerja: "",
   adaListing: false,
-  pplAllocations: [{ id: "1", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }],
-  tanggalMulaiPelatihan: undefined,
-  tanggalSelesaiPelatihan: undefined,
-  tanggalMulaiPendataan: undefined,
-  tanggalSelesaiPendataan: undefined,
-  documents: mandatoryDocs.map((doc, i) => ({ ...doc, id: `wajib-initial-${i}`, link: '' }))
+  pplAllocations: [{ id: "1", pplId: "", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }],
+  documents: mandatoryDocs.map((doc, i) => ({ ...doc, id: `wajib-initial-${i}`, link: '' })),
+  tanggalMulaiPersiapan: undefined,
+  tanggalSelesaiPersiapan: undefined,
+  tanggalMulaiPengumpulanData: undefined,
+  tanggalSelesaiPengumpulanData: undefined,
+  tanggalMulaiPengolahanAnalisis: undefined,
+  tanggalSelesaiPengolahanAnalisis: undefined,
+  tanggalMulaiDiseminasiEvaluasi: undefined,
+  tanggalSelesaiDiseminasiEvaluasi: undefined,
 };
 
 const useInputKegiatanStore = create<State & Actions>()(
@@ -71,7 +73,7 @@ const useInputKegiatanStore = create<State & Actions>()(
     (set): State & Actions => ({
       ...initialState,
       updateFormField: (field: keyof State, value: any) => set({ [field as any]: value }),
-      addPPL: () => set((state: State) => ({ pplAllocations: [...state.pplAllocations, { id: Date.now().toString(), namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }] })),
+      addPPL: () => set((state: State) => ({ pplAllocations: [...state.pplAllocations, { id: Date.now().toString(), pplId: "", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }] })),
       removePPL: (id: string) => set((state: State) => ({ pplAllocations: state.pplAllocations.filter((ppl: PPLItem) => ppl.id !== id) })),
       updatePPL: (id: string, field: keyof Omit<PPLItem, 'id'>, value: string) => set((state: State) => ({
         pplAllocations: state.pplAllocations.map((ppl: PPLItem) =>

@@ -33,25 +33,29 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
 
         const {
             namaKegiatan, ketuaTim, timKerja, adaListing,
-            tanggalMulaiPelatihan, tanggalSelesaiPelatihan,
-            tanggalMulaiPendataan, tanggalSelesaiPendataan,
+            tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
+            tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
+            tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
+            tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
             pplAllocations, documents
         } = data;
 
         const kegiatanQuery = `
             INSERT INTO kegiatan 
             (namaKegiatan, ketuaTim, timKerja, adaListing,
-             tanggalMulaiPelatihan, tanggalSelesaiPelatihan, 
-             tanggalMulaiPendataan, tanggalSelesaiPendataan, 
+             tanggalMulaiPersiapan, tanggalSelesaiPersiapan, 
+             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
+             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
+             tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
              status, progressKeseluruhan) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
             namaKegiatan, ketuaTim, timKerja, adaListing || false,
-            tanggalMulaiPelatihan || null,
-            tanggalSelesaiPelatihan || null,
-            tanggalMulaiPendataan || null,
-            tanggalSelesaiPendataan || null
+            tanggalMulaiPersiapan || null, tanggalSelesaiPersiapan || null,
+            tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
+            tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
+            tanggalMulaiDiseminasiEvaluasi || null, tanggalSelesaiDiseminasiEvaluasi || null,
         ]);
         const kegiatanId = kegiatanResult.insertId;
 
@@ -95,6 +99,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
     }
 }
 
+// ... (fungsi updatePplProgress tetap sama)
 export const updatePplProgress = async (pplId: number, progressData: { open: number; submit: number; diperiksa: number; approved: number; }) => {
     const { open, submit, diperiksa, approved } = progressData;
     const query = `
@@ -130,23 +135,29 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
 
         const {
             namaKegiatan, ketuaTim, timKerja, adaListing,
-            tanggalMulaiPelatihan, tanggalSelesaiPelatihan,
-            tanggalMulaiPendataan, tanggalSelesaiPendataan,
+            tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
+            tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
+            tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
+            tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
             ppl, dokumen 
         } = data;
 
         const kegiatanQuery = `
             UPDATE kegiatan SET 
             namaKegiatan = ?, ketuaTim = ?, timKerja = ?, adaListing = ?,
-            tanggalMulaiPelatihan = ?, tanggalSelesaiPelatihan = ?, 
-            tanggalMulaiPendataan = ?, tanggalSelesaiPendataan = ?,
+            tanggalMulaiPersiapan = ?, tanggalSelesaiPersiapan = ?, 
+            tanggalMulaiPengumpulanData = ?, tanggalSelesaiPengumpulanData = ?,
+            tanggalMulaiPengolahanAnalisis = ?, tanggalSelesaiPengolahanAnalisis = ?,
+            tanggalMulaiDiseminasiEvaluasi = ?, tanggalSelesaiDiseminasiEvaluasi = ?,
             lastUpdated = CURRENT_TIMESTAMP
             WHERE id = ?
         `;
         await connection.execute(kegiatanQuery, [
             namaKegiatan, ketuaTim, timKerja, adaListing || false,
-            tanggalMulaiPelatihan || null, tanggalSelesaiPelatihan || null,
-            tanggalMulaiPendataan || null, tanggalSelesaiPendataan || null,
+            tanggalMulaiPersiapan || null, tanggalSelesaiPersiapan || null,
+            tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
+            tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
+            tanggalMulaiDiseminasiEvaluasi || null, tanggalSelesaiDiseminasiEvaluasi || null,
             id
         ]);
 
@@ -194,6 +205,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
     }
 }
 
+// ... (sisa fungsi tetap sama)
 export const deleteKegiatan = async (id: number): Promise<boolean> => {
     const connection = await db.getConnection();
     try {
@@ -224,7 +236,6 @@ export const updateDocumentStatus = async (dokumenId: number, status: Dokumen['s
     return rows[0] as Dokumen;
 };
 
-// Fungsi baru untuk approve semua dokumen dalam satu tahapan
 export const approveDocumentsByTipe = async (kegiatanId: number, tipe: Dokumen['tipe']): Promise<OkPacket> => {
     const query = 'UPDATE dokumen SET status = ? WHERE kegiatanId = ? AND tipe = ?';
     const [result] = await db.execute<OkPacket>(query, ['Approved', kegiatanId, tipe]);

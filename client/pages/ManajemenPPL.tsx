@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -12,18 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Plus,
-  Trash2,
-  Edit,
-  Users,
-  UserCheck,
-  Search,
-  ChevronUp,
-  ChevronDown,
-  Save,
-  UserPlus
-} from "lucide-react";
+import { Plus, Trash2, Edit, Users, UserCheck, Search, ChevronUp, ChevronDown, Save, UserPlus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PPLMaster } from "@shared/api";
 
@@ -71,7 +60,6 @@ export default function ManajemenPPL() {
     const updateMutation = useMutation({ mutationFn: updatePPLAPI, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pplMaster'] }) });
     const deleteMutation = useMutation({ mutationFn: deletePPLAPI, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pplMaster'] }) });
     
-    // States for modals and forms
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -79,7 +67,6 @@ export default function ManajemenPPL() {
     const [successMessage, setSuccessMessage] = useState("");
     const [showBulkSuccessModal, setShowBulkSuccessModal] = useState(false);
     
-    // Form states
     const [newPPLId, setNewPPLId] = useState("");
     const [newPPLName, setNewPPLName] = useState("");
     const [editPPLId, setEditPPLId] = useState("");
@@ -88,11 +75,9 @@ export default function ManajemenPPL() {
     const [deletePPLId, setDeletePPLId] = useState("");
     const [deletePPLName, setDeletePPLName] = useState("");
     
-    // Search and sort states
     const [searchTerm, setSearchTerm] = useState("");
     const [sortConfig, setSortConfig] = useState<{ key: 'id' | 'namaPPL'; direction: 'asc' | 'desc'; } | null>(null);
 
-    // Selection states
     const [selectedPPLs, setSelectedPPLs] = useState<string[]>([]);
     
     const filteredAndSortedData = useMemo(() => {
@@ -111,13 +96,11 @@ export default function ManajemenPPL() {
         return filteredAndSortedData.length > 0 && selectedPPLs.length === filteredAndSortedData.length;
     }, [selectedPPLs, filteredAndSortedData]);
 
-    // Form validation
     const isValidPPLId = (id: string) => id.trim().length >= 1;
     const isValidPPLName = (name: string) => name.trim().length >= 2;
     const isDuplicateId = (id: string, excludeId?: string) => pplList.some(ppl => ppl.id === id && ppl.id !== excludeId);
     const isDuplicateName = (name: string, excludeId?: string) => pplList.some(ppl => ppl.namaPPL.toLowerCase() === name.toLowerCase() && ppl.id !== excludeId);
     
-    // Handlers
     const handleAddPPL = () => {
         const trimmedId = newPPLId.trim();
         const trimmedName = newPPLName.trim();

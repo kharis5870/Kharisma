@@ -23,16 +23,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 type ClientPPL = PPL & { clientId: string };
 type ClientDokumen = Dokumen & { clientId: string };
 
-type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan'> & {
-    tanggalMulaiPelatihan?: Date;
-    tanggalSelesaiPelatihan?: Date;
-    tanggalMulaiPendataan?: Date;
-    tanggalSelesaiPendataan?: Date;
+type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan' | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData' | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis' | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi'> & {
+    tanggalMulaiPersiapan?: Date;
+    tanggalSelesaiPersiapan?: Date;
+    tanggalMulaiPengumpulanData?: Date;
+    tanggalSelesaiPengumpulanData?: Date;
+    tanggalMulaiPengolahanAnalisis?: Date;
+    tanggalSelesaiPengolahanAnalisis?: Date;
+    tanggalMulaiDiseminasiEvaluasi?: Date;
+    tanggalSelesaiDiseminasiEvaluasi?: Date;
     ppl: ClientPPL[];
     dokumen: ClientDokumen[];
 };
 
-type DateFieldName = 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan';
+type DateFieldName = 
+  | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
+  | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData'
+  | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
+  | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
 // --- API Functions ---
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
@@ -89,10 +97,14 @@ export default function EditActivity() {
 
             setFormData({
                 ...initialData,
-                tanggalMulaiPelatihan: parseDate(initialData.tanggalMulaiPelatihan),
-                tanggalSelesaiPelatihan: parseDate(initialData.tanggalSelesaiPelatihan),
-                tanggalMulaiPendataan: parseDate(initialData.tanggalMulaiPendataan),
-                tanggalSelesaiPendataan: parseDate(initialData.tanggalSelesaiPendataan),
+                tanggalMulaiPersiapan: parseDate(initialData.tanggalMulaiPersiapan),
+                tanggalSelesaiPersiapan: parseDate(initialData.tanggalSelesaiPersiapan),
+                tanggalMulaiPengumpulanData: parseDate(initialData.tanggalMulaiPengumpulanData),
+                tanggalSelesaiPengumpulanData: parseDate(initialData.tanggalSelesaiPengumpulanData),
+                tanggalMulaiPengolahanAnalisis: parseDate(initialData.tanggalMulaiPengolahanAnalisis),
+                tanggalSelesaiPengolahanAnalisis: parseDate(initialData.tanggalSelesaiPengolahanAnalisis),
+                tanggalMulaiDiseminasiEvaluasi: parseDate(initialData.tanggalMulaiDiseminasiEvaluasi),
+                tanggalSelesaiDiseminasiEvaluasi: parseDate(initialData.tanggalSelesaiDiseminasiEvaluasi),
                 dokumen: initialData.dokumen.map((d, i) => ({...d, clientId: d.id?.toString() || `doc-${Date.now()}-${i}` })),
                 ppl: initialData.ppl.map((p, i) => ({...p, clientId: p.id?.toString() || `ppl-${Date.now()}-${i}` }))
             });
@@ -167,10 +179,14 @@ export default function EditActivity() {
         const dataToSubmit = {
             ...formData,
             id: formData.id,
-            tanggalMulaiPelatihan: formData.tanggalMulaiPelatihan && isValid(formData.tanggalMulaiPelatihan) ? format(formData.tanggalMulaiPelatihan, 'yyyy-MM-dd') : undefined,
-            tanggalSelesaiPelatihan: formData.tanggalSelesaiPelatihan && isValid(formData.tanggalSelesaiPelatihan) ? format(formData.tanggalSelesaiPelatihan, 'yyyy-MM-dd') : undefined,
-            tanggalMulaiPendataan: formData.tanggalMulaiPendataan && isValid(formData.tanggalMulaiPendataan) ? format(formData.tanggalMulaiPendataan, 'yyyy-MM-dd') : undefined,
-            tanggalSelesaiPendataan: formData.tanggalSelesaiPendataan && isValid(formData.tanggalSelesaiPendataan) ? format(formData.tanggalSelesaiPendataan, 'yyyy-MM-dd') : undefined,
+            tanggalMulaiPersiapan: formData.tanggalMulaiPersiapan && isValid(formData.tanggalMulaiPersiapan) ? format(formData.tanggalMulaiPersiapan, 'yyyy-MM-dd') : undefined,
+            tanggalSelesaiPersiapan: formData.tanggalSelesaiPersiapan && isValid(formData.tanggalSelesaiPersiapan) ? format(formData.tanggalSelesaiPersiapan, 'yyyy-MM-dd') : undefined,
+            tanggalMulaiPengumpulanData: formData.tanggalMulaiPengumpulanData && isValid(formData.tanggalMulaiPengumpulanData) ? format(formData.tanggalMulaiPengumpulanData, 'yyyy-MM-dd') : undefined,
+            tanggalSelesaiPengumpulanData: formData.tanggalSelesaiPengumpulanData && isValid(formData.tanggalSelesaiPengumpulanData) ? format(formData.tanggalSelesaiPengumpulanData, 'yyyy-MM-dd') : undefined,
+            tanggalMulaiPengolahanAnalisis: formData.tanggalMulaiPengolahanAnalisis && isValid(formData.tanggalMulaiPengolahanAnalisis) ? format(formData.tanggalMulaiPengolahanAnalisis, 'yyyy-MM-dd') : undefined,
+            tanggalSelesaiPengolahanAnalisis: formData.tanggalSelesaiPengolahanAnalisis && isValid(formData.tanggalSelesaiPengolahanAnalisis) ? format(formData.tanggalSelesaiPengolahanAnalisis, 'yyyy-MM-dd') : undefined,
+            tanggalMulaiDiseminasiEvaluasi: formData.tanggalMulaiDiseminasiEvaluasi && isValid(formData.tanggalMulaiDiseminasiEvaluasi) ? format(formData.tanggalMulaiDiseminasiEvaluasi, 'yyyy-MM-dd') : undefined,
+            tanggalSelesaiDiseminasiEvaluasi: formData.tanggalSelesaiDiseminasiEvaluasi && isValid(formData.tanggalSelesaiDiseminasiEvaluasi) ? format(formData.tanggalSelesaiDiseminasiEvaluasi, 'yyyy-MM-dd') : undefined,
         };
         mutation.mutate(dataToSubmit as Partial<Kegiatan> & {id: number});
     };
@@ -254,7 +270,7 @@ export default function EditActivity() {
     if (isLoading) return <Layout><div>Memuat data kegiatan...</div></Layout>;
     if (isError) return <Layout><div>Gagal memuat data. Silakan coba lagi.</div></Layout>;
     
-    const ketuaTimOptions = ["MOHAMMAD FATHAN ROMDHONI, S.ST., M.Si", "ENGKY HENDARMADI R, S.E", "ROSSI BETTEGA, S.E", "NOPTI RIANAH, SP", "EDIANTO, SE", "WILSON, SE", "YAYUK KURNIA NINGSIH, S.I.KOM", "ANDI OKTA FENGKI, SSI., M.SI", "DEFRI ARIYANTO, SSI., M.SI"];
+    const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
 
     return (
         <Layout>
@@ -303,8 +319,17 @@ export default function EditActivity() {
                         </Card>
                         <Card>
                             <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {([ {label: 'Mulai Pelatihan', field: 'tanggalMulaiPelatihan'}, {label: 'Selesai Pelatihan', field: 'tanggalSelesaiPelatihan'}, {label: 'Mulai Pendataan', field: 'tanggalMulaiPendataan'}, {label: 'Selesai Pendataan', field: 'tanggalSelesaiPendataan'} ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                                {([ 
+                                    {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, 
+                                    {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},
+                                    {label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'},
+                                    {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'},
+                                    {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'},
+                                    {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'},
+                                    {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'},
+                                    {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}
+                                ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
                                     <div key={field} className="space-y-2">
                                         <Label>{label}</Label>
                                         <Popover>

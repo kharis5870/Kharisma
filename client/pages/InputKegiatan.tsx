@@ -17,12 +17,15 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import useInputKegiatanStore, { State as InputKegiatanState } from "@/stores/useInputKegiatanStore";
+import useInputKegiatanStore from "@/stores/useInputKegiatanStore";
 import { Dokumen, PPLMaster } from "@shared/api";
 
-type DateFieldName = 'tanggalMulaiPelatihan' | 'tanggalSelesaiPelatihan' | 'tanggalMulaiPendataan' | 'tanggalSelesaiPendataan';
+type DateFieldName = 
+  | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
+  | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData'
+  | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
+  | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
-// --- API Functions ---
 const createActivity = async (data: any) => {
     const sanitizedData = {
         ...data,
@@ -85,7 +88,12 @@ export default function InputKegiatan() {
   });
 
   const validateForm = () => {
-    return store.namaKegiatan && store.ketuaTim && store.tanggalMulaiPelatihan && store.tanggalSelesaiPelatihan && store.tanggalMulaiPendataan && store.tanggalSelesaiPendataan && store.pplAllocations.every(ppl => ppl.pplId && ppl.bebanKerja && ppl.besaranHonor && ppl.namaPML);
+    return store.namaKegiatan && store.ketuaTim && 
+           store.tanggalMulaiPersiapan && store.tanggalSelesaiPersiapan &&
+           store.tanggalMulaiPengumpulanData && store.tanggalSelesaiPengumpulanData &&
+           store.tanggalMulaiPengolahanAnalisis && store.tanggalSelesaiPengolahanAnalisis &&
+           store.tanggalMulaiDiseminasiEvaluasi && store.tanggalSelesaiDiseminasiEvaluasi &&
+           store.pplAllocations.every(ppl => ppl.pplId && ppl.bebanKerja && ppl.besaranHonor && ppl.namaPML);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -96,15 +104,19 @@ export default function InputKegiatan() {
     }
     mutation.mutate({
         ...store,
-        tanggalMulaiPelatihan: format(store.tanggalMulaiPelatihan!, 'yyyy-MM-dd'),
-        tanggalSelesaiPelatihan: format(store.tanggalSelesaiPelatihan!, 'yyyy-MM-dd'),
-        tanggalMulaiPendataan: format(store.tanggalMulaiPendataan!, 'yyyy-MM-dd'),
-        tanggalSelesaiPendataan: format(store.tanggalSelesaiPendataan!, 'yyyy-MM-dd')
+        tanggalMulaiPersiapan: format(store.tanggalMulaiPersiapan!, 'yyyy-MM-dd'),
+        tanggalSelesaiPersiapan: format(store.tanggalSelesaiPersiapan!, 'yyyy-MM-dd'),
+        tanggalMulaiPengumpulanData: format(store.tanggalMulaiPengumpulanData!, 'yyyy-MM-dd'),
+        tanggalSelesaiPengumpulanData: format(store.tanggalSelesaiPengumpulanData!, 'yyyy-MM-dd'),
+        tanggalMulaiPengolahanAnalisis: format(store.tanggalMulaiPengolahanAnalisis!, 'yyyy-MM-dd'),
+        tanggalSelesaiPengolahanAnalisis: format(store.tanggalSelesaiPengolahanAnalisis!, 'yyyy-MM-dd'),
+        tanggalMulaiDiseminasiEvaluasi: format(store.tanggalMulaiDiseminasiEvaluasi!, 'yyyy-MM-dd'),
+        tanggalSelesaiDiseminasiEvaluasi: format(store.tanggalSelesaiDiseminasiEvaluasi!, 'yyyy-MM-dd'),
     });
   };
 
   const handleSuccessAction = () => navigate('/dashboard');
-  const ketuaTimOptions = ["MOHAMMAD FATHAN ROMDHONI, S.ST., M.Si", "ENGKY HENDARMADI R, S.E", "ROSSI BETTEGA, S.E", "NOPTI RIANAH, SP", "EDIANTO, SE", "WILSON, SE", "YAYUK KURNIA NINGSIH, S.I.KOM", "ANDI OKTA FENGKI, SSI., M.SI", "DEFRI ARIYANTO, SSI., M.SI"];
+  const ketuaTimOptions = ["Dr. Ahmad Surya", "Dra. Siti Rahma", "M. Budi Santoso, S.St"];
   
   const renderDocumentSection = (tipe: Dokumen['tipe'], title: string) => {
     const documents = store.documents?.filter(d => d.tipe === tipe) || [];
@@ -171,8 +183,17 @@ export default function InputKegiatan() {
           </Card>
           <Card>
             <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {([ {label: 'Mulai Pelatihan', field: 'tanggalMulaiPelatihan'}, {label: 'Selesai Pelatihan', field: 'tanggalSelesaiPelatihan'}, {label: 'Mulai Pendataan', field: 'tanggalMulaiPendataan'}, {label: 'Selesai Pendataan', field: 'tanggalSelesaiPendataan'} ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                {([ 
+                    {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, 
+                    {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},
+                    {label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'},
+                    {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'},
+                    {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'},
+                    {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'},
+                    {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'},
+                    {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}
+                ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
                     <div key={field} className="space-y-2">
                         <Label>{label}</Label>
                         <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start", !store[field] && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{store[field] ? format(store[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={store[field] as Date} onSelect={(date) => store.updateFormField(field, date)} /></PopoverContent></Popover>

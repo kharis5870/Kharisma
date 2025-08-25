@@ -38,13 +38,19 @@ export interface Kegiatan {
   adaListing: boolean;
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';
   progressKeseluruhan: number;
-  tanggalMulaiPelatihan?: string;
-  tanggalSelesaiPelatihan?: string;
-  tanggalMulaiPendataan?: string;
-  tanggalSelesaiPendataan?: string;
   lastUpdated: string;
   dokumen: Dokumen[];
   ppl: PPL[];
+
+  // Jadwal baru per tahapan
+  tanggalMulaiPersiapan?: string;
+  tanggalSelesaiPersiapan?: string;
+  tanggalMulaiPengumpulanData?: string;
+  tanggalSelesaiPengumpulanData?: string;
+  tanggalMulaiPengolahanAnalisis?: string;
+  tanggalSelesaiPengolahanAnalisis?: string;
+  tanggalMulaiDiseminasiEvaluasi?: string;
+  tanggalSelesaiDiseminasiEvaluasi?: string;
 }
 
 export interface PPLHonorData {
