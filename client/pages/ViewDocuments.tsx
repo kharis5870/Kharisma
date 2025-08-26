@@ -1,6 +1,9 @@
+// client/pages/ViewDocuments.tsx
+
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext"; // <-- Impor useAuth
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +44,7 @@ const approveTahapan = async ({ kegiatanId, tipe }: { kegiatanId: number, tipe: 
 
 export default function ViewDocuments() {
     const { id } = useParams<{ id: string }>();
+    const { user } = useAuth(); // <-- Dapatkan informasi user
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState("persiapan");
     const [noteViewModal, setNoteViewModal] = useState<{ isOpen: boolean; title: string; content: string }>({ isOpen: false, title: '', content: '' });
@@ -123,6 +127,7 @@ export default function ViewDocuments() {
                 <TableBody>
                     {documents.map((doc) => {
                         const isApproved = doc.status === 'Approved';
+                        const isApprovalDisabled = user?.role === 'user'; // <-- Cek role
                         return (
                             <TableRow key={doc.id}>
                                 <TableCell className="font-medium flex items-center gap-2">
@@ -152,7 +157,9 @@ export default function ViewDocuments() {
                                         variant={isApproved ? "destructive" : "default"} 
                                         size="sm" 
                                         onClick={() => handleStatusChange(doc.id!, doc.status)}
+                                        disabled={isApprovalDisabled} // <-- Terapkan disabled
                                         className={cn("flex items-center gap-1", isApproved ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700")}
+                                        title={isApprovalDisabled ? "Anda tidak memiliki izin untuk aksi ini" : ""}
                                     >
                                         {isApproved ? <ThumbsDown className="w-3 h-3" /> : <ThumbsUp className="w-3 h-3" />}
                                         {isApproved ? 'Batal' : 'Setujui'}
@@ -169,6 +176,7 @@ export default function ViewDocuments() {
     const renderTahapanContent = (tipe: Dokumen['tipe'], title: string) => {
         const documents = activityData?.dokumen.filter(d => d.tipe === tipe);
         const allApproved = documents && documents.length > 0 ? documents.every(d => d.status === 'Approved') : false;
+        const isApprovalDisabled = user?.role === 'user'; // <-- Cek role
 
         return (
             <Card>
@@ -178,8 +186,9 @@ export default function ViewDocuments() {
                         <Button
                             size="sm"
                             onClick={() => handleApproveTahapan(tipe)}
-                            disabled={allApproved || !documents || documents.length === 0}
+                            disabled={allApproved || !documents || documents.length === 0 || isApprovalDisabled} // <-- Terapkan disabled
                             className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+                            title={isApprovalDisabled ? "Anda tidak memiliki izin untuk aksi ini" : ""}
                         >
                             <CheckCircle className="w-4 h-4 mr-2" />
                             {allApproved ? 'Tahap Disetujui' : 'Setujui Tahap Ini'}

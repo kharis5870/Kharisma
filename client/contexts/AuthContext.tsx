@@ -1,9 +1,12 @@
+// client/contexts/AuthContext.tsx
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { UserData } from '@shared/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  username: string | null;
-  login: (username: string) => void;
+  user: UserData | null; // <-- Ganti username menjadi objek user
+  login: (userData: UserData) => void;
   logout: () => void;
   checkAuth: () => boolean;
 }
@@ -24,45 +27,44 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState<string | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
 
-  // Check authentication status on mount
   useEffect(() => {
     checkAuth();
   }, []);
 
   const checkAuth = (): boolean => {
     const authStatus = localStorage.getItem('isAuthenticated');
-    const storedUsername = localStorage.getItem('username');
+    const storedUser = localStorage.getItem('user');
     
-    if (authStatus === 'true' && storedUsername) {
+    if (authStatus === 'true' && storedUser) {
       setIsAuthenticated(true);
-      setUsername(storedUsername);
+      setUser(JSON.parse(storedUser));
       return true;
     } else {
       setIsAuthenticated(false);
-      setUsername(null);
+      setUser(null);
       return false;
     }
   };
 
-  const login = (username: string) => {
+  const login = (userData: UserData) => {
     localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('username', username);
+    localStorage.setItem('user', JSON.stringify(userData));
     setIsAuthenticated(true);
-    setUsername(username);
+    setUser(userData);
   };
 
   const logout = () => {
     localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('username');
+    localStorage.removeItem('user');
     setIsAuthenticated(false);
-    setUsername(null);
+    setUser(null);
   };
 
   const value: AuthContextType = {
     isAuthenticated,
-    username,
+    user,
     login,
     logout,
     checkAuth,

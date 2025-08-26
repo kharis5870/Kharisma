@@ -1,3 +1,5 @@
+// client/components/Header.tsx
+
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,16 +11,19 @@ import { cn } from "@/lib/utils";
 export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { username, logout } = useAuth();
+  const { user, logout } = useAuth(); // Ganti username menjadi user
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const navigation = [
-    { name: "Input Kegiatan", href: "/input-kegiatan" },
-    { name: "Dashboard", href: "/dashboard" },
-    { name: "Manajemen Honor", href: "/manajemen-honor" },
-    { name: "Daftar PPL", href: "/daftar-ppl" }, // <-- Ubah nama link
-    { name: "Manajemen Admin", href: "/manajemen-admin" }, // <-- Tambah link baru
+  const allNavigation = [
+    { name: "Input Kegiatan", href: "/input-kegiatan", roles: ['admin', 'supervisor', 'user'] },
+    { name: "Dashboard", href: "/dashboard", roles: ['admin', 'supervisor', 'user'] },
+    { name: "Manajemen Honor", href: "/manajemen-honor", roles: ['admin', 'supervisor', 'user'] },
+    { name: "Daftar PPL", href: "/daftar-ppl", roles: ['admin', 'supervisor', 'user'] },
+    { name: "Manajemen Admin", href: "/manajemen-admin", roles: ['admin'] }, // <-- Hanya untuk admin
   ];
+
+  // Filter navigasi berdasarkan role user
+  const navigation = allNavigation.filter(item => user && item.roles.includes(user.role));
 
   const handleLogoutClick = () => {
     setShowLogoutModal(true);
@@ -47,7 +52,7 @@ export default function Header() {
               <div className="flex items-center gap-4 text-white">
                 <div className="hidden sm:flex items-center gap-2 text-sm">
                   <User className="w-4 h-4" />
-                  <span>Selamat datang, <strong>{username}</strong></span>
+                  <span>Selamat datang, <strong>{user?.username || 'User'}</strong></span>
                 </div>
                 <Button
                   variant="outline"
