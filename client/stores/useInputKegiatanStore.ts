@@ -5,9 +5,17 @@ import { persist } from 'zustand/middleware';
 import { Dokumen, PPL } from "@shared/api";
 
 // --- Tipe Data Frontend ---
-interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId' | 'namaPPL'> {
-  id: string; // Ini adalah ID unik untuk state di frontend, bukan ID database
-  namaPPL: string; // Nama tetap disimpan untuk tampilan di UI
+type Tahap = 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi';
+
+interface HonorariumTahap {
+  satuanBebanKerja: string;
+  hargaSatuan: string;
+}
+
+// PPLItem sekarang lebih ramping
+interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId' | 'namaPPL' | 'satuanBebanKerja' | 'hargaSatuan'> {
+  id: string; // ID unik untuk state di frontend
+  namaPPL: string; // Nama tetap disimpan untuk UI
 }
 
 interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'uploadedAt'> {
@@ -21,8 +29,9 @@ export type State = {
   adaListing: boolean;
   pplAllocations: PPLItem[];
   documents: DocumentItem[];
+  honorarium: Record<Tahap, HonorariumTahap>; // State baru untuk honor per tahap
 
-  // Jadwal baru per tahapan
+  // Jadwal per tahapan
   tanggalMulaiPersiapan?: Date;
   tanggalSelesaiPersiapan?: Date;
   tanggalMulaiPengumpulanData?: Date;
@@ -34,8 +43,9 @@ export type State = {
 };
 
 export type Actions = {
-  updateFormField: (field: keyof State, value: any) => void;
-  addPPL: (tahap: PPL['tahap']) => void; // <-- Diperbarui
+  updateFormField: (field: keyof Omit<State, 'honorarium' | 'pplAllocations' | 'documents'>, value: any) => void;
+  updateHonorariumTahap: (tahap: Tahap, field: keyof HonorariumTahap, value: string) => void;
+  addPPL: (tahap: PPL['tahap']) => void;
   removePPL: (id: string) => void;
   updatePPL: (id: string, field: keyof PPLItem, value: string | number) => void;
   addDocumentLink: (tipe: Dokumen['tipe']) => void;
@@ -64,13 +74,23 @@ const mandatoryDocs: Omit<DocumentItem, 'id' | 'link'>[] = [
     { nama: 'Laporan Diseminasi & Evaluasi', tipe: 'diseminasi-evaluasi', isWajib: true, jenis: 'link' },
 ];
 
+const parseHonor = (value: string): string => String(value).replace(/\./g, '');
+
+const initialHonorariumState: Record<Tahap, HonorariumTahap> = {
+  persiapan: { satuanBebanKerja: '', hargaSatuan: '' },
+  'pengumpulan-data': { satuanBebanKerja: '', hargaSatuan: '' },
+  'pengolahan-analisis': { satuanBebanKerja: '', hargaSatuan: '' },
+  'diseminasi-evaluasi': { satuanBebanKerja: '', hargaSatuan: '' },
+};
+
 const initialState: State = {
   namaKegiatan: "",
   ketua_tim_id: undefined,
   deskripsiKegiatan: "",
   adaListing: false,
-  pplAllocations: [], 
+  pplAllocations: [],
   documents: mandatoryDocs.map((doc, i) => ({ ...doc, id: `wajib-initial-${i}`, link: '' })),
+  honorarium: initialHonorariumState,
   tanggalMulaiPersiapan: undefined,
   tanggalSelesaiPersiapan: undefined,
   tanggalMulaiPengumpulanData: undefined,
@@ -83,10 +103,30 @@ const initialState: State = {
 
 const useInputKegiatanStore = create<State & Actions>()(
   persist(
-    (set): State & Actions => ({
+    (set, get): State & Actions => ({
       ...initialState,
-      updateFormField: (field: keyof State, value: any) => set({ [field as any]: value }),
-      addPPL: (tahap) => set((state: State) => ({ 
+      updateFormField: (field, value) => set({ [field as any]: value }),
+      
+      updateHonorariumTahap: (tahap, field, value) => set(state => {
+          const newHonorariumState = {
+              ...state.honorarium,
+              [tahap]: { ...state.honorarium[tahap], [field]: value }
+          };
+
+          // Recalculate honor for all PPLs in this stage
+          const updatedPplAllocations = state.pplAllocations.map(ppl => {
+              if (ppl.tahap === tahap) {
+                  const bebanKerja = parseInt(ppl.bebanKerja) || 0;
+                  const hargaSatuan = field === 'hargaSatuan' ? parseInt(parseHonor(value)) || 0 : parseInt(parseHonor(newHonorariumState[tahap].hargaSatuan)) || 0;
+                  return { ...ppl, besaranHonor: (bebanKerja * hargaSatuan).toString() };
+              }
+              return ppl;
+          });
+
+          return { honorarium: newHonorariumState, pplAllocations: updatedPplAllocations };
+      }),
+
+      addPPL: (tahap) => set((state) => ({ 
         pplAllocations: [
             ...state.pplAllocations, 
             { 
@@ -94,31 +134,46 @@ const useInputKegiatanStore = create<State & Actions>()(
                 ppl_master_id: "", 
                 namaPPL: "", 
                 bebanKerja: "", 
-                satuanBebanKerja: "",
-                hargaSatuan: "", 
-                besaranHonor: "", 
+                besaranHonor: "0", 
                 namaPML: "",
-                tahap: tahap // <-- Tahap ditambahkan
+                tahap: tahap
             }
         ] 
       })),
-      removePPL: (id: string) => set((state: State) => ({ pplAllocations: state.pplAllocations.filter((ppl: PPLItem) => ppl.id !== id) })),
-      updatePPL: (id: string, field: keyof PPLItem, value: string | number) => set((state: State) => ({
-        pplAllocations: state.pplAllocations.map((ppl: PPLItem) =>
-          ppl.id === id ? { ...ppl, [field]: value } : ppl
-        )
+      
+      removePPL: (id) => set((state) => ({ pplAllocations: state.pplAllocations.filter((ppl) => ppl.id !== id) })),
+      
+      updatePPL: (id, field, value) => set((state) => ({
+        pplAllocations: state.pplAllocations.map((ppl) => {
+          if (ppl.id === id) {
+            const updatedPpl = { ...ppl, [field]: value };
+            if (field === 'bebanKerja') {
+              const bebanKerja = parseInt(String(value)) || 0;
+              const hargaSatuan = parseInt(parseHonor(state.honorarium[ppl.tahap].hargaSatuan)) || 0;
+              updatedPpl.besaranHonor = (bebanKerja * hargaSatuan).toString();
+            }
+            return updatedPpl;
+          }
+          return ppl;
+        })
       })),
-      addDocumentLink: (tipe) => set((state: State) => ({
+
+      addDocumentLink: (tipe) => set((state) => ({
         documents: [...state.documents, { id: Date.now().toString(), nama: "", jenis: 'link', tipe, link: '', isWajib: false }]
       })),
-      updateDocument: (id: string, field: 'nama' | 'link', value: string) => set((state: State) => ({
-        documents: state.documents.map((doc: DocumentItem) =>
+      
+      updateDocument: (id, field, value) => set((state) => ({
+        documents: state.documents.map((doc) =>
           doc.id === id ? { ...doc, [field]: value } : doc
         )
       })),
-      removeDocument: (id: string) => set((state: State) => ({ documents: state.documents.filter((doc: DocumentItem) => doc.id !== id) })),
-      setPplAllocations: (allocations: PPLItem[]) => set({ pplAllocations: allocations }),
-      setDocuments: (documents: DocumentItem[]) => set({ documents }),
+
+      removeDocument: (id) => set((state) => ({ documents: state.documents.filter((doc) => doc.id !== id) })),
+      
+      setPplAllocations: (allocations) => set({ pplAllocations: allocations }),
+      
+      setDocuments: (documents) => set({ documents }),
+      
       resetForm: () => set(initialState),
     }),
     {

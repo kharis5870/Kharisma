@@ -1,6 +1,6 @@
 // client/pages/InputKegiatan.tsx
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -32,30 +32,38 @@ type DateFieldName =
 // Helper functions for honorarium formatting
 const formatHonor = (value: string | number): string => {
   if (value === '' || value === null || value === undefined) return '';
-  const numString = String(value).replace(/\./g, '');
+  const numString = String(value).replace(/[^0-9]/g, '');
   const num = Number(numString);
   if (isNaN(num)) return '';
   return num.toLocaleString('id-ID');
 };
 
-const parseHonor = (value: string): string => value.replace(/\./g, '');
+const parseHonor = (value: string): string => String(value).replace(/\./g, '');
 
 // API functions
 const createActivity = async (data: any) => {
+    // Menyesuaikan data PPL untuk backend
+    const sanitizedPplAllocations = data.pplAllocations.map((ppl: any) => ({
+        ...ppl,
+        besaranHonor: parseHonor(ppl.besaranHonor),
+        satuanBebanKerja: data.honorarium[ppl.tahap].satuanBebanKerja,
+        hargaSatuan: parseHonor(data.honorarium[ppl.tahap].hargaSatuan),
+    }));
+
     const sanitizedData = {
         ...data,
         documents: data.documents.map(({ id, ...rest }: any) => rest),
-        pplAllocations: data.pplAllocations.map(({ id, namaPPL, besaranHonor, hargaSatuan, ...rest }: any) => ({
-            ...rest,
-            besaranHonor: parseHonor(besaranHonor),
-            hargaSatuan: parseHonor(hargaSatuan)
-        })),
+        pplAllocations: sanitizedPplAllocations,
     };
+    
+    delete sanitizedData.honorarium;
+
     const res = await fetch('/api/kegiatan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitizedData),
     });
+
     if (!res.ok) throw new Error('Gagal membuat kegiatan');
     return res.json();
 }
@@ -72,6 +80,135 @@ const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
     return res.json();
 };
 
+// **Komponen PPL Item yang Dioptimalkan**
+const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: any) => {
+    const [bebanKerja, setBebanKerja] = useState(ppl.bebanKerja);
+    const [namaPML, setNamaPML] = useState(ppl.namaPML);
+    const [isComboboxOpen, setIsComboboxOpen] = useState(false);
+    
+    // Ambil data honorarium dari store
+    const honorariumTahap = useInputKegiatanStore(state => state.honorarium[ppl.tahap]);
+
+    // Sinkronisasi state lokal jika prop dari store berubah
+    useEffect(() => {
+        setBebanKerja(ppl.bebanKerja);
+        setNamaPML(ppl.namaPML);
+    }, [ppl.bebanKerja, ppl.namaPML]);
+
+    // Kalkulasi honor secara dinamis berdasarkan state lokal dan store
+    const totalHonor = useMemo(() => {
+        const beban = parseInt(bebanKerja) || 0;
+        const harga = parseInt(parseHonor(honorariumTahap.hargaSatuan)) || 0;
+        return (beban * harga).toString();
+    }, [bebanKerja, honorariumTahap.hargaSatuan]);
+
+    const handleBebanKerjaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setBebanKerja(e.target.value);
+    };
+
+    const handleBebanKerjaBlur = () => {
+        // Hanya update store saat onBlur jika nilainya berubah
+        if (bebanKerja !== ppl.bebanKerja) {
+            store.getState().updatePPL(ppl.id, 'bebanKerja', bebanKerja);
+        }
+    };
+    
+    const handleNamaPMLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setNamaPML(e.target.value);
+    };
+    
+    const handleNamaPMLBlur = () => {
+        if (namaPML !== ppl.namaPML) {
+            store.getState().updatePPL(ppl.id, 'namaPML', namaPML);
+        }
+    };
+
+    // Update honor di store setiap kali hasil kalkulasi berubah
+    useEffect(() => {
+        if (ppl.besaranHonor !== totalHonor) {
+            store.getState().updatePPL(ppl.id, 'besaranHonor', totalHonor);
+        }
+    }, [totalHonor, ppl.id, ppl.besaranHonor, store]);
+    
+    return (
+        <div className="p-4 border rounded-lg space-y-4 bg-gray-50">
+            <div className="flex justify-between items-center">
+                <h4 className="font-medium">Alokasi {index + 1}</h4>
+                <Button type="button" variant="ghost" size="icon" onClick={onRemove}>
+                    <Trash2 className="w-4 h-4 text-red-500"/>
+                </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="space-y-2 lg:col-span-2">
+                    <Label>Pilih PPL *</Label>
+                    <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" className="w-full justify-between">
+                                {ppl.namaPPL || "Pilih PPL..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <Command>
+                                <CommandInput placeholder="Cari PPL..." />
+                                <CommandList>
+                                    <CommandEmpty>PPL tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                        {pplList.map((pplOption: PPLMaster) => (
+                                            <CommandItem 
+                                                key={pplOption.id} 
+                                                value={`${pplOption.id} ${pplOption.namaPPL}`} 
+                                                onSelect={() => {
+                                                    store.getState().updatePPL(ppl.id, 'ppl_master_id', pplOption.id);
+                                                    store.getState().updatePPL(ppl.id, 'namaPPL', pplOption.namaPPL);
+                                                    setIsComboboxOpen(false);
+                                                }}>
+                                                <Check className={cn("mr-2 h-4 w-4", ppl.ppl_master_id === pplOption.id ? "opacity-100" : "opacity-0")} />
+                                                <div className="flex flex-col">
+                                                    <span>{pplOption.namaPPL}</span>
+                                                    <span className="text-xs text-gray-500">ID: {pplOption.id}</span>
+                                                </div>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor={`bebanKerja-${ppl.id}`}>Jumlah Beban Kerja *</Label>
+                    <Input 
+                        id={`bebanKerja-${ppl.id}`}
+                        placeholder="Contoh: 12" 
+                        value={bebanKerja} 
+                        onChange={handleBebanKerjaChange}
+                        onBlur={handleBebanKerjaBlur}
+                        type="number"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>Total Honor (Rp) *</Label>
+                    <Input 
+                        value={formatHonor(ppl.besaranHonor)} 
+                        readOnly 
+                        className="bg-gray-100" 
+                    />
+                </div>
+                <div className="space-y-2 lg:col-span-5">
+                    <Label htmlFor={`namaPML-${ppl.id}`}>Nama PML *</Label>
+                    <Input 
+                        id={`namaPML-${ppl.id}`}
+                        placeholder="Nama PML" 
+                        value={namaPML} 
+                        onChange={handleNamaPMLChange}
+                        onBlur={handleNamaPMLBlur}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+});
 
 export default function InputKegiatan() {
   const { user } = useAuth();
@@ -84,7 +221,6 @@ export default function InputKegiatan() {
   const [activeTab, setActiveTab] = useState("info-dasar");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
-  const [pplComboboxStates, setPplComboboxStates] = useState<{ [key: string]: boolean }>({});
 
   const store = useInputKegiatanStore();
 
@@ -95,9 +231,7 @@ export default function InputKegiatan() {
             ppl_master_id: ppl.id,
             namaPPL: ppl.namaPPL,
             bebanKerja: "",
-            satuanBebanKerja: "",
-            hargaSatuan: "",
-            besaranHonor: "",
+            besaranHonor: "0",
             namaPML: "",
             tahap: "persiapan" as const
         }));
@@ -151,67 +285,85 @@ export default function InputKegiatan() {
   const handleSuccessAction = () => navigate('/dashboard');
 
   const AlokasiPPLContent = () => {
-    const pplForStage = useMemo(() => store.pplAllocations.filter(p => p.tahap === 'persiapan'), [store.pplAllocations]);
+    const tahap = 'persiapan';
+    const pplForStage = useInputKegiatanStore(state => state.pplAllocations.filter(p => p.tahap === tahap));
+    const honorariumTahap = useInputKegiatanStore(state => state.honorarium[tahap]);
+    const { updateHonorariumTahap, addPPL, removePPL } = useInputKegiatanStore.getState();
+    
+    // State lokal untuk input honorarium agar tidak lag
+    const [localSatuan, setLocalSatuan] = useState(honorariumTahap.satuanBebanKerja);
+    const [localHarga, setLocalHarga] = useState(formatHonor(honorariumTahap.hargaSatuan));
 
-    const updatePPL = (id: string, field: keyof typeof pplForStage[0], value: any) => {
-        const currentPpl = pplForStage.find(p => p.id === id);
-        if (!currentPpl) return;
-        
-        let newValues = { [field]: value };
-        
-        if (field === 'bebanKerja' || field === 'hargaSatuan') {
-            const bebanKerja = field === 'bebanKerja' ? parseInt(value) || 0 : parseInt(currentPpl.bebanKerja) || 0;
-            const hargaSatuan = field === 'hargaSatuan' ? parseInt(parseHonor(value)) || 0 : parseInt(parseHonor(currentPpl.hargaSatuan)) || 0;
-            const newBesaranHonor = (bebanKerja * hargaSatuan).toString();
-            newValues['besaranHonor'] = newBesaranHonor;
-        }
+    useEffect(() => {
+        setLocalSatuan(honorariumTahap.satuanBebanKerja);
+        setLocalHarga(formatHonor(honorariumTahap.hargaSatuan));
+    }, [honorariumTahap]);
 
-        for (const [key, val] of Object.entries(newValues)) {
-            store.updatePPL(id, key as keyof typeof currentPpl, val);
+    const handleHargaBlur = () => {
+        if (parseHonor(localHarga) !== parseHonor(honorariumTahap.hargaSatuan)) {
+            updateHonorariumTahap(tahap, 'hargaSatuan', localHarga);
         }
     };
     
+    const handleSatuanBlur = () => {
+        if (localSatuan !== honorariumTahap.satuanBebanKerja) {
+            updateHonorariumTahap(tahap, 'satuanBebanKerja', localSatuan);
+        }
+    };
+
     return (
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Alokasi PPL & PML (Tahap Persiapan)</CardTitle>
-                        <CardDescription>Pilih PPL dan isi detail alokasi untuk tahap persiapan.</CardDescription>
+                        <CardDescription>Atur detail honorarium untuk tahap ini, lalu alokasikan PPL.</CardDescription>
                     </div>
                     <Button variant="outline" asChild>
                         <Link to="/daftar-ppl"><Users className="w-4 h-4 mr-2" />Pilih dari Daftar PPL</Link>
                     </Button>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-                {pplForStage.map((ppl, index) => (
-                    <div key={ppl.id} className="p-4 border rounded-lg space-y-4 bg-gray-50">
-                        <div className="flex justify-between items-center"><h4 className="font-medium">Alokasi {index + 1}</h4>{pplForStage.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => store.removePPL(ppl.id)}><Trash2 className="w-4 h-4 text-red-500"/></Button>}</div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="space-y-2 lg:col-span-4">
-                                <Label>Pilih PPL *</Label>
-                                <Popover open={pplComboboxStates[ppl.id] || false} onOpenChange={(open) => setPplComboboxStates(prev => ({ ...prev, [ppl.id]: open }))}>
-                                    <PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between">{ppl.namaPPL || "Pilih PPL..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Cari PPL..." /><CommandList><CommandEmpty>PPL tidak ditemukan.</CommandEmpty><CommandGroup>
-                                        {pplList.map((pplOption) => (
-                                            <CommandItem key={pplOption.id} value={`${pplOption.id} ${pplOption.namaPPL}`} onSelect={() => { store.updatePPL(ppl.id, 'ppl_master_id', pplOption.id); store.updatePPL(ppl.id, 'namaPPL', pplOption.namaPPL); setPplComboboxStates(prev => ({ ...prev, [ppl.id]: false })); }}>
-                                                <Check className={cn("mr-2 h-4 w-4", ppl.ppl_master_id === pplOption.id ? "opacity-100" : "opacity-0")} />
-                                                <div className="flex flex-col"><span>{pplOption.namaPPL}</span><span className="text-xs text-gray-500">ID: {pplOption.id}</span></div>
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup></CommandList></Command></PopoverContent>
-                                </Popover>
-                            </div>
-                             <div className="space-y-2"><Label>Satuan Beban Kerja</Label><Input placeholder="Contoh: Dokumen" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.id, 'satuanBebanKerja', e.target.value)} /></div>
-                             <div className="space-y-2"><Label>Harga per Satuan (Rp)</Label><Input placeholder="Contoh: 50.000" value={formatHonor(ppl.hargaSatuan)} onChange={e => updatePPL(ppl.id, 'hargaSatuan', e.target.value)} inputMode="numeric"/></div>
-                             <div className="space-y-2"><Label>Jumlah Beban Kerja *</Label><Input placeholder="Contoh: 12" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.id, 'bebanKerja', e.target.value)} type="number"/></div>
-                            <div className="space-y-2"><Label>Total Honor (Rp) *</Label><Input value={formatHonor(ppl.besaranHonor)} readOnly className="bg-gray-100" /></div>
-                            <div className="space-y-2 md:col-span-2 lg:col-span-4"><Label>Nama PML *</Label><Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => updatePPL(ppl.id, 'namaPML', e.target.value)} /></div>
+            <CardContent className="space-y-6">
+                <div className="p-4 border rounded-lg bg-blue-50/50 space-y-4">
+                    <h4 className="font-medium text-gray-800">Pengaturan Honorarium Tahap Persiapan</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Satuan Beban Kerja</Label>
+                            <Input 
+                                placeholder="Contoh: Dokumen, Responden" 
+                                value={localSatuan} 
+                                onChange={e => setLocalSatuan(e.target.value)}
+                                onBlur={handleSatuanBlur}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Harga per Satuan (Rp)</Label>
+                            <Input 
+                                placeholder="Contoh: 50.000" 
+                                value={localHarga} 
+                                onChange={e => setLocalHarga(formatHonor(e.target.value))}
+                                onBlur={handleHargaBlur}
+                                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                inputMode="numeric"
+                            />
                         </div>
                     </div>
-                ))}
-                <Button type="button" variant="outline" onClick={() => store.addPPL('persiapan')} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL</Button>
+                </div>
+
+                <div className="space-y-4">
+                    {pplForStage.map((ppl, index) => (
+                        <PPLAllocationItem 
+                            key={ppl.id} 
+                            ppl={ppl} 
+                            index={index}
+                            onRemove={() => removePPL(ppl.id)}
+                            pplList={pplList}
+                            store={useInputKegiatanStore}
+                        />
+                    ))}
+                    <Button type="button" variant="outline" onClick={() => addPPL('persiapan')} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL</Button>
+                </div>
             </CardContent>
         </Card>
     );
