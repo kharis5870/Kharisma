@@ -48,6 +48,7 @@ export interface Kegiatan {
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';
   progressKeseluruhan: number;
   lastUpdated: string;
+  lastUpdatedBy?: string; 
   dokumen: Dokumen[];
   ppl: PPL[];
   tanggalMulaiPersiapan?: string;

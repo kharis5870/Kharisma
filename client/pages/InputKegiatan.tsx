@@ -1,7 +1,7 @@
 // client/pages/InputKegiatan.tsx
 
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom"; // <-- Impor Link
+import { useNavigate, Link } from "react-router-dom"; 
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import { usePPL } from "@/contexts/PPLContext";
@@ -14,7 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-// PERBAIKAN: Tambahkan ikon Users
 import { CalendarIcon, Plus, Trash2, Link2, X, Lock, Check, ChevronsUpDown, Users } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format } from "date-fns";
@@ -22,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore from "@/stores/useInputKegiatanStore";
 import { Dokumen, PPLMaster, KetuaTim } from "@shared/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 type DateFieldName = 
   | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
@@ -72,6 +72,7 @@ const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
 };
 
 export default function InputKegiatan() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { selectedPPLsForActivity, clearSelectedPPLsForActivity } = usePPL();
@@ -129,6 +130,7 @@ export default function InputKegiatan() {
     }
     mutation.mutate({
         ...store,
+        username: user?.username,
         tanggalMulaiPersiapan: format(store.tanggalMulaiPersiapan!, 'yyyy-MM-dd'),
         tanggalSelesaiPersiapan: format(store.tanggalSelesaiPersiapan!, 'yyyy-MM-dd'),
         tanggalMulaiPengumpulanData: format(store.tanggalMulaiPengumpulanData!, 'yyyy-MM-dd'),

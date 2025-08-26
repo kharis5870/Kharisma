@@ -1,11 +1,11 @@
 // client/contexts/AuthContext.tsx
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserData } from '@shared/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  user: UserData | null; // <-- Ganti username menjadi objek user
+  user: UserData | null;
   login: (userData: UserData) => void;
   logout: () => void;
   checkAuth: () => boolean;
@@ -29,11 +29,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = (): boolean => {
+  // PERBAIKAN: Bungkus checkAuth dengan useCallback
+  const checkAuth = useCallback((): boolean => {
     const authStatus = localStorage.getItem('isAuthenticated');
     const storedUser = localStorage.getItem('user');
     
@@ -46,21 +43,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       return false;
     }
-  };
+  }, []); // Dependency array kosong agar fungsi hanya dibuat sekali
 
-  const login = (userData: UserData) => {
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // PERBAIKAN: Bungkus login dengan useCallback
+  const login = useCallback((userData: UserData) => {
     localStorage.setItem('isAuthenticated', 'true');
     localStorage.setItem('user', JSON.stringify(userData));
     setIsAuthenticated(true);
     setUser(userData);
-  };
+  }, []);
 
-  const logout = () => {
+  // PERBAIKAN: Bungkus logout dengan useCallback
+  const logout = useCallback(() => {
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('user');
     setIsAuthenticated(false);
     setUser(null);
-  };
+  }, []);
 
   const value: AuthContextType = {
     isAuthenticated,

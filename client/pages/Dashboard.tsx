@@ -20,6 +20,7 @@ import { Kegiatan, PPL, Dokumen } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { format, isPast, parseISO } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
+import { useAuth } from "@/contexts/AuthContext";
 
 // --- Tipe Data Frontend ---
 type PPLWithProgress = PPL & {
@@ -127,6 +128,7 @@ const getRelativeTime = (dateString: string) => {
 };
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedActivity, setSelectedActivity] = useState<KegiatanWithDynamicStatus | null>(null);
   const [updateModalActivity, setUpdateModalActivity] = useState<KegiatanWithDynamicStatus | null>(null);
@@ -248,7 +250,17 @@ export default function Dashboard() {
     );
   };
   
-  const handleSaveProgress = () => { localPplProgress.forEach(ppl => { progressMutation.mutate({ pplId: ppl.id!, progressData: { open: ppl.progressOpen, submit: ppl.progressSubmit, diperiksa: ppl.progressDiperiksa, approved: ppl.progressApproved } }); }); setUpdateModalActivity(null); setShowProgressSuccessModal(true); };
+  const handleSaveProgress = () => { 
+    localPplProgress.forEach(ppl => { 
+        progressMutation.mutate({ 
+            pplId: ppl.id!, 
+            progressData: { 
+                open: ppl.progressOpen, 
+                submit: ppl.progressSubmit, 
+                diperiksa: ppl.progressDiperiksa, 
+                approved: ppl.progressApproved,
+                username: user?.username
+            } }); }); setUpdateModalActivity(null); setShowProgressSuccessModal(true); };
 
   const handleDeleteConfirm = () => {
     if (activityToDelete) {
@@ -358,7 +370,16 @@ export default function Dashboard() {
                                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
                                         {getStageDates()}
                                     </div>
-                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-2"><span>Terakhir diupdate:</span><span className="font-medium text-bps-blue-600">{getRelativeTime(activity.lastUpdated)}</span></div>
+                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-2">
+                                        <span>Terakhir diupdate:</span>
+                                        <span className="font-medium text-bps-blue-600">{getRelativeTime(activity.lastUpdated)}</span>
+                                        {activity.lastUpdatedBy && (
+                                            <>
+                                                <span>oleh</span>
+                                                <span className="font-medium text-bps-blue-600">{activity.lastUpdatedBy}</span>
+                                            </>
+                                        )}
+                                    </div>
                                     {warnings.length > 0 && (<div className="space-y-1 mt-2">{warnings.map((warning, index) => (<div key={index} className="flex items-center gap-2 p-2 bg-red-50 border rounded text-xs"><AlertTriangle className="w-3 h-3 text-red-600" /><span className="text-red-700">{warning}</span></div>))}</div>)}
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 pt-4 border-t mt-4">

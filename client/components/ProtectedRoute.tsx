@@ -1,3 +1,5 @@
+// client/components/ProtectedRoute.tsx
+
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,16 +13,14 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check authentication status
     const authStatus = checkAuth();
     
     if (!authStatus) {
-      // Redirect to login if not authenticated
       navigate('/login', { replace: true });
     }
-  }, [checkAuth, navigate]);
+  // PERBAIKAN: Dependency array dikosongkan agar hanya berjalan sekali saat mount
+  }, []); 
 
-  // Don't render children if not authenticated
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">

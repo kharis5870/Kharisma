@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook, FileText, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook, FileText, Check, ChevronsUpDown, Users } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format, parseISO, isValid } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,7 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 type ClientPPL = PPL & { clientId: string };
 type ClientDokumen = Dokumen & { clientId: string };
 
-type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'namaKetua' | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan' | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData' | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis' | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi'> & {
+type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'lastUpdatedBy' | 'namaKetua' | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan' | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData' | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis' | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi'> & {
     tanggalMulaiPersiapan?: Date;
     tanggalSelesaiPersiapan?: Date;
     tanggalMulaiPengumpulanData?: Date;
@@ -52,8 +53,9 @@ const formatHonor = (value: string | number): string => {
   return num.toLocaleString('id-ID');
 };
 
-const parseHonor = (value: string): string => {
-  return value.replace(/\./g, '');
+const parseHonor = (value: string | number): string => {
+  if (value === '' || value === null || value === undefined) return '';
+  return String(value).replace(/\./g, '');
 };
 // --- Akhir Helper Functions ---
 
@@ -79,7 +81,10 @@ const updateActivity = async (kegiatan: Partial<Kegiatan> & {id: number}): Promi
     const sanitizedData = {
         ...kegiatan,
         dokumen: kegiatan.dokumen?.map(({ clientId, ...rest }: any) => rest),
-        ppl: kegiatan.ppl?.map(({ clientId, namaPPL, ...rest }: any) => rest)
+        ppl: kegiatan.ppl?.map(({ clientId, namaPPL, besaranHonor, ...rest }: any) => ({
+            ...rest,
+            besaranHonor: parseHonor(besaranHonor)
+        }))
     };
     const res = await fetch(`/api/kegiatan/${kegiatan.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sanitizedData) });
     if (!res.ok) {
@@ -92,8 +97,9 @@ const updateActivity = async (kegiatan: Partial<Kegiatan> & {id: number}): Promi
 export default function EditActivity() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState("persiapan");
+    const [activeTab, setActiveTab] = useState("basic");
     const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string; isApproved: boolean }>({ isOpen: false, tipe: null, content: '', isApproved: false });
@@ -200,6 +206,7 @@ export default function EditActivity() {
         const dataToSubmit = {
             ...formData,
             id: formData.id,
+            username: user?.username,
             tanggalMulaiPersiapan: formData.tanggalMulaiPersiapan && isValid(formData.tanggalMulaiPersiapan) ? format(formData.tanggalMulaiPersiapan, 'yyyy-MM-dd') : undefined,
             tanggalSelesaiPersiapan: formData.tanggalSelesaiPersiapan && isValid(formData.tanggalSelesaiPersiapan) ? format(formData.tanggalSelesaiPersiapan, 'yyyy-MM-dd') : undefined,
             tanggalMulaiPengumpulanData: formData.tanggalMulaiPengumpulanData && isValid(formData.tanggalMulaiPengumpulanData) ? format(formData.tanggalMulaiPengumpulanData, 'yyyy-MM-dd') : undefined,
@@ -332,12 +339,7 @@ export default function EditActivity() {
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label>
-                                <Textarea 
-                                  id="deskripsiKegiatan" 
-                                  value={formData.deskripsiKegiatan || ''} 
-                                  onChange={(e) => handleFormFieldChange('deskripsiKegiatan', e.target.value)} 
-                                  placeholder="Deskripsikan kegiatan dan pembagian tugas secara singkat." 
-                                />
+                                <Textarea id="deskripsiKegiatan" value={formData.deskripsiKegiatan || ''} onChange={(e) => handleFormFieldChange('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan dan pembagian tugas secara singkat." />
                               </div>
                             </CardContent>
                         </Card>
@@ -371,12 +373,20 @@ export default function EditActivity() {
                         </Card>
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex justify-between items-center">
-                                    Alokasi PPL & PML
-                                </CardTitle>
-                                <CardDescription>
-                                    Perbarui data Petugas Pencacah Lapangan (PPL) dan Petugas Pemeriksa Lapangan (PML).
-                                </CardDescription>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle>Alokasi PPL & PML</CardTitle>
+                                        <CardDescription>
+                                            Perbarui data Petugas Pencacah Lapangan (PPL) dan Petugas Pemeriksa Lapangan (PML).
+                                        </CardDescription>
+                                    </div>
+                                    <Button variant="outline" asChild>
+                                        <Link to="/daftar-ppl">
+                                            <Users className="w-4 h-4 mr-2" />
+                                            Pilih dari Daftar PPL
+                                        </Link>
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {formData.ppl?.map((ppl, index) => (
@@ -402,17 +412,16 @@ export default function EditActivity() {
                                                     </CommandGroup></CommandList></Command></PopoverContent>
                                                 </Popover>
                                             </div>
-                                            <div className="space-y-2"><Label>Beban Kerja *</Label><Input placeholder="Beban Kerja" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} /></div>
-                                            <div className="space-y-2"><Label>Satuan</Label><Input placeholder="Contoh: Hari" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} /></div>
+                                            <div className="space-y-2"><Label>Jumlah Beban Kerja *</Label><Input placeholder="Contoh: 12" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} /></div>
+                                            <div className="space-y-2"><Label>Satuan</Label><Input placeholder="Contoh: Dokumen" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} /></div>
                                             <div className="space-y-2">
                                                 <Label>Honor (Rp) *</Label>
-                                                {/* PERBAIKAN: Terapkan format honor */}
                                                 <Input 
                                                     placeholder="Contoh: 2.000.000" 
                                                     value={formatHonor(ppl.besaranHonor)} 
                                                     onChange={e => {
                                                         const parsedValue = parseHonor(e.target.value);
-                                                        if (/^\d*$/.test(parsedValue)) { // Hanya izinkan angka
+                                                        if (/^\d*$/.test(parsedValue)) {
                                                             updatePPL(ppl.clientId, 'besaranHonor', parsedValue);
                                                         }
                                                     }}

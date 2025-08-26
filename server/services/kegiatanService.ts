@@ -7,18 +7,10 @@ import { Kegiatan, Dokumen, PPL } from '@shared/api';
 interface KegiatanPacket extends Kegiatan, RowDataPacket {}
 
 const getKegiatanWithRelations = async (whereClause: string, params: any[]): Promise<Kegiatan[]> => {
-    // PERBAIKAN: Menambahkan CASE statement untuk menentukan status secara dinamis berdasarkan tanggal saat ini
     const query = `
         SELECT 
             k.*, 
-            kt.nama_ketua AS namaKetua,
-            CASE
-                WHEN CURDATE() > k.tanggalSelesaiDiseminasiEvaluasi THEN 'Selesai'
-                WHEN CURDATE() >= k.tanggalMulaiDiseminasiEvaluasi THEN 'Diseminasi & Evaluasi'
-                WHEN CURDATE() >= k.tanggalMulaiPengolahanAnalisis THEN 'Pengolahan & Analisis'
-                WHEN CURDATE() >= k.tanggalMulaiPengumpulanData THEN 'Pengumpulan Data'
-                ELSE 'Persiapan'
-            END AS status
+            kt.nama_ketua AS namaKetua
         FROM kegiatan k
         LEFT JOIN ketua_tim kt ON k.ketua_tim_id = kt.id
         ${whereClause}
@@ -40,7 +32,6 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
     return kegiatanRows;
 };
 
-// ... sisa file tetap sama, tidak ada perubahan di fungsi lain ...
 export const getAllKegiatan = async (): Promise<Kegiatan[]> => {
     return getKegiatanWithRelations('ORDER BY k.id DESC', []);
 };
@@ -61,7 +52,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
             tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
-            pplAllocations, documents
+            pplAllocations, documents, username
         } = data;
 
         const kegiatanQuery = `
@@ -71,8 +62,8 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
              tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
              tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
              tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
-             status, progressKeseluruhan) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0)
+             status, progressKeseluruhan, lastUpdatedBy) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
             namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false,
@@ -80,6 +71,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
             tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
             tanggalMulaiDiseminasiEvaluasi || null, tanggalSelesaiDiseminasiEvaluasi || null,
+            username
         ]);
         const kegiatanId = kegiatanResult.insertId;
 
@@ -133,9 +125,10 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
             tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
-            ppl, dokumen 
+            ppl, dokumen, username 
         } = data;
 
+        // PERBAIKAN: Memperbaiki kesalahan sintaks SQL (menambahkan `= ?` dan koma)
         const kegiatanQuery = `
             UPDATE kegiatan SET 
             namaKegiatan = ?, ketua_tim_id = ?, deskripsiKegiatan = ?, adaListing = ?,
@@ -143,7 +136,8 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             tanggalMulaiPengumpulanData = ?, tanggalSelesaiPengumpulanData = ?,
             tanggalMulaiPengolahanAnalisis = ?, tanggalSelesaiPengolahanAnalisis = ?,
             tanggalMulaiDiseminasiEvaluasi = ?, tanggalSelesaiDiseminasiEvaluasi = ?,
-            lastUpdated = CURRENT_TIMESTAMP
+            lastUpdated = CURRENT_TIMESTAMP,
+            lastUpdatedBy = ?
             WHERE id = ?
         `;
         await connection.execute(kegiatanQuery, [
@@ -152,6 +146,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
             tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
             tanggalMulaiDiseminasiEvaluasi || null, tanggalSelesaiDiseminasiEvaluasi || null,
+            username,
             id
         ]);
 
@@ -199,8 +194,8 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
     }
 }
 
-export const updatePplProgress = async (pplId: number, progressData: { open: number; submit: number; diperiksa: number; approved: number; }) => {
-    const { open, submit, diperiksa, approved } = progressData;
+export const updatePplProgress = async (pplId: number, progressData: { open: number; submit: number; diperiksa: number; approved: number; username: string; }) => {
+    const { open, submit, diperiksa, approved, username } = progressData;
     const query = `
         UPDATE ppl 
         SET progressOpen = ?, progressSubmit = ?, progressDiperiksa = ?, progressApproved = ? 
@@ -218,8 +213,8 @@ export const updatePplProgress = async (pplId: number, progressData: { open: num
         const progressKeseluruhan = totalBebanKerja > 0 ? Math.round((totalApproved / totalBebanKerja) * 100) : 0;
 
         await db.execute(
-            'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, progressKeseluruhan = ? WHERE id = ?', 
-            [progressKeseluruhan, kegiatanId]
+            'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, progressKeseluruhan = ?, lastUpdatedBy = ? WHERE id = ?', 
+            [progressKeseluruhan, username, kegiatanId]
         );
     }
 
