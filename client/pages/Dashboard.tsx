@@ -29,7 +29,6 @@ type PPLWithProgress = PPL & {
   progressApproved: number;
 };
 
-// PERBAIKAN: Menambahkan `dynamicStatus` dan `warnings` ke tipe data frontend
 type KegiatanWithDynamicStatus = Kegiatan & {
   dynamicStatus: {
     status: Kegiatan['status'];
@@ -61,7 +60,6 @@ const updatePplProgress = async ({ pplId, progressData }: { pplId: number; progr
 };
 
 // --- Helper Functions ---
-// PERBAIKAN: Fungsi baru untuk menghitung status dan warning secara dinamis
 const calculateActivityStatus = (kegiatan: Kegiatan): KegiatanWithDynamicStatus['dynamicStatus'] => {
     const warnings: string[] = [];
     const now = new Date();
@@ -84,10 +82,9 @@ const calculateActivityStatus = (kegiatan: Kegiatan): KegiatanWithDynamicStatus[
     checkTahapanWarning(kegiatan.tanggalSelesaiPengolahanAnalisis, 'pengolahan-analisis', 'Pengolahan & Analisis');
     checkTahapanWarning(kegiatan.tanggalSelesaiDiseminasiEvaluasi, 'diseminasi-evaluasi', 'Diseminasi & Evaluasi');
 
-    let status: Kegiatan['status'] = kegiatan.status; // Status dari DB sebagai default
+    let status: Kegiatan['status'] = kegiatan.status;
     let color = 'bg-blue-100 text-blue-700';
     
-    // Override status dari DB dengan logika tanggal
     if (kegiatan.tanggalSelesaiDiseminasiEvaluasi && isPast(parseISO(kegiatan.tanggalSelesaiDiseminasiEvaluasi))) {
         status = 'Selesai';
     } else if (kegiatan.tanggalMulaiDiseminasiEvaluasi && now >= parseISO(kegiatan.tanggalMulaiDiseminasiEvaluasi)) {
@@ -146,7 +143,6 @@ export default function Dashboard() {
 
   const { data: activities = [], isLoading } = useQuery<Kegiatan[]>({ queryKey: ['kegiatan'], queryFn: fetchActivities });
 
-  // PERBAIKAN: Proses data dari server untuk menambahkan status dinamis
   const processedActivities = useMemo(() => {
     return activities.map(activity => ({
         ...activity,
@@ -315,6 +311,43 @@ export default function Dashboard() {
                 ) : (
                     filteredActivities.map((activity) => {
                     const { status, color, warnings } = activity.dynamicStatus;
+                    
+                    // PERBAIKAN: Logika untuk menampilkan tanggal dinamis
+                    const getStageDates = () => {
+                        const formatDate = (dateString?: string) => dateString ? format(new Date(dateString), 'dd MMM yyyy', { locale: localeID }) : '-';
+                        let stageLabel = "Persiapan";
+                        let startDate = activity.tanggalMulaiPersiapan;
+                        let endDate = activity.tanggalSelesaiPersiapan;
+
+                        switch (status) {
+                            case 'Pengumpulan Data':
+                                stageLabel = "Pengumpulan Data";
+                                startDate = activity.tanggalMulaiPengumpulanData;
+                                endDate = activity.tanggalSelesaiPengumpulanData;
+                                break;
+                            case 'Pengolahan & Analisis':
+                                stageLabel = "Pengolahan & Analisis";
+                                startDate = activity.tanggalMulaiPengolahanAnalisis;
+                                endDate = activity.tanggalSelesaiPengolahanAnalisis;
+                                break;
+                            case 'Diseminasi & Evaluasi':
+                                stageLabel = "Diseminasi & Evaluasi";
+                                startDate = activity.tanggalMulaiDiseminasiEvaluasi;
+                                endDate = activity.tanggalSelesaiDiseminasiEvaluasi;
+                                break;
+                            case 'Selesai':
+                                return (
+                                    <div><p className="text-gray-500">Selesai Pada</p><p className="font-medium">{formatDate(activity.tanggalSelesaiDiseminasiEvaluasi)}</p></div>
+                                );
+                        }
+                        return (
+                            <>
+                                <div><p className="text-gray-500">Mulai {stageLabel}</p><p className="font-medium">{formatDate(startDate)}</p></div>
+                                <div><p className="text-gray-500">Selesai {stageLabel}</p><p className="font-medium">{formatDate(endDate)}</p></div>
+                            </>
+                        );
+                    };
+
                     return (
                         <Card key={activity.id} className="hover:shadow-lg transition-shadow flex flex-col">
                             <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.namaKetua}</p></div><Badge className={cn("ml-2 whitespace-nowrap", warnings.length > 0 ? 'bg-red-100 text-red-700' : color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
@@ -323,8 +356,7 @@ export default function Dashboard() {
                                     <div className="flex justify-between items-center mb-2"><span className="text-sm font-medium">Progress Keseluruhan</span><span className="text-sm font-bold text-bps-blue-600">{activity.progressKeseluruhan || 0}%</span></div>
                                     <Progress value={activity.progressKeseluruhan || 0} className="h-2" />
                                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
-                                        <div><p className="text-gray-500">Persiapan</p><p className="font-medium">{activity.tanggalSelesaiPersiapan ? format(new Date(activity.tanggalSelesaiPersiapan), 'dd MMM yyyy', { locale: localeID }) : '-'}</p></div>
-                                        <div><p className="text-gray-500">Pengumpulan Data</p><p className="font-medium">{activity.tanggalSelesaiPengumpulanData ? format(new Date(activity.tanggalSelesaiPengumpulanData), 'dd MMM yyyy', { locale: localeID }) : '-'}</p></div>
+                                        {getStageDates()}
                                     </div>
                                     <div className="text-xs text-gray-500 flex items-center gap-1 mt-2"><span>Terakhir diupdate:</span><span className="font-medium text-bps-blue-600">{getRelativeTime(activity.lastUpdated)}</span></div>
                                     {warnings.length > 0 && (<div className="space-y-1 mt-2">{warnings.map((warning, index) => (<div key={index} className="flex items-center gap-2 p-2 bg-red-50 border rounded text-xs"><AlertTriangle className="w-3 h-3 text-red-600" /><span className="text-red-700">{warning}</span></div>))}</div>)}

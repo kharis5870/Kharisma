@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 
 const months = [ "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des" ];
 const currentYear = new Date().getFullYear();
+const years = Array.from({ length: 5 }, (_, i) => currentYear - i); // Buat daftar 5 tahun terakhir
+
 const getCurrentMonth = () => new Date().getMonth();
 
 const fetchHonorData = async (bulan: number, tahun: number): Promise<PPLHonorData[]> => {
@@ -25,8 +27,8 @@ const fetchHonorData = async (bulan: number, tahun: number): Promise<PPLHonorDat
     return res.json();
 }
 
-// Komponen baru untuk Modal Detail Kegiatan
-const ActivityDetailModal = ({ isOpen, onClose, pplData, selectedMonth }: { isOpen: boolean, onClose: () => void, pplData: PPLHonorData | null, selectedMonth: number }) => {
+// Komponen Modal Detail Kegiatan (Tidak ada perubahan)
+const ActivityDetailModal = ({ isOpen, onClose, pplData, selectedMonth, selectedYear }: { isOpen: boolean, onClose: () => void, pplData: PPLHonorData | null, selectedMonth: number, selectedYear: number }) => {
     if (!pplData) return null;
 
     return (
@@ -35,7 +37,7 @@ const ActivityDetailModal = ({ isOpen, onClose, pplData, selectedMonth }: { isOp
                 <DialogHeader>
                     <DialogTitle>Detail Kegiatan: {pplData.nama}</DialogTitle>
                     <DialogDescription>
-                        Berikut adalah daftar kegiatan yang diikuti pada bulan {months[selectedMonth]} {currentYear}.
+                        Berikut adalah daftar kegiatan yang diikuti pada bulan {months[selectedMonth]} {selectedYear}.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="mt-4 max-h-80 overflow-y-auto">
@@ -61,7 +63,11 @@ const ActivityDetailModal = ({ isOpen, onClose, pplData, selectedMonth }: { isOp
 };
 
 export default function ManajemenHonor() {
-  const [globalSettings, setGlobalSettings] = useState({ batasHonorBulananGlobal: 3000000, selectedMonth: getCurrentMonth() });
+  const [globalSettings, setGlobalSettings] = useState({ 
+      batasHonorBulananGlobal: 3000000, 
+      selectedMonth: getCurrentMonth(),
+      selectedYear: currentYear // <-- Tambahkan state untuk tahun
+  });
   const [isEditingGlobalLimit, setIsEditingGlobalLimit] = useState(false);
   const [tempGlobalLimit, setTempGlobalLimit] = useState(globalSettings.batasHonorBulananGlobal);
   const [searchTerm, setSearchTerm] = useState("");
@@ -71,8 +77,8 @@ export default function ManajemenHonor() {
   const [selectedPplDetails, setSelectedPplDetails] = useState<PPLHonorData | null>(null);
 
   const { data: pplData = [], isLoading } = useQuery({
-      queryKey: ['honor', globalSettings.selectedMonth, currentYear],
-      queryFn: () => fetchHonorData(globalSettings.selectedMonth, currentYear),
+      queryKey: ['honor', globalSettings.selectedMonth, globalSettings.selectedYear], // <-- Tambahkan tahun ke queryKey
+      queryFn: () => fetchHonorData(globalSettings.selectedMonth, globalSettings.selectedYear),
   });
 
   const handleSort = (key: string) => {
@@ -159,7 +165,18 @@ export default function ManajemenHonor() {
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
           <div><h1 className="text-3xl font-bold text-gray-900">Manajemen Honor PPL</h1><p className="text-gray-600 mt-1">Kelola akumulasi honor bulanan dengan batas global untuk semua PPL</p></div>
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-            <div className="flex items-center gap-2"><Label className="text-sm font-medium">Pilih Bulan:</Label><Select value={String(globalSettings.selectedMonth)} onValueChange={(val) => setGlobalSettings(p => ({...p, selectedMonth: Number(val)}))}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent>{months.map((month, i) => (<SelectItem key={i} value={String(i)}>{month} {currentYear}</SelectItem>))}</SelectContent></Select></div>
+            {/* PERBAIKAN: Pisahkan pemilihan bulan dan tahun */}
+            <div className="flex items-center gap-2">
+                <Label className="text-sm font-medium">Periode:</Label>
+                <Select value={String(globalSettings.selectedMonth)} onValueChange={(val) => setGlobalSettings(p => ({...p, selectedMonth: Number(val)}))}>
+                    <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                    <SelectContent>{months.map((month, i) => (<SelectItem key={i} value={String(i)}>{month}</SelectItem>))}</SelectContent>
+                </Select>
+                <Select value={String(globalSettings.selectedYear)} onValueChange={(val) => setGlobalSettings(p => ({...p, selectedYear: Number(val)}))}>
+                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                    <SelectContent>{years.map((year) => (<SelectItem key={year} value={String(year)}>{year}</SelectItem>))}</SelectContent>
+                </Select>
+            </div>
             <div className="flex items-center gap-2"><Label className="text-sm font-medium">Batas Global:</Label>{isEditingGlobalLimit ? (<div className="flex items-center gap-2"><Input type="number" value={tempGlobalLimit} onChange={e => setTempGlobalLimit(Number(e.target.value))} className="w-36 h-8" placeholder="Honor limit"/><Button size="sm" onClick={() => { setGlobalSettings(p => ({...p, batasHonorBulananGlobal: tempGlobalLimit})); setIsEditingGlobalLimit(false); }} className="h-8 w-8 p-0"><Save className="w-3 h-3" /></Button><Button size="sm" variant="outline" onClick={() => setIsEditingGlobalLimit(false)} className="h-8 w-8 p-0"><X className="w-3 h-3" /></Button></div>) : (<div className="flex items-center gap-2"><Badge variant="outline" className="bg-bps-blue-50 text-bps-blue-700 font-semibold">Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</Badge><Button size="sm" variant="outline" onClick={() => { setTempGlobalLimit(globalSettings.batasHonorBulananGlobal); setIsEditingGlobalLimit(true); }} className="h-6 w-6 p-0"><Edit className="w-3 h-3" /></Button></div>)}</div>
           </div>
         </div>
@@ -173,7 +190,7 @@ export default function ManajemenHonor() {
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <CardTitle>Akumulasi Honor PPL - {months[globalSettings.selectedMonth]} {currentYear}</CardTitle>
+                <CardTitle>Akumulasi Honor PPL - {months[globalSettings.selectedMonth]} {globalSettings.selectedYear}</CardTitle>
                 <div className="text-sm text-gray-600 mt-2">Batas Global: <strong>Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</strong> per PPL per bulan</div>
               </div>
               <div className="sm:w-64">
@@ -232,6 +249,7 @@ export default function ManajemenHonor() {
         onClose={() => setIsDetailModalOpen(false)} 
         pplData={selectedPplDetails}
         selectedMonth={globalSettings.selectedMonth}
+        selectedYear={globalSettings.selectedYear}
       />
     </Layout>
   );
