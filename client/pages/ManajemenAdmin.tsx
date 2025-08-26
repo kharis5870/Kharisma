@@ -1,3 +1,5 @@
+// client/pages/ManajemenAdmin.tsx
+
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -10,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,7 +33,8 @@ import {
   EyeOff,
   MapPin,
   Phone,
-  Activity
+  Activity,
+  AlertCircle
 } from "lucide-react";
 
 export default function ManajemenAdmin() {
@@ -65,6 +68,9 @@ export default function ManajemenAdmin() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   
+  // Form Error State
+  const [formError, setFormError] = useState<string | null>(null);
+
   // User form states
   const [newUserData, setNewUserData] = useState<UserData>({
     id: "",
@@ -93,7 +99,8 @@ export default function ManajemenAdmin() {
     namaPPL: "",
     totalKegiatan: 0,
     alamat: "",
-    noTelepon: ""
+    noTelepon: "",
+    kegiatanNames: []
   });
   const [editPPLData, setEditPPLData] = useState<PPLAdminData | null>(null);
   const [deletePPLId, setDeletePPLId] = useState("");
@@ -117,7 +124,8 @@ export default function ManajemenAdmin() {
   const isValidPassword = (password?: string) => !password || password.trim().length >= 6;
   const isValidNamaLengkap = (nama: string) => nama.trim().length >= 2;
   const isValidNip = (nip: string) => nip.trim().length >= 10;
-  const isValidTelepon = (telepon: string) => telepon.trim().length >= 10;
+  // PERBAIKAN: Validasi telepon hanya angka dan minimal 10 karakter
+  const isValidTelepon = (telepon: string) => /^\d{10,}$/.test(telepon.trim());
   const isValidAlamat = (alamat: string) => alamat.trim().length >= 5;
   
   const isDuplicateUserId = (id: string, excludeId?: string) => userList.some(user => user.id.toLowerCase() === id.toLowerCase() && user.id !== excludeId);
@@ -128,13 +136,14 @@ export default function ManajemenAdmin() {
   const isDuplicatePPLTelepon = (telepon: string, excludeId?: string) => pplAdminList.some(ppl => ppl.noTelepon === telepon && ppl.id !== excludeId);
   
   const handleAddUser = () => {
+    setFormError(null);
     const { id, username, password, namaLengkap, role } = newUserData;
-    if (!isValidUserId(id)) { alert("ID User harus diisi!"); return; }
-    if (!isValidUsername(username)) { alert("Username harus minimal 3 karakter!"); return; }
-    if (!password || !isValidPassword(password)) { alert("Password harus minimal 6 karakter!"); return; }
-    if (!isValidNamaLengkap(namaLengkap)) { alert("Nama lengkap harus minimal 2 karakter!"); return; }
-    if (isDuplicateUserId(id)) { alert("ID User sudah ada!"); return; }
-    if (isDuplicateUsername(username)) { alert("Username sudah ada!"); return; }
+    if (!isValidUserId(id)) { setFormError("ID User harus diisi!"); return; }
+    if (!isValidUsername(username)) { setFormError("Username harus minimal 3 karakter!"); return; }
+    if (!password || !isValidPassword(password)) { setFormError("Password harus minimal 6 karakter!"); return; }
+    if (!isValidNamaLengkap(namaLengkap)) { setFormError("Nama lengkap harus minimal 2 karakter!"); return; }
+    if (isDuplicateUserId(id)) { setFormError("ID User sudah ada!"); return; }
+    if (isDuplicateUsername(username)) { setFormError("Username sudah ada!"); return; }
     
     addUser({ id: id.trim(), username: username.trim(), password, namaLengkap: namaLengkap.trim(), role });
     setNewUserData({ id: "", username: "", password: "", namaLengkap: "", role: "user" });
@@ -144,12 +153,13 @@ export default function ManajemenAdmin() {
   };
   
   const handleEditUser = () => {
+    setFormError(null);
     if (!editUserData) return;
-    const { id, username, password, namaLengkap, role } = editUserData;
-    if (!isValidUsername(username)) { alert("Username harus minimal 3 karakter!"); return; }
-    if (!isValidPassword(password)) { alert("Password baru harus minimal 6 karakter!"); return; }
-    if (!isValidNamaLengkap(namaLengkap)) { alert("Nama lengkap harus minimal 2 karakter!"); return; }
-    if (isDuplicateUsername(username, editUserData.id)) { alert("Username sudah ada!"); return; }
+    const { username, password, namaLengkap } = editUserData;
+    if (!isValidUsername(username)) { setFormError("Username harus minimal 3 karakter!"); return; }
+    if (!isValidPassword(password)) { setFormError("Password baru harus minimal 6 karakter!"); return; }
+    if (!isValidNamaLengkap(namaLengkap)) { setFormError("Nama lengkap harus minimal 2 karakter!"); return; }
+    if (isDuplicateUsername(username, editUserData.id)) { setFormError("Username sudah ada!"); return; }
     
     updateUser(editUserData.id, { ...editUserData, username: username.trim(), namaLengkap: namaLengkap.trim() });
     setShowEditUserModal(false);
@@ -160,12 +170,13 @@ export default function ManajemenAdmin() {
   const handleDeleteUser = () => { removeUser(deleteUserId); setShowDeleteUserModal(false); setSuccessMessage(`User "${deleteUserName}" berhasil dihapus!`); setShowSuccessModal(true); };
   
   const handleAddKetuaTim = () => {
+    setFormError(null);
     const { id, nama, nip } = newKetuaTimData;
-    if (!isValidUserId(id)) { alert("ID Ketua Tim harus diisi!"); return; }
-    if (!isValidNamaLengkap(nama)) { alert("Nama harus minimal 2 karakter!"); return; }
-    if (!isValidNip(nip)) { alert("NIP harus minimal 10 karakter!"); return; }
-    if (isDuplicateKetuaTimId(id)) { alert("ID Ketua Tim sudah ada!"); return; }
-    if (isDuplicateNip(nip)) { alert("NIP sudah ada!"); return; }
+    if (!isValidUserId(id)) { setFormError("ID Ketua Tim harus diisi!"); return; }
+    if (!isValidNamaLengkap(nama)) { setFormError("Nama harus minimal 2 karakter!"); return; }
+    if (!isValidNip(nip)) { setFormError("NIP harus minimal 10 karakter!"); return; }
+    if (isDuplicateKetuaTimId(id)) { setFormError("ID Ketua Tim sudah ada!"); return; }
+    if (isDuplicateNip(nip)) { setFormError("NIP sudah ada!"); return; }
     
     addKetuaTim({ id: id.trim(), nama: nama.trim(), nip: nip.trim() });
     setNewKetuaTimData({ id: "", nama: "", nip: "" });
@@ -175,12 +186,13 @@ export default function ManajemenAdmin() {
   };
   
   const handleEditKetuaTim = () => {
+    setFormError(null);
     if (!editKetuaTimData) return;
-    const { id, nama, nip } = editKetuaTimData;
+    const { nama, nip } = editKetuaTimData;
     
-    if (!isValidNamaLengkap(nama)) { alert("Nama harus minimal 2 karakter!"); return; }
-    if (!isValidNip(nip)) { alert("NIP harus minimal 10 karakter!"); return; }
-    if (isDuplicateNip(nip, editKetuaTimData.id)) { alert("NIP sudah ada!"); return; }
+    if (!isValidNamaLengkap(nama)) { setFormError("Nama harus minimal 2 karakter!"); return; }
+    if (!isValidNip(nip)) { setFormError("NIP harus minimal 10 karakter!"); return; }
+    if (isDuplicateNip(nip, editKetuaTimData.id)) { setFormError("NIP sudah ada!"); return; }
     
     updateKetuaTim(editKetuaTimData.id, { ...editKetuaTimData, nama: nama.trim(), nip: nip.trim() });
     setShowEditKetuaTimModal(false);
@@ -196,43 +208,45 @@ export default function ManajemenAdmin() {
   };
 
   const handleAddPPL = () => {
-    const { id, namaPPL, totalKegiatan, alamat, noTelepon } = newPPLData;
+    setFormError(null);
+    const { id, namaPPL, alamat, noTelepon } = newPPLData;
 
-    if (!isValidUserId(id)) { alert("ID PPL harus diisi!"); return; }
-    if (!isValidNamaLengkap(namaPPL)) { alert("Nama PPL harus minimal 2 karakter!"); return; }
-    if (!isValidAlamat(alamat)) { alert("Alamat harus minimal 5 karakter!"); return; }
-    if (!isValidTelepon(noTelepon)) { alert("No. telepon harus minimal 10 karakter!"); return; }
-    if (isDuplicatePPLId(id)) { alert("ID PPL sudah ada!"); return; }
-    if (isDuplicatePPLTelepon(noTelepon)) { alert("No. telepon sudah ada!"); return; }
+    if (!isValidUserId(id)) { setFormError("ID PPL harus diisi!"); return; }
+    if (!isValidNamaLengkap(namaPPL)) { setFormError("Nama PPL harus minimal 2 karakter!"); return; }
+    if (!isValidAlamat(alamat)) { setFormError("Alamat harus minimal 5 karakter!"); return; }
+    if (!isValidTelepon(noTelepon)) { setFormError("No. telepon harus berisi minimal 10 angka!"); return; }
+    if (isDuplicatePPLId(id)) { setFormError("ID PPL sudah ada!"); return; }
+    if (isDuplicatePPLTelepon(noTelepon)) { setFormError("No. telepon sudah ada!"); return; }
 
     addPPLAdmin({
+      ...newPPLData,
       id: id.trim(),
       namaPPL: namaPPL.trim(),
-      totalKegiatan: 0,
       alamat: alamat.trim(),
       noTelepon: noTelepon.trim()
     });
-    setNewPPLData({ id: "", namaPPL: "", totalKegiatan: 0, alamat: "", noTelepon: "" });
+    setNewPPLData({ id: "", namaPPL: "", totalKegiatan: 0, alamat: "", noTelepon: "", kegiatanNames: [] });
     setShowAddPPLModal(false);
     setSuccessMessage(`PPL "${namaPPL}" berhasil ditambahkan!`);
     setShowSuccessModal(true);
   };
 
   const handleEditPPL = () => {
+    setFormError(null);
     if (!editPPLData) return;
-    const { id, namaPPL, alamat, noTelepon } = editPPLData;
+    const { namaPPL, alamat, noTelepon } = editPPLData;
     
-    if (!isValidNamaLengkap(namaPPL)) { alert("Nama PPL harus minimal 2 karakter!"); return; }
-    if (!isValidAlamat(alamat)) { alert("Alamat harus minimal 5 karakter!"); return; }
-    if (!isValidTelepon(noTelepon)) { alert("No. telepon harus minimal 10 karakter!"); return; }
-    if (isDuplicatePPLTelepon(noTelepon, editPPLData.id)) { alert("No. telepon sudah ada!"); return; }
+    if (!isValidNamaLengkap(namaPPL)) { setFormError("Nama PPL harus minimal 2 karakter!"); return; }
+    if (!isValidAlamat(alamat)) { setFormError("Alamat harus minimal 5 karakter!"); return; }
+    if (!isValidTelepon(noTelepon)) { setFormError("No. telepon harus berisi minimal 10 angka!"); return; }
+    if (isDuplicatePPLTelepon(noTelepon, editPPLData.id)) { setFormError("No. telepon sudah ada!"); return; }
 
     updatePPLAdmin(editPPLData.id, { ...editPPLData, namaPPL: namaPPL.trim(), alamat: alamat.trim(), noTelepon: noTelepon.trim() });
     setShowEditPPLModal(false);
     setSuccessMessage(`PPL "${namaPPL}" berhasil diperbarui!`);
     setShowSuccessModal(true);
   };
-
+  
   const handleDeletePPL = () => {
     removePPLAdmin(deletePPLId);
     setShowDeletePPLModal(false);
@@ -240,11 +254,15 @@ export default function ManajemenAdmin() {
     setShowSuccessModal(true);
   };
 
-  const openEditUserModal = (user: UserData) => { setEditUserData({...user, password: ''}); setShowEditUserModal(true); };
+  // Functiions to open modals and reset form errors
+  const openAddUserModal = () => { setFormError(null); setShowAddUserModal(true); };
+  const openEditUserModal = (user: UserData) => { setFormError(null); setEditUserData({...user, password: ''}); setShowEditUserModal(true); };
   const openDeleteUserModal = (user: UserData) => { setDeleteUserId(user.id); setDeleteUserName(user.username); setShowDeleteUserModal(true); };
-  const openEditKetuaTimModal = (ketuaTim: KetuaTimData) => { setEditKetuaTimData(ketuaTim); setShowEditKetuaTimModal(true); };
+  const openAddKetuaTimModal = () => { setFormError(null); setShowAddKetuaTimModal(true); };
+  const openEditKetuaTimModal = (ketuaTim: KetuaTimData) => { setFormError(null); setEditKetuaTimData(ketuaTim); setShowEditKetuaTimModal(true); };
   const openDeleteKetuaTimModal = (ketuaTim: KetuaTimData) => { setDeleteKetuaTimId(ketuaTim.id); setDeleteKetuaTimName(ketuaTim.nama); setShowDeleteKetuaTimModal(true); };
-  const openEditPPLModal = (ppl: PPLAdminData) => { setEditPPLData(ppl); setShowEditPPLModal(true); };
+  const openAddPPLModal = () => { setFormError(null); setShowAddPPLModal(true); };
+  const openEditPPLModal = (ppl: PPLAdminData) => { setFormError(null); setEditPPLData(ppl); setShowEditPPLModal(true); };
   const openDeletePPLModal = (ppl: PPLAdminData) => { setDeletePPLId(ppl.id); setDeletePPLName(ppl.namaPPL); setShowDeletePPLModal(true); };
 
   const handleUserSort = (key: keyof UserData) => { let direction: 'asc' | 'desc' = 'asc'; if (userSortConfig?.key === key && userSortConfig.direction === 'asc') { direction = 'desc'; } setUserSortConfig({ key, direction }); };
@@ -267,6 +285,17 @@ export default function ManajemenAdmin() {
   const ketuaTimStats = useMemo(() => ({ totalKetuaTim: ketuaTimList.length }), [ketuaTimList]);
   const pplStats = useMemo(() => ({ totalPPL: pplAdminList.length, totalKegiatan: pplAdminList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0), avgKegiatan: pplAdminList.length > 0 ? Math.round(pplAdminList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0) / pplAdminList.length) : 0 }), [pplAdminList]);
 
+  // Komponen untuk menampilkan error
+  const FormError = ({ message }: { message: string | null }) => {
+    if (!message) return null;
+    return (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
+            <AlertCircle className="w-4 h-4 text-red-600" />
+            <p className="text-sm text-red-700">{message}</p>
+        </div>
+    );
+  };
+  
   return (
     <Layout>
       <div className="space-y-8">
@@ -295,7 +324,7 @@ export default function ManajemenAdmin() {
                   <CardTitle>Daftar Users</CardTitle>
                   <div className="flex gap-4">
                     <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari username atau nama..." value={userSearchTerm} onChange={(e) => setUserSearchTerm(e.target.value)} className="pl-10"/></div></div>
-                    <Button onClick={() => setShowAddUserModal(true)} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2" />Tambah User</Button>
+                    <Button onClick={openAddUserModal} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2" />Tambah User</Button>
                   </div>
                 </div>
               </CardHeader>
@@ -340,7 +369,7 @@ export default function ManajemenAdmin() {
                         <CardTitle>Daftar Ketua Tim</CardTitle>
                         <div className="flex gap-4">
                             <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari nama atau NIP..." value={ketuaTimSearchTerm} onChange={(e) => setKetuaTimSearchTerm(e.target.value)} className="pl-10"/></div></div>
-                            <Button onClick={() => setShowAddKetuaTimModal(true)} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah Ketua Tim</Button>
+                            <Button onClick={openAddKetuaTimModal} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah Ketua Tim</Button>
                         </div>
                     </div>
                 </CardHeader>
@@ -385,7 +414,7 @@ export default function ManajemenAdmin() {
                         <CardTitle>Daftar PPL</CardTitle>
                         <div className="flex gap-4">
                             <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari PPL..." value={pplSearchTerm} onChange={(e) => setPplSearchTerm(e.target.value)} className="pl-10"/></div></div>
-                            <Button onClick={() => setShowAddPPLModal(true)} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah PPL</Button>
+                            <Button onClick={openAddPPLModal} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah PPL</Button>
                         </div>
                     </div>
                 </CardHeader>
@@ -430,13 +459,13 @@ export default function ManajemenAdmin() {
         <ConfirmationModal isOpen={showDeleteKetuaTimModal} onClose={() => setShowDeleteKetuaTimModal(false)} onConfirm={handleDeleteKetuaTim} title="Konfirmasi Hapus Ketua Tim" description={`Apakah Anda yakin ingin menghapus ketua tim "${deleteKetuaTimName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         <ConfirmationModal isOpen={showDeletePPLModal} onClose={() => setShowDeletePPLModal(false)} onConfirm={handleDeletePPL} title="Konfirmasi Hapus PPL" description={`Apakah Anda yakin ingin menghapus PPL "${deletePPLName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         
-        {showAddUserModal && <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Tambah User Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="newUserId">ID User *</Label><Input id="newUserId" value={newUserData.id} onChange={(e) => setNewUserData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID User (contoh: USR001)"/></div><div className="space-y-2"><Label htmlFor="newUsername">Username *</Label><Input id="newUsername" value={newUserData.username} onChange={(e) => setNewUserData(prev => ({ ...prev, username: e.target.value }))} placeholder="Masukkan username"/></div><div className="space-y-2"><Label htmlFor="newPassword">Password *</Label><div className="relative"><Input id="newPassword" type={showPassword ? "text" : "password"} value={newUserData.password} onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))} placeholder="Masukkan password (minimal 6 karakter)"/><Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div><div className="space-y-2"><Label htmlFor="newNamaLengkap">Nama Lengkap *</Label><Input id="newNamaLengkap" value={newUserData.namaLengkap} onChange={(e) => setNewUserData(prev => ({ ...prev, namaLengkap: e.target.value }))} placeholder="Masukkan nama lengkap"/></div><div className="space-y-2"><Label htmlFor="newRole">Role *</Label><Select value={newUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setNewUserData(prev => ({ ...prev, role: value }))}><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddUserModal(false)}>Batal</Button><Button onClick={handleAddUser} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
-        {showAddKetuaTimModal && <Dialog open={showAddKetuaTimModal} onOpenChange={setShowAddKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Tambah Ketua Tim Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="newKetuaTimId">ID Ketua Tim *</Label><Input id="newKetuaTimId" value={newKetuaTimData.id} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID Ketua Tim (contoh: KT001)"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNama">Nama *</Label><Input id="newKetuaTimNama" value={newKetuaTimData.nama} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nama: e.target.value }))} placeholder="Masukkan nama ketua tim"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNip">NIP *</Label><Input id="newKetuaTimNip" value={newKetuaTimData.nip} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nip: e.target.value }))} placeholder="Masukkan NIP (minimal 10 karakter)"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddKetuaTimModal(false)}>Batal</Button><Button onClick={handleAddKetuaTim} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
-        {showAddPPLModal && <Dialog open={showAddPPLModal} onOpenChange={setShowAddPPLModal}><DialogContent><DialogHeader><DialogTitle>Tambah PPL Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="newPPLId">ID PPL *</Label><Input id="newPPLId" value={newPPLData.id} onChange={(e) => setNewPPLData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID PPL (contoh: PPL001)"/></div><div className="space-y-2"><Label htmlFor="newPPLNama">Nama PPL *</Label><Input id="newPPLNama" value={newPPLData.namaPPL} onChange={(e) => setNewPPLData(prev => ({ ...prev, namaPPL: e.target.value }))} placeholder="Masukkan nama PPL"/></div><div className="space-y-2"><Label htmlFor="newPPLAlamat">Alamat *</Label><Input id="newPPLAlamat" value={newPPLData.alamat} onChange={(e) => setNewPPLData(prev => ({ ...prev, alamat: e.target.value }))} placeholder="Masukkan alamat"/></div><div className="space-y-2"><Label htmlFor="newPPLTelepon">No. Telepon *</Label><Input id="newPPLTelepon" value={newPPLData.noTelepon} onChange={(e) => setNewPPLData(prev => ({ ...prev, noTelepon: e.target.value }))} placeholder="Masukkan no. telepon"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddPPLModal(false)}>Batal</Button><Button onClick={handleAddPPL} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+        {showAddUserModal && <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Tambah User Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newUserId">ID User *</Label><Input id="newUserId" value={newUserData.id} onChange={(e) => setNewUserData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID User (contoh: USR001)"/></div><div className="space-y-2"><Label htmlFor="newUsername">Username *</Label><Input id="newUsername" value={newUserData.username} onChange={(e) => setNewUserData(prev => ({ ...prev, username: e.target.value }))} placeholder="Masukkan username"/></div><div className="space-y-2"><Label htmlFor="newPassword">Password *</Label><div className="relative"><Input id="newPassword" type={showPassword ? "text" : "password"} value={newUserData.password} onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))} placeholder="Masukkan password (minimal 6 karakter)"/><Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div><div className="space-y-2"><Label htmlFor="newNamaLengkap">Nama Lengkap *</Label><Input id="newNamaLengkap" value={newUserData.namaLengkap} onChange={(e) => setNewUserData(prev => ({ ...prev, namaLengkap: e.target.value }))} placeholder="Masukkan nama lengkap"/></div><div className="space-y-2"><Label htmlFor="newRole">Role *</Label><Select value={newUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setNewUserData(prev => ({ ...prev, role: value }))}><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddUserModal(false)}>Batal</Button><Button onClick={handleAddUser} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+        {showAddKetuaTimModal && <Dialog open={showAddKetuaTimModal} onOpenChange={setShowAddKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Tambah Ketua Tim Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newKetuaTimId">ID Ketua Tim *</Label><Input id="newKetuaTimId" value={newKetuaTimData.id} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID Ketua Tim (contoh: KT001)"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNama">Nama *</Label><Input id="newKetuaTimNama" value={newKetuaTimData.nama} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nama: e.target.value }))} placeholder="Masukkan nama ketua tim"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNip">NIP *</Label><Input id="newKetuaTimNip" value={newKetuaTimData.nip} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nip: e.target.value }))} placeholder="Masukkan NIP (minimal 10 karakter)"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddKetuaTimModal(false)}>Batal</Button><Button onClick={handleAddKetuaTim} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+        {showAddPPLModal && <Dialog open={showAddPPLModal} onOpenChange={setShowAddPPLModal}><DialogContent><DialogHeader><DialogTitle>Tambah PPL Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newPPLId">ID PPL *</Label><Input id="newPPLId" value={newPPLData.id} onChange={(e) => setNewPPLData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID PPL (contoh: PPL001)"/></div><div className="space-y-2"><Label htmlFor="newPPLNama">Nama PPL *</Label><Input id="newPPLNama" value={newPPLData.namaPPL} onChange={(e) => setNewPPLData(prev => ({ ...prev, namaPPL: e.target.value }))} placeholder="Masukkan nama PPL"/></div><div className="space-y-2"><Label htmlFor="newPPLAlamat">Alamat *</Label><Input id="newPPLAlamat" value={newPPLData.alamat} onChange={(e) => setNewPPLData(prev => ({ ...prev, alamat: e.target.value }))} placeholder="Masukkan alamat"/></div><div className="space-y-2"><Label htmlFor="newPPLTelepon">No. Telepon *</Label><Input id="newPPLTelepon" value={newPPLData.noTelepon} onChange={(e) => setNewPPLData(prev => ({ ...prev, noTelepon: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="Masukkan no. telepon"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddPPLModal(false)}>Batal</Button><Button onClick={handleAddPPL} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
         
-        {editUserData && <Dialog open={showEditUserModal} onOpenChange={setShowEditUserModal}><DialogContent><DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="editUsername">Username *</Label><Input id="editUsername" value={editUserData.username} onChange={e => setEditUserData({...editUserData, username: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editNamaLengkap">Nama Lengkap *</Label><Input id="editNamaLengkap" value={editUserData.namaLengkap} onChange={e => setEditUserData({...editUserData, namaLengkap: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPassword">Password (kosongkan jika tidak diubah)</Label><Input id="editPassword" type="password" onChange={e => setEditUserData({...editUserData, password: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editRole">Role *</Label><Select value={editUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setEditUserData({...editUserData, role: value})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditUserModal(false)}>Batal</Button><Button onClick={handleEditUser}>Simpan</Button></div></div></DialogContent></Dialog>}
-        {editKetuaTimData && <Dialog open={showEditKetuaTimModal} onOpenChange={setShowEditKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Edit Ketua Tim</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="editKtNama">Nama *</Label><Input id="editKtNama" value={editKetuaTimData.nama} onChange={e => setEditKetuaTimData({...editKetuaTimData, nama: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editKtNip">NIP *</Label><Input id="editKtNip" value={editKetuaTimData.nip} onChange={e => setEditKetuaTimData({...editKetuaTimData, nip: e.target.value})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditKetuaTimModal(false)}>Batal</Button><Button onClick={handleEditKetuaTim}>Simpan</Button></div></div></DialogContent></Dialog>}
-        {editPPLData && <Dialog open={showEditPPLModal} onOpenChange={setShowEditPPLModal}><DialogContent><DialogHeader><DialogTitle>Edit PPL</DialogTitle></DialogHeader><div className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="editPplNama">Nama PPL *</Label><Input id="editPplNama" value={editPPLData.namaPPL} onChange={e => setEditPPLData({...editPPLData, namaPPL: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPplAlamat">Alamat *</Label><Input id="editPplAlamat" value={editPPLData.alamat} onChange={e => setEditPPLData({...editPPLData, alamat: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPplTelepon">No. Telepon *</Label><Input id="editPplTelepon" value={editPPLData.noTelepon} onChange={e => setEditPPLData({...editPPLData, noTelepon: e.target.value})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditPPLModal(false)}>Batal</Button><Button onClick={handleEditPPL}>Simpan</Button></div></div></DialogContent></Dialog>}
+        {editUserData && <Dialog open={showEditUserModal} onOpenChange={setShowEditUserModal}><DialogContent><DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editUsername">Username *</Label><Input id="editUsername" value={editUserData.username} onChange={e => setEditUserData({...editUserData, username: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editNamaLengkap">Nama Lengkap *</Label><Input id="editNamaLengkap" value={editUserData.namaLengkap} onChange={e => setEditUserData({...editUserData, namaLengkap: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPassword">Password (kosongkan jika tidak diubah)</Label><Input id="editPassword" type="password" onChange={e => setEditUserData({...editUserData, password: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editRole">Role *</Label><Select value={editUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setEditUserData({...editUserData, role: value})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditUserModal(false)}>Batal</Button><Button onClick={handleEditUser}>Simpan</Button></div></div></DialogContent></Dialog>}
+        {editKetuaTimData && <Dialog open={showEditKetuaTimModal} onOpenChange={setShowEditKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Edit Ketua Tim</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editKtNama">Nama *</Label><Input id="editKtNama" value={editKetuaTimData.nama} onChange={e => setEditKetuaTimData({...editKetuaTimData, nama: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editKtNip">NIP *</Label><Input id="editKtNip" value={editKetuaTimData.nip} onChange={e => setEditKetuaTimData({...editKetuaTimData, nip: e.target.value})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditKetuaTimModal(false)}>Batal</Button><Button onClick={handleEditKetuaTim}>Simpan</Button></div></div></DialogContent></Dialog>}
+        {editPPLData && <Dialog open={showEditPPLModal} onOpenChange={setShowEditPPLModal}><DialogContent><DialogHeader><DialogTitle>Edit PPL</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editPplNama">Nama PPL *</Label><Input id="editPplNama" value={editPPLData.namaPPL} onChange={e => setEditPPLData({...editPPLData, namaPPL: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPplAlamat">Alamat *</Label><Input id="editPplAlamat" value={editPPLData.alamat} onChange={e => setEditPPLData({...editPPLData, alamat: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPplTelepon">No. Telepon *</Label><Input id="editPplTelepon" value={editPPLData.noTelepon} onChange={e => setEditPPLData({...editPPLData, noTelepon: e.target.value.replace(/[^0-9]/g, '')})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditPPLModal(false)}>Batal</Button><Button onClick={handleEditPPL}>Simpan</Button></div></div></DialogContent></Dialog>}
       </div>
     </Layout>
   );

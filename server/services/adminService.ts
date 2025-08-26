@@ -3,32 +3,47 @@
 import { RowDataPacket, OkPacket } from 'mysql2';
 import db from '../db';
 import { UserData, KetuaTimData, PPLAdminData } from '@shared/api';
+import bcrypt from 'bcryptjs'; 
 
-// --- User Management --- (Tidak ada perubahan)
+const SALT_ROUNDS = 10;
+
+// --- User Management ---
 export const getAllUsers = async (): Promise<UserData[]> => {
     const [rows] = await db.query<RowDataPacket[]>('SELECT id, username, nama_lengkap AS namaLengkap, role FROM users ORDER BY nama_lengkap ASC');
     return rows as UserData[];
 };
+
 export const createUser = async (user: UserData): Promise<UserData> => {
     const { id, username, password, namaLengkap, role } = user;
-    await db.execute('INSERT INTO users (id, username, password, nama_lengkap, role) VALUES (?, ?, ?, ?, ?)', [id, username, password, namaLengkap, role]);
-    return user;
+    if (!password) throw new Error("Password is required for new user");
+    
+    // PERBAIKAN: Hash password sebelum disimpan
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+    
+    await db.execute('INSERT INTO users (id, username, password, nama_lengkap, role) VALUES (?, ?, ?, ?, ?)', [id, username, hashedPassword, namaLengkap, role]);
+    return { ...user, password: '' }; // Jangan kembalikan password
 };
+
 export const updateUser = async (id: string, user: UserData): Promise<UserData> => {
     const { username, password, namaLengkap, role } = user;
+    
+    // PERBAIKAN: Hanya update password jika diisi, dan hash password baru
     if (password) {
-        await db.execute('UPDATE users SET username = ?, password = ?, nama_lengkap = ?, role = ? WHERE id = ?', [username, password, namaLengkap, role, id]);
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+        await db.execute('UPDATE users SET username = ?, password = ?, nama_lengkap = ?, role = ? WHERE id = ?', [username, hashedPassword, namaLengkap, role, id]);
     } else {
         await db.execute('UPDATE users SET username = ?, nama_lengkap = ?, role = ? WHERE id = ?', [username, namaLengkap, role, id]);
     }
-    return user;
+    return { ...user, password: '' };
 };
+
 export const deleteUser = async (id: string): Promise<boolean> => {
     const [result] = await db.execute<OkPacket>('DELETE FROM users WHERE id = ?', [id]);
     return result.affectedRows > 0;
 };
 
-// --- Ketua Tim Management --- (Tidak ada perubahan)
+// --- Ketua Tim & PPL Management (Tidak ada perubahan) ---
+// ... (sisa kode tetap sama)
 export const getAllKetuaTim = async (): Promise<KetuaTimData[]> => {
     const [rows] = await db.query<RowDataPacket[]>('SELECT id, nama_ketua AS nama, nip FROM ketua_tim ORDER BY nama_ketua ASC');
     return rows as KetuaTimData[];
@@ -47,10 +62,7 @@ export const deleteKetuaTim = async (id: string): Promise<boolean> => {
     const [result] = await db.execute<OkPacket>('DELETE FROM ketua_tim WHERE id = ?', [id]);
     return result.affectedRows > 0;
 };
-
-// --- PPL Management ---
 export const getAllPPLAdmin = async (): Promise<PPLAdminData[]> => {
-    // PERBAIKAN: Menambahkan JOIN dan GROUP_CONCAT untuk mengambil nama kegiatan
     const query = `
         SELECT 
             pm.id, 
@@ -66,7 +78,6 @@ export const getAllPPLAdmin = async (): Promise<PPLAdminData[]> => {
         ORDER BY pm.namaPPL ASC
     `;
     const [rows] = await db.query<RowDataPacket[]>(query);
-    // PERBAIKAN: Memproses kegiatanNames menjadi array
     return rows.map(row => ({
         ...row,
         kegiatanNames: row.kegiatanNames ? row.kegiatanNames.split(';;') : []

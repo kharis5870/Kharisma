@@ -2,10 +2,20 @@
 
 import { Router } from 'express';
 import { authenticateUser } from '../services/authService';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
 
-router.post('/login', async (req, res) => {
+// PERBAIKAN: Tambahkan rate limiter
+const loginLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000, // 15 menit
+	max: 10, // Batasi setiap IP hingga 10 permintaan login per 15 menit
+	standardHeaders: true,
+	legacyHeaders: false,
+    message: { message: 'Terlalu banyak percobaan login. Silakan coba lagi setelah 15 menit.' }
+});
+
+router.post('/login', loginLimiter, async (req, res) => { // Terapkan limiter di sini
     const { username, password } = req.body;
 
     if (!username || !password) {
