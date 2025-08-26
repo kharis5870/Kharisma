@@ -17,7 +17,7 @@ interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'u
 export type State = {
   namaKegiatan: string;
   ketua_tim_id?: string;
-  timKerja: string;
+  deskripsiKegiatan: string;
   adaListing: boolean;
   pplAllocations: PPLItem[];
   documents: DocumentItem[];
@@ -64,7 +64,7 @@ const mandatoryDocs: Omit<DocumentItem, 'id' | 'link'>[] = [
 const initialState: State = {
   namaKegiatan: "",
   ketua_tim_id: undefined,
-  timKerja: "",
+  deskripsiKegiatan: "",
   adaListing: false,
   pplAllocations: [{ id: "1", ppl_master_id: "", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }],
   documents: mandatoryDocs.map((doc, i) => ({ ...doc, id: `wajib-initial-${i}`, link: '' })),

@@ -205,7 +205,7 @@ export default function InputKegiatan() {
                     </Select>
                 </div>
               </div>
-              <div className="space-y-2"><Label htmlFor="timKerja">Tim Kerja</Label><Textarea id="timKerja" value={store.timKerja} onChange={(e) => store.updateFormField('timKerja', e.target.value)} placeholder="Deskripsikan tim kerja..." /></div>
+              <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={store.deskripsiKegiatan} onChange={(e) => store.updateFormField('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan..." /></div>
             </CardContent>
           </Card>
           <Card>
@@ -260,17 +260,16 @@ export default function InputKegiatan() {
                                     </CommandGroup></CommandList></Command></PopoverContent>
                                 </Popover>
                             </div>
-                            <div className="space-y-2"><Label>Beban Kerja *</Label><Input placeholder="Beban Kerja" value={ppl.bebanKerja} onChange={e => store.updatePPL(ppl.id, 'bebanKerja', e.target.value)} /></div>
-                            <div className="space-y-2"><Label>Satuan</Label><Input placeholder="Contoh: Hari" value={ppl.satuanBebanKerja} onChange={e => store.updatePPL(ppl.id, 'satuanBebanKerja', e.target.value)} /></div>
+                            <div className="space-y-2"><Label>Jumlah Beban Kerja *</Label><Input placeholder="Contoh: 20" value={ppl.bebanKerja} onChange={e => store.updatePPL(ppl.id, 'bebanKerja', e.target.value)} /></div>
+                            <div className="space-y-2"><Label>Satuan *</Label><Input placeholder="Contoh: Dokumen" value={ppl.satuanBebanKerja} onChange={e => store.updatePPL(ppl.id, 'satuanBebanKerja', e.target.value)} /></div>
                             <div className="space-y-2">
                                 <Label>Honor (Rp) *</Label>
-                                {/* PERBAIKAN: Terapkan format honor */}
                                 <Input 
                                     placeholder="Contoh: 2.000.000" 
                                     value={formatHonor(ppl.besaranHonor)} 
                                     onChange={e => {
                                         const parsedValue = parseHonor(e.target.value);
-                                        if (/^\d*$/.test(parsedValue)) { // Hanya izinkan angka
+                                        if (/^\d*$/.test(parsedValue)) { 
                                             store.updatePPL(ppl.id, 'besaranHonor', parsedValue);
                                         }
                                     }}

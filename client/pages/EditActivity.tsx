@@ -331,8 +331,13 @@ export default function EditActivity() {
                                 </div>
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor="timKerja">Tim Kerja</Label>
-                                <Textarea id="timKerja" value={formData.timKerja || ''} onChange={(e) => handleFormFieldChange('timKerja', e.target.value)} placeholder="Deskripsikan tim kerja dan pembagian tugas secara singkat." />
+                                <Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label>
+                                <Textarea 
+                                  id="deskripsiKegiatan" 
+                                  value={formData.deskripsiKegiatan || ''} 
+                                  onChange={(e) => handleFormFieldChange('deskripsiKegiatan', e.target.value)} 
+                                  placeholder="Deskripsikan kegiatan dan pembagian tugas secara singkat." 
+                                />
                               </div>
                             </CardContent>
                         </Card>

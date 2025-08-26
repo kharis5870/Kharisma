@@ -43,7 +43,7 @@ export interface Kegiatan {
   namaKegiatan: string;
   ketua_tim_id: string;
   namaKetua?: string; 
-  timKerja: string;
+  deskripsiKegiatan: string;
   adaListing: boolean;
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';
   progressKeseluruhan: number;

@@ -367,7 +367,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 </div>
-                                <div><h4 className="font-semibold text-gray-900 mb-2">Tim Kerja</h4><p className="text-sm text-gray-600 leading-relaxed">{selectedActivity.timKerja}</p></div>
+                                <div><h4 className="font-semibold text-gray-900 mb-2">Deskripsi Kegiatan</h4><p className="text-sm text-gray-600 leading-relaxed">{selectedActivity.deskripsiKegiatan}</p></div>
                                 <div>
                                 <div className="flex items-center justify-between mb-4"><h4 className="font-semibold text-gray-900">Progress PPL</h4><div className="w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari nama PPL..." value={pplSearchView} onChange={(e) => setPplSearchView(e.target.value)} className="pl-10 h-8 text-sm" /></div></div></div>
                                 <div className="space-y-4">
