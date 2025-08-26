@@ -47,17 +47,20 @@ export type Actions = {
 };
 
 const mandatoryDocs: Omit<DocumentItem, 'id' | 'link'>[] = [
+    { nama: 'SK ', tipe: 'persiapan', isWajib: true, jenis: 'link' },
     { nama: 'Surat Tugas', tipe: 'persiapan', isWajib: true, jenis: 'link' },
     { nama: 'Undangan', tipe: 'persiapan', isWajib: true, jenis: 'link' },
-    { nama: 'Daftar Hasil', tipe: 'persiapan', isWajib: true, jenis: 'link' },
+    { nama: 'Daftar Hadir', tipe: 'persiapan', isWajib: true, jenis: 'link' },
     { nama: 'Notulensi', tipe: 'persiapan', isWajib: true, jenis: 'link' },
-    { nama: 'Laporan Persiapan', tipe: 'persiapan', isWajib: true, jenis: 'link' },
+    { nama: 'Laporan Pelatihan', tipe: 'persiapan', isWajib: true, jenis: 'link' },
     { nama: 'KAK', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
     { nama: 'SK', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
     { nama: 'ST', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
     { nama: 'Visum', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
+    { nama: 'BAST', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
     { nama: 'Laporan Pengumpulan Data', tipe: 'pengumpulan-data', isWajib: true, jenis: 'link' },
     { nama: 'Laporan Pengolahan & Analisis', tipe: 'pengolahan-analisis', isWajib: true, jenis: 'link' },
+    { nama: 'Dokumentasi', tipe: 'pengolahan-analisis', isWajib: true, jenis: 'link' },
     { nama: 'Laporan Diseminasi & Evaluasi', tipe: 'diseminasi-evaluasi', isWajib: true, jenis: 'link' },
 ];
 
@@ -66,7 +69,7 @@ const initialState: State = {
   ketua_tim_id: undefined,
   deskripsiKegiatan: "",
   adaListing: false,
-  pplAllocations: [], // <-- Dikosongkan, PPL ditambahkan per tahap
+  pplAllocations: [], 
   documents: mandatoryDocs.map((doc, i) => ({ ...doc, id: `wajib-initial-${i}`, link: '' })),
   tanggalMulaiPersiapan: undefined,
   tanggalSelesaiPersiapan: undefined,

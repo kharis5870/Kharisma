@@ -16,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare, Notebook } from "lucide-react";
+import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare, Notebook, List } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
 import { cn } from "@/lib/utils";
@@ -149,7 +149,7 @@ export default function Dashboard() {
 
   const { data: activities = [], isLoading } = useQuery<Kegiatan[]>({ queryKey: ['kegiatan'], queryFn: fetchActivities });
 
-  const processedActivities = useMemo(() => {
+  const processedActivities: KegiatanWithDynamicStatus[] = useMemo(() => {
     return activities.map(activity => ({
         ...activity,
         ppl: (activity.ppl || []).map(p => ({
@@ -158,7 +158,7 @@ export default function Dashboard() {
             progressSubmit: p.progressSubmit ?? 0,
             progressDiperiksa: p.progressDiperiksa ?? 0,
             progressApproved: p.progressApproved ?? 0,
-        })) as PPLWithProgress[],
+        })),
         dynamicStatus: calculateActivityStatus(activity),
     }));
   }, [activities]);
@@ -296,13 +296,13 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="grid grid-cols-4 gap-4">
-                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressOpen || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressOpen || 0} {ppl.satuanBebanKerja}</div></div>
-                        <div className="text-center"><Label className="text-xs text-gray-600">Submit</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressSubmit || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressSubmit || 0} {ppl.satuanBebanKerja}</div></div>
-                        <div className="text-center"><Label className="text-xs text-gray-600">Diperiksa</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressDiperiksa || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressDiperiksa || 0} {ppl.satuanBebanKerja}</div></div>
-                        <div className="text-center"><Label className="text-xs text-gray-600">Approved</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressApproved || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressApproved || 0} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressOpen}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressOpen} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Submit</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressSubmit}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressSubmit} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Diperiksa</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressDiperiksa}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressDiperiksa} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Approved</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressApproved}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressApproved} {ppl.satuanBebanKerja}</div></div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-bps-green-600 h-2 rounded-full transition-all duration-300" style={{ width: `${getProgressBarValue(ppl)}%` }}></div></div>
-                    <div className="text-xs text-gray-500 text-center">Total: {(ppl.progressOpen ?? 0) + (ppl.progressSubmit ?? 0) + (ppl.progressDiperiksa ?? 0) + (ppl.progressApproved ?? 0)} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
+                    <div className="text-xs text-gray-500 text-center">Total: {ppl.progressOpen + ppl.progressSubmit + ppl.progressDiperiksa + ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
                 </div>
             </Card>
         ))}
@@ -332,7 +332,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="grid grid-cols-4 gap-4">
-                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><Input type="number" value={ppl.progressOpen || 0} disabled className="mt-1 text-center"/></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><Input type="number" value={ppl.progressOpen} disabled className="mt-1 text-center"/></div>
                         {['submit', 'diperiksa', 'approved'].map(field => (
                             <div key={field} className="text-center">
                                 <Label className="text-xs text-gray-600 capitalize">{field}</Label>
@@ -341,7 +341,7 @@ export default function Dashboard() {
                         ))}
                     </div>
                     <Progress value={getProgressBarValue(ppl)} className="h-2" />
-                    <div className="text-xs text-gray-500 text-center">Total: {(ppl.progressOpen ?? 0) + (ppl.progressSubmit ?? 0) + (ppl.progressDiperiksa ?? 0) + (ppl.progressApproved ?? 0)} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
+                    <div className="text-xs text-gray-500 text-center">Total: {ppl.progressOpen + ppl.progressSubmit + ppl.progressDiperiksa + ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
                 </div>
             </Card>
         ))}
@@ -448,7 +448,7 @@ export default function Dashboard() {
                             <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.namaKetua}</p></div><Badge className={cn("ml-2 whitespace-nowrap", warnings.length > 0 ? 'bg-red-100 text-red-700' : color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
                             <CardContent className="space-y-4 flex-grow flex flex-col justify-between">
                                 <div>
-                                    <div className="flex justify-between items-center mb-2"><span className="text-sm font-medium">Progress Keseluruhan</span><span className="text-sm font-bold text-bps-blue-600">{activity.progressKeseluruhan || 0}%</span></div>
+                                    <div className="flex justify-between items-center mb-2"><span className="text-sm font-medium">Progress Pendataan/Pengolahan</span><span className="text-sm font-bold text-bps-blue-600">{activity.progressKeseluruhan || 0}%</span></div>
                                     <Progress value={activity.progressKeseluruhan || 0} className="h-2" />
                                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
                                         {getStageDates()}

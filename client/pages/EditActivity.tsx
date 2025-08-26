@@ -21,6 +21,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen, PPLMaster, KetuaTim } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import AlertModal from "@/components/AlertModal";
 
 type ClientPPL = PPL & { clientId: string };
 type ClientDokumen = Dokumen & { clientId: string };
@@ -38,7 +39,7 @@ type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'lastUpdated
     dokumen: ClientDokumen[];
 };
 
-type DateFieldName = 
+type DateFieldName =
   | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
   | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData'
   | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
@@ -105,6 +106,7 @@ export default function EditActivity() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string; isApproved: boolean }>({ isOpen: false, tipe: null, content: '', isApproved: false });
     const [pplComboboxStates, setPplComboboxStates] = useState<{ [key: string]: boolean }>({});
+    const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
 
     const { data: initialData, isLoading, isError } = useQuery({
         queryKey: ['kegiatan', id],
@@ -141,27 +143,27 @@ export default function EditActivity() {
 
     const mutation = useMutation({
         mutationFn: updateActivity,
-        onSuccess: () => { 
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['kegiatan', id] });
             queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
-            setShowSuccessModal(true); 
+            setShowSuccessModal(true);
         },
         onError: (error) => {
             console.error("Gagal menyimpan:", error);
             alert(`Terjadi kesalahan saat menyimpan: ${error.message}`);
         }
     });
-    
+
     const handleFormFieldChange = (field: keyof FormState, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
-    
+
     const titleCase = (str: string) => str.replace(/-/g, ' ').toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
     const handleNoteSubmit = () => {
         if (!noteModal.tipe) return;
         const tipe = noteModal.tipe;
-        
+
         setFormData(prev => {
             const newDocs = [...(prev.dokumen || [])];
             const existingNoteIndex = newDocs.findIndex(d => d.tipe === tipe && d.jenis === 'catatan');
@@ -195,22 +197,37 @@ export default function EditActivity() {
     };
 
     const updatePPL = (clientId: string, field: keyof PPL, value: string) => {
-        setFormData(prev => ({
-            ...prev,
-            ppl: prev.ppl?.map(p => {
+        setFormData(prev => {
+            if (!prev.ppl) return prev;
+
+            const newPplList = prev.ppl.map(p => {
                 if (p.clientId === clientId) {
                     const updatedPpl = { ...p, [field]: value };
-                    
+
+                    if (field === 'bebanKerja') {
+                        const oldBebanKerja = parseInt(p.bebanKerja) || 0;
+                        const newBebanKerja = parseInt(value) || 0;
+                        const diff = newBebanKerja - oldBebanKerja;
+                        const currentOpen = p.progressOpen ?? 0;
+
+                        if (diff < 0 && currentOpen + diff < 0) {
+                            setAlertModal({ isOpen: true, title: "Gagal Mengurangi", message: "Dokumen open kosong, harap tambahkan dokumen open terlebih dahulu." });
+                            return p; // Kembalikan state PPL yang lama jika tidak valid
+                        }
+                        updatedPpl.progressOpen = currentOpen + diff;
+                    }
+
                     if (field === 'bebanKerja' || field === 'hargaSatuan') {
-                        const bebanKerja = field === 'bebanKerja' ? parseInt(value) || 0 : parseInt(updatedPpl.bebanKerja) || 0;
-                        const hargaSatuan = field === 'hargaSatuan' ? parseInt(parseHonor(value)) || 0 : parseInt(parseHonor(updatedPpl.hargaSatuan)) || 0;
+                        const bebanKerja = parseInt(updatedPpl.bebanKerja) || 0;
+                        const hargaSatuan = parseInt(parseHonor(updatedPpl.hargaSatuan)) || 0;
                         updatedPpl.besaranHonor = (bebanKerja * hargaSatuan).toString();
                     }
                     return updatedPpl;
                 }
                 return p;
-            })
-        }));
+            });
+            return { ...prev, ppl: newPplList };
+        });
     };
 
     const handleSuccessAction = () => navigate('/dashboard');
@@ -234,7 +251,7 @@ export default function EditActivity() {
         };
         mutation.mutate(dataToSubmit as Partial<Kegiatan> & {id: number});
     };
-    
+
     const addDocument = (tipe: Dokumen['tipe']) => {
         const newDoc: ClientDokumen = { clientId: `new-doc-${Date.now()}`, tipe, nama: "", link: "", jenis: 'link', isWajib: false };
         setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
@@ -245,10 +262,10 @@ export default function EditActivity() {
     const removeDocument = (clientId: string) => {
         setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) }));
     };
-    
+
     const AlokasiPPLContent = ({ tahap }: { tahap: PPL['tahap'] }) => {
         const pplForStage = useMemo(() => formData.ppl?.filter(p => p.tahap === tahap) || [], [formData.ppl, tahap]);
-    
+
         return (
             <Card>
                 <CardHeader>
@@ -342,7 +359,7 @@ export default function EditActivity() {
 
     if (isLoading) return <Layout><div>Memuat data kegiatan...</div></Layout>;
     if (isError) return <Layout><div>Gagal memuat data. Silakan coba lagi.</div></Layout>;
-    
+
     return (
         <Layout>
             <div className="max-w-4xl mx-auto">
@@ -392,6 +409,7 @@ export default function EditActivity() {
             <Dialog open={noteModal.isOpen} onOpenChange={(isOpen) => !isOpen && setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false })}>
                 <DialogContent><DialogHeader><DialogTitle>Tambah/Edit Catatan</DialogTitle><DialogDescription>Isi catatan untuk tahap ini. {noteModal.isApproved && "Catatan ini sudah disetujui dan tidak bisa diedit."}</DialogDescription></DialogHeader><Textarea value={noteModal.content} onChange={(e) => setNoteModal(prev => ({...prev, content: e.target.value}))} rows={8} placeholder="Tulis catatan di sini..." disabled={noteModal.isApproved} /><DialogFooter><Button variant="outline" onClick={() => setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false })}>Batal</Button><Button onClick={handleNoteSubmit} disabled={noteModal.isApproved}>Simpan Catatan</Button></DialogFooter></DialogContent>
             </Dialog>
+            <AlertModal isOpen={alertModal.isOpen} onClose={() => setAlertModal({ isOpen: false, title: "", message: "" })} title={alertModal.title} description={alertModal.message} />
         </Layout>
     );
 }
