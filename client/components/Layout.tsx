@@ -1,8 +1,9 @@
-// src/components/Layout.tsx
+// client/components/Layout.tsx
 
 import React, { useState } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import Footer from './Footer'; // Impor Footer
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,24 +17,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="bg-gray-100 min-h-screen">
-      <Sidebar 
-        isExpanded={isSidebarExpanded} 
-        toggleSidebar={toggleSidebar} 
+    <div className="bg-gray-100 min-h-screen flex flex-col">
+      <Sidebar
+        isExpanded={isSidebarExpanded}
+        toggleSidebar={toggleSidebar}
       />
 
-      <div 
+      <div
         className={`
-          transition-all duration-300 ease-in-out
-          ${isSidebarExpanded ? 'ml-64' : 'ml-20'} 
+          transition-all duration-300 ease-in-out flex-grow flex flex-col
+          ${isSidebarExpanded ? 'ml-64' : 'ml-20'}
         `}
       >
         <Header isSidebarExpanded={isSidebarExpanded} />
-        
-        {/* PENAMBAHAN DI SINI: Menambahkan margin-top agar konten tidak tertutup Header */}
-        <main className="p-6 mt-[68px]">
+
+        <main className="p-6 mt-[68px] flex-grow">
             {children}
         </main>
+
+        <Footer />
       </div>
     </div>
   );

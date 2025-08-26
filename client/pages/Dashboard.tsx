@@ -1,3 +1,5 @@
+// client/pages/Dashboard.tsx
+
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -14,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare, List, UserX, ChevronLeft, ChevronRight } from "lucide-react";
+import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare, Notebook } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
 import { cn } from "@/lib/utils";
@@ -66,7 +68,7 @@ const calculateActivityStatus = (kegiatan: Kegiatan): KegiatanWithDynamicStatus[
     const now = new Date();
 
     const checkTahapanWarning = (
-        tanggalSelesai: string | undefined, 
+        tanggalSelesai: string | undefined,
         tipeDokumen: Dokumen['tipe'],
         namaTahapan: string
     ) => {
@@ -85,7 +87,7 @@ const calculateActivityStatus = (kegiatan: Kegiatan): KegiatanWithDynamicStatus[
 
     let status: Kegiatan['status'] = kegiatan.status;
     let color = 'bg-blue-100 text-blue-700';
-    
+
     if (kegiatan.tanggalSelesaiDiseminasiEvaluasi && isPast(parseISO(kegiatan.tanggalSelesaiDiseminasiEvaluasi))) {
         status = 'Selesai';
     } else if (kegiatan.tanggalMulaiDiseminasiEvaluasi && now >= parseISO(kegiatan.tanggalMulaiDiseminasiEvaluasi)) {
@@ -142,7 +144,7 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [pplSearchView, setPplSearchView] = useState("");
   const [pplSearchUpdate, setPplSearchUpdate] = useState("");
-  
+
   const [warningModalContent, setWarningModalContent] = useState<{title: string; warnings: string[]} | null>(null);
 
   const { data: activities = [], isLoading } = useQuery<Kegiatan[]>({ queryKey: ['kegiatan'], queryFn: fetchActivities });
@@ -152,10 +154,10 @@ export default function Dashboard() {
         ...activity,
         ppl: (activity.ppl || []).map(p => ({
             ...p,
-            progressOpen: p.progressOpen || 0,
-            progressSubmit: p.progressSubmit || 0,
-            progressDiperiksa: p.progressDiperiksa || 0,
-            progressApproved: p.progressApproved || 0,
+            progressOpen: p.progressOpen ?? 0,
+            progressSubmit: p.progressSubmit ?? 0,
+            progressDiperiksa: p.progressDiperiksa ?? 0,
+            progressApproved: p.progressApproved ?? 0,
         })) as PPLWithProgress[],
         dynamicStatus: calculateActivityStatus(activity),
     }));
@@ -251,7 +253,7 @@ export default function Dashboard() {
         })
     );
   };
-  
+
   const handleSaveProgress = () => {
     localPplProgress.forEach(ppl => {
       progressMutation.mutate({
@@ -405,7 +407,7 @@ export default function Dashboard() {
                 ) : (
                     filteredActivities.map((activity) => {
                     const { status, color, warnings } = activity.dynamicStatus;
-                    
+
                     const getStageDates = () => {
                         const formatDate = (dateString?: string) => dateString ? format(new Date(dateString), 'dd MMM yyyy', { locale: localeID }) : '-';
                         let stageLabel = "Persiapan";
@@ -453,8 +455,8 @@ export default function Dashboard() {
                                     </div>
                                     <div className="text-xs text-gray-500 flex items-center gap-1 mt-2"><span>Update:</span><span className="font-medium text-bps-blue-600">{getRelativeTime(activity.lastUpdated)}</span>{activity.lastUpdatedBy && (<><span>oleh</span><span className="font-medium text-bps-blue-600">{activity.lastUpdatedBy}</span></>)}</div>
                                     {warnings.length > 0 && (
-                                        <Button 
-                                            variant="link" 
+                                        <Button
+                                            variant="link"
                                             className="p-0 h-auto text-red-600 text-xs mt-2"
                                             onClick={() => setWarningModalContent({ title: activity.namaKegiatan, warnings })}
                                         >
@@ -475,7 +477,7 @@ export default function Dashboard() {
                     )})
                 )}
                 </div>
-                
+
                 <Dialog open={!!selectedActivity} onOpenChange={(isOpen) => { if (!isOpen) setSelectedActivity(null); }}>
                     <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                         <DialogHeader><DialogTitle>Detail Kegiatan: {selectedActivity?.namaKegiatan}</DialogTitle></DialogHeader>
@@ -563,7 +565,7 @@ export default function Dashboard() {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-                
+
                 <Dialog open={!!warningModalContent} onOpenChange={() => setWarningModalContent(null)}>
                     <DialogContent>
                         <DialogHeader>
@@ -582,7 +584,7 @@ export default function Dashboard() {
                         </div>
                     </DialogContent>
                 </Dialog>
-                
+
                 <ConfirmationModal isOpen={!!activityToDelete} onConfirm={handleDeleteConfirm} onClose={() => setActivityToDelete(null)} title="Konfirmasi Hapus" description={`Yakin ingin menghapus "${activityToDelete?.namaKegiatan}"?`} />
                 <SuccessModal isOpen={showProgressSuccessModal} onClose={() => setShowProgressSuccessModal(false)} title="Progress Berhasil Diperbarui!" autoCloseDelay={2000} />
                 <SuccessModal isOpen={showDeleteSuccessModal} onClose={() => setShowDeleteSuccessModal(false)} title="Kegiatan Berhasil Dihapus!" description={`Kegiatan "${deletedActivityName}" telah berhasil dihapus dari sistem.`} autoCloseDelay={2000} />

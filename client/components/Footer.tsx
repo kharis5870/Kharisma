@@ -1,3 +1,5 @@
+// client/components/Footer.tsx
+
 export default function Footer() {
   return (
     <footer className="bg-white border-t border-gray-200 mt-auto">

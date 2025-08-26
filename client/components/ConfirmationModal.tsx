@@ -1,3 +1,5 @@
+// client/components/ConfirmationModal.tsx
+
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, X } from "lucide-react";
@@ -26,7 +28,7 @@ export default function ConfirmationModal({
   variant = 'warning',
   icon
 }: ConfirmationModalProps) {
-  
+
   const getVariantStyles = () => {
     switch (variant) {
       case 'danger':
@@ -88,7 +90,7 @@ export default function ConfirmationModal({
               <X className="w-4 h-4 mr-2" />
               {cancelLabel}
             </Button>
-            
+
             <Button
               onClick={() => {
                 onConfirm();
