@@ -1,5 +1,3 @@
-// client/pages/Dashboard.tsx
-
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -13,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare, List, UserX, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -262,7 +261,7 @@ export default function Dashboard() {
           submit: ppl.progressSubmit,
           diperiksa: ppl.progressDiperiksa,
           approved: ppl.progressApproved,
-          username: user?.username // PERBAIKAN: Kirim username saat update
+          username: user?.username
         }
       });
     });
@@ -276,6 +275,81 @@ export default function Dashboard() {
         deleteMutation.mutate(activityToDelete.id);
     }
   };
+
+  const renderPPLProgress = (pplList: PPLWithProgress[], search: string) => (
+    <div className="space-y-4">
+        {pplList.filter(p => (p.namaPPL || '').toLowerCase().includes(search.toLowerCase())).map((ppl) => (
+            <Card key={ppl.id} className="p-4 bg-gray-50">
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
+                            <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
+                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
+                            <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-lg font-bold text-bps-blue-600">{getProgressBarValue(ppl).toFixed(1)}%</div>
+                            <div className="text-xs text-gray-500">Progress Approved</div>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-4">
+                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressOpen || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressOpen || 0} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Submit</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressSubmit || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressSubmit || 0} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Diperiksa</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressDiperiksa || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressDiperiksa || 0} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Approved</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressApproved || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressApproved || 0} {ppl.satuanBebanKerja}</div></div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-bps-green-600 h-2 rounded-full transition-all duration-300" style={{ width: `${getProgressBarValue(ppl)}%` }}></div></div>
+                    <div className="text-xs text-gray-500 text-center">Total: {(ppl.progressOpen ?? 0) + (ppl.progressSubmit ?? 0) + (ppl.progressDiperiksa ?? 0) + (ppl.progressApproved ?? 0)} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
+                </div>
+            </Card>
+        ))}
+        {pplList.filter(p => (p.namaPPL || '').toLowerCase().includes(search.toLowerCase())).length === 0 && (
+            <p className="text-center text-gray-500 py-4">
+                {pplList.length === 0 ? "Tidak ada alokasi PPL untuk tahap ini." : "PPL tidak ditemukan."}
+            </p>
+        )}
+    </div>
+  );
+
+  const renderPPLUpdate = (pplList: PPLWithProgress[], search: string) => (
+    <div className="space-y-4">
+        {pplList.filter(p => (p.namaPPL || '').toLowerCase().includes(search.toLowerCase())).map(ppl => (
+            <Card key={ppl.id} className="p-4">
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
+                            <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
+                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
+                            <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-lg font-bold text-bps-blue-600">{getProgressBarValue(ppl).toFixed(1)}%</div>
+                            <div className="text-xs text-gray-500">Progress Approved</div>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-4">
+                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><Input type="number" value={ppl.progressOpen || 0} disabled className="mt-1 text-center"/></div>
+                        {['submit', 'diperiksa', 'approved'].map(field => (
+                            <div key={field} className="text-center">
+                                <Label className="text-xs text-gray-600 capitalize">{field}</Label>
+                                <Input type="number" min="0" value={(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]} onChange={e => handleUpdatePPL(ppl.id!, `progress${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof PPLWithProgress, e.target.value)} className="mt-1 text-center" />
+                            </div>
+                        ))}
+                    </div>
+                    <Progress value={getProgressBarValue(ppl)} className="h-2" />
+                    <div className="text-xs text-gray-500 text-center">Total: {(ppl.progressOpen ?? 0) + (ppl.progressSubmit ?? 0) + (ppl.progressDiperiksa ?? 0) + (ppl.progressApproved ?? 0)} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
+                </div>
+            </Card>
+        ))}
+        {pplList.filter(p => (p.namaPPL || '').toLowerCase().includes(search.toLowerCase())).length === 0 && (
+            <p className="text-center text-gray-500 py-4">
+                {pplList.length === 0 ? "Tidak ada alokasi PPL untuk tahap ini." : "PPL tidak ditemukan."}
+            </p>
+        )}
+    </div>
+  );
 
   if (isLoading) return <Layout><div className="text-center p-8">Memuat...</div></Layout>;
 
@@ -429,35 +503,29 @@ export default function Dashboard() {
                                 </div>
                                 <div className="min-w-0"><h4 className="font-semibold text-gray-900 mb-2">Deskripsi Kegiatan</h4><p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{selectedActivity.deskripsiKegiatan}</p></div>
                                 <div>
-                                <div className="flex items-center justify-between mb-4"><h4 className="font-semibold text-gray-900">Progress PPL</h4><div className="w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari nama PPL..." value={pplSearchView} onChange={(e) => setPplSearchView(e.target.value)} className="pl-10 h-8 text-sm" /></div></div></div>
-                                <div className="space-y-4">
-                                    {selectedActivity.ppl.filter(p => (p.namaPPL || '').toLowerCase().includes(pplSearchView.toLowerCase())).map((ppl) => (
-                                    <Card key={ppl.id} className="p-4 bg-gray-50">
-                                        <div className="space-y-4">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                            <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
-                                            <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
-                                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
-                                            <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
-                                            </div>
-                                            <div className="text-right">
-                                            <div className="text-lg font-bold text-bps-blue-600">{getProgressBarValue(ppl as PPLWithProgress).toFixed(1)}%</div>
-                                            <div className="text-xs text-gray-500">Progress Approved</div>
-                                            </div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="font-semibold text-gray-900">Progress PPL per Tahap</h4>
+                                    <div className="w-64">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                            <Input type="text" placeholder="Cari nama PPL..." value={pplSearchView} onChange={(e) => setPplSearchView(e.target.value)} className="pl-10 h-8 text-sm" />
                                         </div>
-                                        <div className="grid grid-cols-4 gap-4">
-                                            <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressOpen || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressOpen || 0} {ppl.satuanBebanKerja}</div></div>
-                                            <div className="text-center"><Label className="text-xs text-gray-600">Submit</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressSubmit || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressSubmit || 0} {ppl.satuanBebanKerja}</div></div>
-                                            <div className="text-center"><Label className="text-xs text-gray-600">Diperiksa</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressDiperiksa || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressDiperiksa || 0} {ppl.satuanBebanKerja}</div></div>
-                                            <div className="text-center"><Label className="text-xs text-gray-600">Approved</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressApproved || 0}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressApproved || 0} {ppl.satuanBebanKerja}</div></div>
-                                        </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-bps-green-600 h-2 rounded-full transition-all duration-300" style={{ width: `${getProgressBarValue(ppl as PPLWithProgress)}%` }}></div></div>
-                                        <div className="text-xs text-gray-500 text-center">Total: {(ppl.progressOpen ?? 0) + (ppl.progressSubmit ?? 0) + (ppl.progressDiperiksa ?? 0) + (ppl.progressApproved ?? 0)} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
-                                        </div>
-                                    </Card>
-                                    ))}
+                                    </div>
                                 </div>
+                                <Tabs defaultValue="persiapan">
+                                    <TabsList className="grid w-full grid-cols-4">
+                                        <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
+                                        <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
+                                        <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger>
+                                        <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
+                                    </TabsList>
+                                    <div className="mt-4 max-h-[40vh] overflow-y-auto pr-2">
+                                        <TabsContent value="persiapan">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'persiapan'), pplSearchView)}</TabsContent>
+                                        <TabsContent value="pengumpulan-data">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'pengumpulan-data'), pplSearchView)}</TabsContent>
+                                        <TabsContent value="pengolahan-analisis">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'pengolahan-analisis'), pplSearchView)}</TabsContent>
+                                        <TabsContent value="diseminasi-evaluasi">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'diseminasi-evaluasi'), pplSearchView)}</TabsContent>
+                                    </div>
+                                </Tabs>
                                 </div>
                                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg"><div className="flex items-start gap-3"><FileCheck className="w-5 h-5 text-blue-600 mt-0.5" /><div><h4 className="font-medium text-blue-900">Informasi Akses</h4><p className="text-blue-700 text-sm mt-1">Gunakan tombol <strong>Edit</strong> untuk mengakses dan mengupload dokumen semua fase. Tombol <strong>View Docs</strong> untuk melihat semua dokumen yang telah diunggah.</p></div></div></div>
                             </div>
@@ -466,41 +534,33 @@ export default function Dashboard() {
                 </Dialog>
 
                 <Dialog open={!!updateModalActivity} onOpenChange={(isOpen) => { if (!isOpen) setUpdateModalActivity(null); }}>
-                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                         <DialogHeader><DialogTitle>Update Progress: {updateModalActivity?.namaKegiatan}</DialogTitle></DialogHeader>
-                        <div className="p-4">
-                        <div className="flex items-center justify-between mb-4"><h4 className="font-semibold text-gray-900">Update Progress PPL</h4><div className="w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari nama PPL..." value={pplSearchUpdate} onChange={(e) => setPplSearchUpdate(e.target.value)} className="pl-10 h-8 text-sm"/></div></div></div>
-                            {localPplProgress.filter(p => (p.namaPPL || '').toLowerCase().includes(pplSearchUpdate.toLowerCase())).map(ppl => (
-                                <Card key={ppl.id} className="p-4 mb-4">
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
-                                                <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
-                                                <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
-                                                <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-lg font-bold text-bps-blue-600">{getProgressBarValue(ppl).toFixed(1)}%</div>
-                                                <div className="text-xs text-gray-500">Progress Approved</div>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-4 gap-4">
-                                            <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><Input type="number" value={ppl.progressOpen || 0} disabled className="mt-1 text-center"/></div>
-                                            {['submit', 'diperiksa', 'approved'].map(field => (
-                                                <div key={field} className="text-center">
-                                                    <Label className="text-xs text-gray-600 capitalize">{field}</Label>
-                                                    <Input type="number" min="0" value={(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]} onChange={e => handleUpdatePPL(ppl.id!, `progress${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof PPLWithProgress, e.target.value)} className="mt-1 text-center" />
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <Progress value={getProgressBarValue(ppl)} className="h-2" />
-                                        <div className="text-xs text-gray-500 text-center">Total: {(ppl.progressOpen ?? 0) + (ppl.progressSubmit ?? 0) + (ppl.progressDiperiksa ?? 0) + (ppl.progressApproved ?? 0)} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
+                        {updateModalActivity && (
+                            <div className="flex-grow overflow-hidden flex flex-col">
+                                <Tabs defaultValue="persiapan" className="flex-grow flex flex-col overflow-hidden">
+                                    <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
+                                        <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
+                                        <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
+                                        <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger>
+                                        <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
+                                    </TabsList>
+                                    <div className="relative mt-4 flex-shrink-0">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                        <Input type="text" placeholder="Cari nama PPL..." value={pplSearchUpdate} onChange={(e) => setPplSearchUpdate(e.target.value)} className="pl-10 mb-4 h-8 text-sm" />
                                     </div>
-                                </Card>
-                            ))}
-                        </div>
-                        <div className="flex justify-end p-4 border-t"><Button onClick={handleSaveProgress}>Simpan Progress</Button></div>
+                                    <div className="overflow-y-auto flex-grow pr-2">
+                                        <TabsContent value="persiapan">{renderPPLUpdate(localPplProgress.filter(p => p.tahap === 'persiapan'), pplSearchUpdate)}</TabsContent>
+                                        <TabsContent value="pengumpulan-data">{renderPPLUpdate(localPplProgress.filter(p => p.tahap === 'pengumpulan-data'), pplSearchUpdate)}</TabsContent>
+                                        <TabsContent value="pengolahan-analisis">{renderPPLUpdate(localPplProgress.filter(p => p.tahap === 'pengolahan-analisis'), pplSearchUpdate)}</TabsContent>
+                                        <TabsContent value="diseminasi-evaluasi">{renderPPLUpdate(localPplProgress.filter(p => p.tahap === 'diseminasi-evaluasi'), pplSearchUpdate)}</TabsContent>
+                                    </div>
+                                </Tabs>
+                            </div>
+                        )}
+                        <DialogFooter className="pt-4 border-t mt-4 flex-shrink-0">
+                            <Button onClick={handleSaveProgress}>Simpan Progress</Button>
+                        </DialogFooter>
                     </DialogContent>
                 </Dialog>
                 

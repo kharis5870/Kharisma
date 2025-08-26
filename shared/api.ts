@@ -20,7 +20,9 @@ export interface PPL {
   namaPML: string;
   bebanKerja: string;
   satuanBebanKerja: string;
+  hargaSatuan: string; // <-- Tambahan baru
   besaranHonor: string;
+  tahap: 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi'; // <-- Tambahan baru
   progressOpen?: number;
   progressSubmit?: number;
   progressDiperiksa?: number;

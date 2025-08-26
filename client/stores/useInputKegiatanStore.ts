@@ -35,7 +35,7 @@ export type State = {
 
 export type Actions = {
   updateFormField: (field: keyof State, value: any) => void;
-  addPPL: () => void;
+  addPPL: (tahap: PPL['tahap']) => void; // <-- Diperbarui
   removePPL: (id: string) => void;
   updatePPL: (id: string, field: keyof PPLItem, value: string | number) => void;
   addDocumentLink: (tipe: Dokumen['tipe']) => void;
@@ -66,7 +66,7 @@ const initialState: State = {
   ketua_tim_id: undefined,
   deskripsiKegiatan: "",
   adaListing: false,
-  pplAllocations: [{ id: "1", ppl_master_id: "", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }],
+  pplAllocations: [], // <-- Dikosongkan, PPL ditambahkan per tahap
   documents: mandatoryDocs.map((doc, i) => ({ ...doc, id: `wajib-initial-${i}`, link: '' })),
   tanggalMulaiPersiapan: undefined,
   tanggalSelesaiPersiapan: undefined,
@@ -83,7 +83,22 @@ const useInputKegiatanStore = create<State & Actions>()(
     (set): State & Actions => ({
       ...initialState,
       updateFormField: (field: keyof State, value: any) => set({ [field as any]: value }),
-      addPPL: () => set((state: State) => ({ pplAllocations: [...state.pplAllocations, { id: Date.now().toString(), ppl_master_id: "", namaPPL: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "", namaPML: "" }] })),
+      addPPL: (tahap) => set((state: State) => ({ 
+        pplAllocations: [
+            ...state.pplAllocations, 
+            { 
+                id: Date.now().toString(), 
+                ppl_master_id: "", 
+                namaPPL: "", 
+                bebanKerja: "", 
+                satuanBebanKerja: "",
+                hargaSatuan: "", 
+                besaranHonor: "", 
+                namaPML: "",
+                tahap: tahap // <-- Tahap ditambahkan
+            }
+        ] 
+      })),
       removePPL: (id: string) => set((state: State) => ({ pplAllocations: state.pplAllocations.filter((ppl: PPLItem) => ppl.id !== id) })),
       updatePPL: (id: string, field: keyof PPLItem, value: string | number) => set((state: State) => ({
         pplAllocations: state.pplAllocations.map((ppl: PPLItem) =>

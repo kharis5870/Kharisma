@@ -76,7 +76,8 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         const kegiatanId = kegiatanResult.insertId;
 
         if (pplAllocations && pplAllocations.length > 0) {
-            const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, besaranHonor, satuanBebanKerja, progressOpen) VALUES ?';
+            // PERUBAHAN: Menambahkan 'tahap' dan 'hargaSatuan' ke query
+            const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, satuanBebanKerja, hargaSatuan, besaranHonor, tahap, progressOpen) VALUES ?';
             const pplValues = pplAllocations.map((ppl: PPL) => {
                 const bebanKerja = parseInt(ppl.bebanKerja) || 0;
                 return [
@@ -84,8 +85,10 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
                     ppl.ppl_master_id,
                     ppl.namaPML,
                     bebanKerja,
-                    parseInt(ppl.besaranHonor) || 0,
                     ppl.satuanBebanKerja,
+                    parseInt(ppl.hargaSatuan) || 0, // <-- Tambahan baru
+                    parseInt(ppl.besaranHonor) || 0,
+                    ppl.tahap, // <-- Tambahan baru
                     bebanKerja,
                 ];
             });
@@ -128,7 +131,6 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             ppl, dokumen, username 
         } = data;
 
-        // PERBAIKAN: Memperbaiki kesalahan sintaks SQL (menambahkan `= ?` dan koma)
         const kegiatanQuery = `
             UPDATE kegiatan SET 
             namaKegiatan = ?, ketua_tim_id = ?, deskripsiKegiatan = ?, adaListing = ?,
@@ -154,14 +156,17 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         await connection.execute('DELETE FROM dokumen WHERE kegiatanId = ?', [id]);
 
         if (ppl && ppl.length > 0) {
-            const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, besaranHonor, satuanBebanKerja, progressOpen, progressSubmit, progressDiperiksa, progressApproved) VALUES ?';
+            // PERUBAHAN: Menambahkan 'tahap' dan 'hargaSatuan' ke query
+            const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, satuanBebanKerja, hargaSatuan, besaranHonor, tahap, progressOpen, progressSubmit, progressDiperiksa, progressApproved) VALUES ?';
             const pplValues = ppl.map((p: PPL) => {
                  const bebanKerja = parseInt(p.bebanKerja) || 0;
                  return [
                     id, p.ppl_master_id, p.namaPML,
                     bebanKerja,
-                    parseInt(p.besaranHonor) || 0,
                     p.satuanBebanKerja,
+                    parseInt(p.hargaSatuan) || 0, // <-- Tambahan baru
+                    parseInt(p.besaranHonor) || 0,
+                    p.tahap, // <-- Tambahan baru
                     p.progressOpen ?? bebanKerja, 
                     p.progressSubmit ?? 0, 
                     p.progressDiperiksa ?? 0, 

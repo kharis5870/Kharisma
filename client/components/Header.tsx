@@ -1,104 +1,71 @@
-// client/components/Header.tsx
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { User } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
-import ConfirmationModal from "./ConfirmationModal";
-import { LogOut, User } from "lucide-react";
-import { cn } from "@/lib/utils";
+// Menambahkan interface untuk props yang diterima dari Layout.tsx
+interface HeaderProps {
+  isSidebarExpanded: boolean;
+}
 
-export default function Header() {
+const getTitleFromPath = (path: string): string => {
+  switch (path) {
+    case '/dashboard':
+      return 'Dashboard';
+    case '/daftar-ppl':
+      return 'Daftar PPL';
+    case '/manajemen-honor':
+      return 'Manajemen Honor';
+    case '/manajemen-admin':
+      return 'Manajemen Admin';
+    case '/input-kegiatan':
+      return 'Input Kegiatan Baru';
+    default:
+      if (path.startsWith('/input-kegiatan')) return 'Input Kegiatan';
+      return 'Kharisma';
+  }
+};
+
+const Header: React.FC<HeaderProps> = ({ isSidebarExpanded }) => { // Gunakan props di sini
+  const { user } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth(); 
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [pageTitle, setPageTitle] = useState('Dashboard');
 
-  const allNavigation = [
-    { name: "Daftar PPL", href: "/daftar-ppl", roles: ['admin', 'supervisor', 'user'] },
-    { name: "Input Kegiatan", href: "/input-kegiatan", roles: ['admin', 'supervisor', 'user'] },
-    { name: "Dashboard", href: "/dashboard", roles: ['admin', 'supervisor', 'user'] },
-    { name: "Manajemen Honor", href: "/manajemen-honor", roles: ['admin', 'supervisor', 'user'] },
-    { name: "Manajemen Admin", href: "/manajemen-admin", roles: ['admin'] }, 
-  ];
-
-  // Filter navigasi berdasarkan role user
-  const navigation = allNavigation.filter(item => user && item.roles.includes(user.role));
-
-  const handleLogoutClick = () => {
-    setShowLogoutModal(true);
-  };
-
-  const handleLogoutConfirm = () => {
-    logout();
-    navigate("/login");
-  };
+  useEffect(() => {
+    const newTitle = getTitleFromPath(location.pathname);
+    setPageTitle(newTitle);
+  }, [location]);
 
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="bg-gradient-to-r from-bps-blue-600 to-bps-blue-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <div className="flex-1"></div>
-            <div className="text-center">
-              <h1 className="text-3xl md:text-4xl font-bold text-white tracking-wide">
-                KHARISMA
-              </h1>
-              <p className="text-bps-blue-100 text-sm md:text-base mt-1 font-medium">
-                BPS Kabupaten Bengkulu Selatan
-              </p>
-            </div>
-            <div className="flex-1 flex justify-end">
-              <div className="flex items-center gap-4 text-white">
-                <div className="hidden sm:flex items-center gap-2 text-sm">
-                  <User className="w-4 h-4" />
-                  <span>Selamat datang, <strong>{user?.username || 'User'}</strong></span>
+    // Header sekarang 'sticky' dan memiliki 'z-index'
+    <header 
+      className={`
+        bg-white shadow-md fixed top-0 right-0 z-30
+        transition-all duration-300 ease-in-out
+        ${isSidebarExpanded ? 'left-64' : 'left-20'}
+      `}
+    >
+      <div className="px-6 py-3 flex justify-between items-center h-[68px]"> {/* Menambahkan tinggi agar konsisten */}
+        {/* Judul Halaman Dinamis */}
+        <h1 className="text-xl font-semibold text-gray-700">{pageTitle}</h1>
+        
+        {/* Profil Pengguna */}
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                    <User className="text-gray-500" />
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogoutClick}
-                  className="bg-transparent border-white text-white hover:bg-white hover:text-bps-blue-600"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Keluar
-                </Button>
-              </div>
+                <div className="text-right hidden md:block">
+                    <p className="font-semibold text-sm text-gray-700">{user?.username || 'Guest'}</p>
+                    <p className="text-xs text-gray-500">{user?.role || 'User'}</p>
+                </div>
             </div>
           </div>
         </div>
       </div>
-      <div className="bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex justify-center space-x-8">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  "py-4 px-6 text-sm font-medium border-b-2 transition-colors duration-200",
-                  location.pathname === item.href
-                    ? "border-bps-blue-600 text-bps-blue-600 bg-bps-blue-50"
-                    : "border-transparent text-gray-600 hover:text-bps-blue-600 hover:border-bps-blue-300 hover:bg-bps-blue-50"
-                )}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </div>
-      <ConfirmationModal
-        isOpen={showLogoutModal}
-        onClose={() => setShowLogoutModal(false)}
-        onConfirm={handleLogoutConfirm}
-        title="Konfirmasi Logout"
-        description={`Apakah Anda yakin ingin keluar dari sistem KHARISMA? Anda akan diarahkan kembali ke halaman login.`}
-        confirmLabel="Ya, Keluar"
-        cancelLabel="Batal"
-        variant="warning"
-        icon={<LogOut className="w-6 h-6" />}
-      />
     </header>
   );
-}
+};
+
+export default Header;

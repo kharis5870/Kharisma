@@ -1,6 +1,6 @@
 // client/pages/EditActivity.tsx
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -81,9 +81,10 @@ const updateActivity = async (kegiatan: Partial<Kegiatan> & {id: number}): Promi
     const sanitizedData = {
         ...kegiatan,
         dokumen: kegiatan.dokumen?.map(({ clientId, ...rest }: any) => rest),
-        ppl: kegiatan.ppl?.map(({ clientId, namaPPL, besaranHonor, ...rest }: any) => ({
+        ppl: kegiatan.ppl?.map(({ clientId, namaPPL, besaranHonor, hargaSatuan, ...rest }: any) => ({
             ...rest,
-            besaranHonor: parseHonor(besaranHonor)
+            besaranHonor: parseHonor(besaranHonor),
+            hargaSatuan: parseHonor(hargaSatuan)
         }))
     };
     const res = await fetch(`/api/kegiatan/${kegiatan.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sanitizedData) });
@@ -99,7 +100,7 @@ export default function EditActivity() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState("basic");
+    const [activeTab, setActiveTab] = useState("info-dasar");
     const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string; isApproved: boolean }>({ isOpen: false, tipe: null, content: '', isApproved: false });
@@ -184,8 +185,8 @@ export default function EditActivity() {
         setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false });
     };
 
-    const addPPL = () => {
-        const newPPL: ClientPPL = { clientId: `new-ppl-${Date.now()}`, ppl_master_id: "", namaPPL: "", namaPML: "", bebanKerja: "", satuanBebanKerja: "", besaranHonor: "" };
+    const addPPL = (tahap: PPL['tahap']) => {
+        const newPPL: ClientPPL = { clientId: `new-ppl-${Date.now()}`, ppl_master_id: "", namaPPL: "", namaPML: "", bebanKerja: "", satuanBebanKerja: "", hargaSatuan: "", besaranHonor: "", tahap };
         setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), newPPL]}));
     };
 
@@ -194,7 +195,22 @@ export default function EditActivity() {
     };
 
     const updatePPL = (clientId: string, field: keyof PPL, value: string) => {
-        setFormData(prev => ({ ...prev, ppl: prev.ppl?.map(p => p.clientId === clientId ? { ...p, [field]: value } : p) }));
+        setFormData(prev => ({
+            ...prev,
+            ppl: prev.ppl?.map(p => {
+                if (p.clientId === clientId) {
+                    const updatedPpl = { ...p, [field]: value };
+                    
+                    if (field === 'bebanKerja' || field === 'hargaSatuan') {
+                        const bebanKerja = field === 'bebanKerja' ? parseInt(value) || 0 : parseInt(updatedPpl.bebanKerja) || 0;
+                        const hargaSatuan = field === 'hargaSatuan' ? parseInt(parseHonor(value)) || 0 : parseInt(parseHonor(updatedPpl.hargaSatuan)) || 0;
+                        updatedPpl.besaranHonor = (bebanKerja * hargaSatuan).toString();
+                    }
+                    return updatedPpl;
+                }
+                return p;
+            })
+        }));
     };
 
     const handleSuccessAction = () => navigate('/dashboard');
@@ -229,26 +245,62 @@ export default function EditActivity() {
     const removeDocument = (clientId: string) => {
         setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) }));
     };
+    
+    const AlokasiPPLContent = ({ tahap }: { tahap: PPL['tahap'] }) => {
+        const pplForStage = useMemo(() => formData.ppl?.filter(p => p.tahap === tahap) || [], [formData.ppl, tahap]);
+    
+        return (
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Alokasi PPL & PML</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {pplForStage.map((ppl, index) => (
+                        <div key={ppl.clientId} className="p-4 border rounded-lg space-y-4 bg-gray-50">
+                            <div className="flex justify-between items-center"><h4 className="font-medium">Alokasi {index + 1}</h4><Button type="button" variant="ghost" size="icon" onClick={() => removePPL(ppl.clientId)}><Trash2 className="w-4 h-4 text-red-500"/></Button></div>
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="space-y-2 lg:col-span-4">
+                                    <Label>Pilih PPL *</Label>
+                                    <Popover open={pplComboboxStates[ppl.clientId] || false} onOpenChange={(open) => setPplComboboxStates(prev => ({ ...prev, [ppl.clientId]: open }))}>
+                                        <PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between">{ppl.namaPPL || "Pilih PPL..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
+                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Cari PPL..." /><CommandList><CommandEmpty>PPL tidak ditemukan.</CommandEmpty><CommandGroup>
+                                            {pplList.map((pplOption) => (
+                                                <CommandItem key={pplOption.id} value={`${pplOption.id} ${pplOption.namaPPL}`} onSelect={() => { updatePPL(ppl.clientId, 'ppl_master_id', pplOption.id); updatePPL(ppl.clientId, 'namaPPL', pplOption.namaPPL); setPplComboboxStates(prev => ({ ...prev, [ppl.clientId]: false })); }}>
+                                                    <Check className={cn("mr-2 h-4 w-4", ppl.ppl_master_id === pplOption.id ? "opacity-100" : "opacity-0")} />
+                                                    <div className="flex flex-col"><span>{pplOption.namaPPL}</span><span className="text-xs text-gray-500">ID: {pplOption.id}</span></div>
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup></CommandList></Command></PopoverContent>
+                                    </Popover>
+                                </div>
+                                 <div className="space-y-2"><Label>Satuan Beban Kerja</Label><Input placeholder="Contoh: Dokumen" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} /></div>
+                                 <div className="space-y-2"><Label>Harga per Satuan (Rp)</Label><Input placeholder="Contoh: 50.000" value={formatHonor(ppl.hargaSatuan)} onChange={e => updatePPL(ppl.clientId, 'hargaSatuan', e.target.value)} inputMode="numeric" /></div>
+                                 <div className="space-y-2"><Label>Jumlah Beban Kerja *</Label><Input placeholder="Contoh: 12" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} type="number"/></div>
+                                 <div className="space-y-2"><Label>Total Honor (Rp) *</Label><Input value={formatHonor(ppl.besaranHonor)} readOnly className="bg-gray-100"/></div>
+                                <div className="space-y-2 md:col-span-2 lg:col-span-4"><Label>Nama PML *</Label><Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => updatePPL(ppl.clientId, 'namaPML', e.target.value)} /></div>
+                            </div>
+                        </div>
+                    ))}
+                    <Button type="button" variant="outline" onClick={() => addPPL(tahap)} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL</Button>
+                </CardContent>
+            </Card>
+        );
+    };
 
-    const renderDocumentSection = useCallback((tipe: Dokumen['tipe'], title: string) => {
-        const documents = formData.dokumen?.filter(d => d.tipe === tipe && d.jenis !== 'catatan') || [];
-        const note = formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan');
+    const DokumenContent = ({ tipe, title }: { tipe: Dokumen['tipe'], title: string }) => {
+        const documents = useMemo(() => formData.dokumen?.filter(d => d.tipe === tipe && d.jenis !== 'catatan') || [], [formData.dokumen, tipe]);
+        const note = useMemo(() => formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan'), [formData.dokumen, tipe]);
         const isNoteApproved = note?.status === 'Approved';
-        
+
         return (
             <Card>
                 <CardHeader>
                     <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <CardTitle>Dokumen {title}</CardTitle>
-                            <CardDescription className="mt-1">
-                                Isi link untuk dokumen wajib, tambahkan dokumen pendukung, dan kelola catatan.
-                            </CardDescription>
-                        </div>
+                        <div><CardTitle>Dokumen {title}</CardTitle><CardDescription className="mt-1">Isi link untuk dokumen wajib, tambahkan dokumen pendukung, dan kelola catatan.</CardDescription></div>
                         <div className="flex flex-shrink-0 gap-2">
-                           <Button type="button" variant="outline" size="sm" onClick={() => setNoteModal({ isOpen: true, tipe, content: note?.link || '', isApproved: isNoteApproved })} className="flex items-center gap-2">
-                               <Notebook className="w-4 h-4" />{note ? 'Edit' : 'Tambah'} Catatan
-                           </Button>
+                           <Button type="button" variant="outline" size="sm" onClick={() => setNoteModal({ isOpen: true, tipe, content: note?.link || '', isApproved: isNoteApproved })} className="flex items-center gap-2"><Notebook className="w-4 h-4" />{note ? 'Edit' : 'Tambah'} Catatan</Button>
                            <Button type="button" variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2"><Plus className="w-4 h-4" />Dokumen</Button>
                         </div>
                     </div>
@@ -256,10 +308,7 @@ export default function EditActivity() {
                 <CardContent className="space-y-4">
                     {note && (
                          <div className={cn("flex items-center gap-3 p-3 border rounded-lg", isNoteApproved ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200")}>
-                            <div className="flex-grow space-y-2">
-                                <Label className="font-semibold">{note.nama}</Label>
-                                <p className="text-sm text-gray-600 truncate">{note.link || 'Catatan kosong. Klik edit untuk mengisi.'}</p>
-                            </div>
+                            <div className="flex-grow space-y-2"><Label className="font-semibold">{note.nama}</Label><p className="text-sm text-gray-600 truncate">{note.link || 'Catatan kosong. Klik edit untuk mengisi.'}</p></div>
                             <Button type="button" variant="ghost" size="icon" onClick={() => setNoteModal({ isOpen: true, tipe, content: note.link, isApproved: isNoteApproved })} className="self-center"><Notebook className="w-4 h-4 text-gray-500"/></Button>
                         </div>
                     )}
@@ -268,32 +317,28 @@ export default function EditActivity() {
                         return (
                          <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50 border-green-200" : (doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50"))}>
                             <div className="flex-grow space-y-2">
-                                {doc.isWajib ? (
-                                    <Label className="font-semibold">{doc.nama} *</Label>
-                                ) : (
-                                    <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} disabled={isApproved} />
-                                )}
-                                <div className="flex items-center gap-2">
-                                    <Link2 className="w-4 h-4 text-gray-400"/>
-                                    <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} disabled={isApproved} />
-                                </div>
+                                {doc.isWajib ? <Label className="font-semibold">{doc.nama} *</Label> : <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} disabled={isApproved} />}
+                                <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-gray-400"/><Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} disabled={isApproved} /></div>
                             </div>
-                            {!doc.isWajib && !isApproved ? (
-                                <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>
-                            ) : (
-                                <div className="self-center p-2" title={isApproved ? "Dokumen Disetujui" : "Dokumen Wajib"}>
-                                    <Lock className="w-4 h-4 text-gray-400"/>
-                                </div>
-                            )}
+                            {!doc.isWajib && !isApproved ? (<Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>) : (<div className="self-center p-2" title={isApproved ? "Dokumen Disetujui" : "Dokumen Wajib"}><Lock className="w-4 h-4 text-gray-400"/></div>)}
                         </div>
                     )})}
-                    {documents.length === 0 && !note && (
-                        <div className="text-center py-8 text-gray-500"><p>Belum ada dokumen atau catatan untuk fase ini.</p></div>
-                    )}
+                    {documents.length === 0 && !note && (<div className="text-center py-8 text-gray-500"><p>Belum ada dokumen atau catatan untuk fase ini.</p></div>)}
                 </CardContent>
             </Card>
         );
-    }, [formData.dokumen]);
+    };
+
+    const StageTabContent = ({ tipe, title }: { tipe: PPL['tahap'], title: string }) => (
+        <Tabs defaultValue="alokasi-ppl" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="alokasi-ppl">Alokasi PPL</TabsTrigger>
+                <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
+            </TabsList>
+            <TabsContent value="alokasi-ppl"><AlokasiPPLContent tahap={tipe} /></TabsContent>
+            <TabsContent value="dokumen"><DokumenContent tipe={tipe} title={title} /></TabsContent>
+        </Tabs>
+      );
 
     if (isLoading) return <Layout><div>Memuat data kegiatan...</div></Layout>;
     if (isError) return <Layout><div>Gagal memuat data. Silakan coba lagi.</div></Layout>;
@@ -304,170 +349,48 @@ export default function EditActivity() {
                 <div className="flex items-center gap-4 mb-8">
                     <Button variant="outline" asChild><Link to="/dashboard"><ArrowLeft className="w-4 h-4 mr-2" />Kembali</Link></Button>
                     <Button variant="outline" asChild><Link to={`/view-documents/${id}`}><FileText className="w-4 h-4 mr-2" />Lihat Dokumen</Link></Button>
-                    <div className="ml-4">
-                        <h1 className="text-3xl font-bold">Edit Kegiatan</h1>
-                        <p className="text-gray-600">Perbarui informasi dan kelola dokumen.</p>
-                    </div>
+                    <div className="ml-4"><h1 className="text-3xl font-bold">Edit Kegiatan</h1><p className="text-gray-600">Perbarui informasi dan kelola dokumen.</p></div>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-5">
-                        <TabsTrigger value="basic">Info Dasar</TabsTrigger>
-                        <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
-                        <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
-                        <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger>
-                        <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="basic" className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Informasi Kegiatan</CardTitle>
-                                <CardDescription>Perbarui detail dasar mengenai kegiatan yang akan dilaksanakan.</CardDescription>
-                            </CardHeader>
+                    <TabsList className="grid w-full grid-cols-5"><TabsTrigger value="info-dasar">Info Dasar</TabsTrigger><TabsTrigger value="persiapan">Persiapan</TabsTrigger><TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger><TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger><TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger></TabsList>
+                    <TabsContent value="info-dasar" className="space-y-6">
+                        <Card><CardHeader><CardTitle>Informasi Kegiatan</CardTitle><CardDescription>Perbarui detail dasar mengenai kegiatan.</CardDescription></CardHeader>
                             <CardContent className="space-y-4">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label htmlFor="namaKegiatan">Nama Kegiatan *</Label>
-                                    <Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
+                                <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" /></div>
+                                <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
                                     <Select value={formData.ketua_tim_id} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
                                         <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
                                         <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
                                     </Select>
                                 </div>
                               </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label>
-                                <Textarea id="deskripsiKegiatan" value={formData.deskripsiKegiatan || ''} onChange={(e) => handleFormFieldChange('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan dan pembagian tugas secara singkat." />
-                              </div>
+                              <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={formData.deskripsiKegiatan || ''} onChange={(e) => handleFormFieldChange('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan dan pembagian tugas secara singkat." /></div>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                                {([ 
-                                    {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, 
-                                    {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},
-                                    {label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'},
-                                    {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'},
-                                    {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'},
-                                    {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'},
-                                    {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'},
-                                    {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}
-                                ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
-                                    <div key={field} className="space-y-2">
-                                        <Label>{label}</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="outline" className={cn("w-full justify-start", !formData[field] && "text-muted-foreground")}>
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {formData[field] ? format(formData[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date as Date)} /></PopoverContent>
-                                        </Popover>
+                                {([ {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},{label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'}, {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'}, {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'}, {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'}, {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'}, {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
+                                    <div key={field} className="space-y-2"><Label>{label}</Label>
+                                        <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start", !formData[field] && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{formData[field] ? format(formData[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date as Date)} /></PopoverContent></Popover>
                                     </div>
                                 ))}
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <CardTitle>Alokasi PPL & PML</CardTitle>
-                                        <CardDescription>
-                                            Perbarui data Petugas Pencacah Lapangan (PPL) dan Petugas Pemeriksa Lapangan (PML).
-                                        </CardDescription>
-                                    </div>
-                                    <Button variant="outline" asChild>
-                                        <Link to="/daftar-ppl">
-                                            <Users className="w-4 h-4 mr-2" />
-                                            Pilih dari Daftar PPL
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {formData.ppl?.map((ppl, index) => (
-                                    <div key={ppl.clientId} className="p-4 border rounded-lg space-y-4 bg-gray-50">
-                                        <div className="flex justify-between items-center">
-                                            <h4 className="font-medium">Alokasi {index + 1}</h4>
-                                            {formData.ppl && formData.ppl.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removePPL(ppl.clientId)}><Trash2 className="w-4 h-4 text-red-500"/></Button>}
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div className="space-y-2 lg:col-span-3">
-                                                <Label>Pilih PPL *</Label>
-                                                <Popover open={pplComboboxStates[ppl.clientId] || false} onOpenChange={(open) => setPplComboboxStates(prev => ({ ...prev, [ppl.clientId]: open }))}>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant="outline" role="combobox" className="w-full justify-between">{ppl.namaPPL || "Pilih PPL..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Cari PPL..." /><CommandList><CommandEmpty>PPL tidak ditemukan.</CommandEmpty><CommandGroup>
-                                                        {pplList.map((pplOption) => (
-                                                            <CommandItem key={pplOption.id} value={`${pplOption.id} ${pplOption.namaPPL}`} onSelect={() => { updatePPL(ppl.clientId, 'ppl_master_id', pplOption.id); updatePPL(ppl.clientId, 'namaPPL', pplOption.namaPPL); setPplComboboxStates(prev => ({ ...prev, [ppl.clientId]: false })); }}>
-                                                                <Check className={cn("mr-2 h-4 w-4", ppl.ppl_master_id === pplOption.id ? "opacity-100" : "opacity-0")} />
-                                                                <div className="flex flex-col"><span>{pplOption.namaPPL}</span><span className="text-xs text-gray-500">ID: {pplOption.id}</span></div>
-                                                            </CommandItem>
-                                                        ))}
-                                                    </CommandGroup></CommandList></Command></PopoverContent>
-                                                </Popover>
-                                            </div>
-                                            <div className="space-y-2"><Label>Jumlah Beban Kerja *</Label><Input placeholder="Contoh: 12" value={ppl.bebanKerja} onChange={e => updatePPL(ppl.clientId, 'bebanKerja', e.target.value)} /></div>
-                                            <div className="space-y-2"><Label>Satuan</Label><Input placeholder="Contoh: Dokumen" value={ppl.satuanBebanKerja} onChange={e => updatePPL(ppl.clientId, 'satuanBebanKerja', e.target.value)} /></div>
-                                            <div className="space-y-2">
-                                                <Label>Honor (Rp) *</Label>
-                                                <Input 
-                                                    placeholder="Contoh: 2.000.000" 
-                                                    value={formatHonor(ppl.besaranHonor)} 
-                                                    onChange={e => {
-                                                        const parsedValue = parseHonor(e.target.value);
-                                                        if (/^\d*$/.test(parsedValue)) {
-                                                            updatePPL(ppl.clientId, 'besaranHonor', parsedValue);
-                                                        }
-                                                    }}
-                                                    inputMode="numeric" 
-                                                />
-                                            </div>
-                                            <div className="space-y-2 md:col-span-2 lg:col-span-3"><Label>Nama PML *</Label><Input placeholder="Nama PML" value={ppl.namaPML} onChange={e => updatePPL(ppl.clientId, 'namaPML', e.target.value)} /></div>
-                                        </div>
-                                    </div>
-                                ))}
-                                <Button type="button" variant="outline" onClick={addPPL} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL</Button>
                             </CardContent>
                         </Card>
                     </TabsContent>
-                    <TabsContent value="persiapan">{renderDocumentSection('persiapan', 'Persiapan')}</TabsContent>
-                    <TabsContent value="pengumpulan-data">{renderDocumentSection('pengumpulan-data', 'Pengumpulan Data')}</TabsContent>
-                    <TabsContent value="pengolahan-analisis">{renderDocumentSection('pengolahan-analisis', 'Pengolahan & Analisis')}</TabsContent>
-                    <TabsContent value="diseminasi-evaluasi">{renderDocumentSection('diseminasi-evaluasi', 'Diseminasi & Evaluasi')}</TabsContent>
+                    <TabsContent value="persiapan"><StageTabContent tipe="persiapan" title="Persiapan"/></TabsContent>
+                    <TabsContent value="pengumpulan-data"><StageTabContent tipe="pengumpulan-data" title="Pengumpulan Data"/></TabsContent>
+                    <TabsContent value="pengolahan-analisis"><StageTabContent tipe="pengolahan-analisis" title="Pengolahan & Analisis"/></TabsContent>
+                    <TabsContent value="diseminasi-evaluasi"><StageTabContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi"/></TabsContent>
                 </Tabs>
                 <div className="flex justify-center mt-8">
-                    <Button onClick={handleSubmit} disabled={mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" size="lg"><Save className="w-4 h-4 mr-2" />
-                        {mutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}
-                    </Button>
+                    <Button onClick={handleSubmit} disabled={mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" size="lg"><Save className="w-4 h-4 mr-2" />{mutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
                 </div>
                 <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} onAction={handleSuccessAction} title="Kegiatan Berhasil Diperbarui!" description={`Perubahan untuk "${formData.namaKegiatan}" telah disimpan.`} actionLabel="Ke Dashboard" />
             </div>
             <Dialog open={noteModal.isOpen} onOpenChange={(isOpen) => !isOpen && setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false })}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Tambah/Edit Catatan</DialogTitle>
-                        <DialogDescription>
-                            Isi catatan untuk tahap ini. {noteModal.isApproved && "Catatan ini sudah disetujui dan tidak bisa diedit."}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <Textarea 
-                        value={noteModal.content}
-                        onChange={(e) => setNoteModal(prev => ({...prev, content: e.target.value}))}
-                        rows={8}
-                        placeholder="Tulis catatan di sini..."
-                        disabled={noteModal.isApproved}
-                    />
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false })}>Batal</Button>
-                        <Button onClick={handleNoteSubmit} disabled={noteModal.isApproved}>Simpan Catatan</Button>
-                    </DialogFooter>
-                </DialogContent>
+                <DialogContent><DialogHeader><DialogTitle>Tambah/Edit Catatan</DialogTitle><DialogDescription>Isi catatan untuk tahap ini. {noteModal.isApproved && "Catatan ini sudah disetujui dan tidak bisa diedit."}</DialogDescription></DialogHeader><Textarea value={noteModal.content} onChange={(e) => setNoteModal(prev => ({...prev, content: e.target.value}))} rows={8} placeholder="Tulis catatan di sini..." disabled={noteModal.isApproved} /><DialogFooter><Button variant="outline" onClick={() => setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false })}>Batal</Button><Button onClick={handleNoteSubmit} disabled={noteModal.isApproved}>Simpan Catatan</Button></DialogFooter></DialogContent>
             </Dialog>
         </Layout>
     );
