@@ -1,35 +1,29 @@
 // client/components/Layout.tsx
 
-import React, { useState } from 'react';
+import React from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
-import Footer from './Footer'; // Impor Footer
+import Footer from './Footer';
+import { useSidebarStore } from '@/stores/useSidebarStore';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const [isSidebarExpanded, setSidebarExpanded] = useState(false);
-
-  const toggleSidebar = () => {
-    setSidebarExpanded(!isSidebarExpanded);
-  };
+  const { isExpanded } = useSidebarStore();
 
   return (
     <div className="bg-gray-100 min-h-screen flex flex-col">
-      <Sidebar
-        isExpanded={isSidebarExpanded}
-        toggleSidebar={toggleSidebar}
-      />
+      <Sidebar />
 
       <div
         className={`
           transition-all duration-300 ease-in-out flex-grow flex flex-col
-          ${isSidebarExpanded ? 'ml-64' : 'ml-20'}
+          ${isExpanded ? 'ml-64' : 'ml-20'}
         `}
       >
-        <Header isSidebarExpanded={isSidebarExpanded} />
+        <Header />
 
         <main className="p-6 mt-[68px] flex-grow">
             {children}
