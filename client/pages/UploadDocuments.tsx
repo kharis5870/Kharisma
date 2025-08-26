@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,6 @@ const mockActivityData = {
 };
 
 export default function UploadDocuments() {
-  const { id } = useParams();
   const navigate = useNavigate();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -185,7 +184,7 @@ export default function UploadDocuments() {
             <CardTitle>Dokumen Umum</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {generalDocuments.map((doc, index) => (
+            {generalDocuments.map((doc) => (
               <div key={doc.id} className="p-4 border rounded-lg space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1 space-y-3">

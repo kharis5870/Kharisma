@@ -10,14 +10,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { AlertTriangle, Edit, Save, X, DollarSign, TrendingUp, Users, Search, ChevronUp, ChevronDown, List } from "lucide-react";
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem 
+} from "@/components/ui/pagination";
+import { AlertTriangle, Edit, Save, X, DollarSign, TrendingUp, Users, Search, ChevronUp, ChevronDown, List, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLHonorData } from "@shared/api";
 import { cn } from "@/lib/utils";
 
 const months = [ "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des" ];
 const currentYear = new Date().getFullYear();
-const years = Array.from({ length: 5 }, (_, i) => currentYear - i); // Buat daftar 5 tahun terakhir
+const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 const getCurrentMonth = () => new Date().getMonth();
 
@@ -27,7 +32,6 @@ const fetchHonorData = async (bulan: number, tahun: number): Promise<PPLHonorDat
     return res.json();
 }
 
-// Komponen Modal Detail Kegiatan (Tidak ada perubahan)
 const ActivityDetailModal = ({ isOpen, onClose, pplData, selectedMonth, selectedYear }: { isOpen: boolean, onClose: () => void, pplData: PPLHonorData | null, selectedMonth: number, selectedYear: number }) => {
     if (!pplData) return null;
 
@@ -66,7 +70,7 @@ export default function ManajemenHonor() {
   const [globalSettings, setGlobalSettings] = useState({ 
       batasHonorBulananGlobal: 3000000, 
       selectedMonth: getCurrentMonth(),
-      selectedYear: currentYear // <-- Tambahkan state untuk tahun
+      selectedYear: currentYear
   });
   const [isEditingGlobalLimit, setIsEditingGlobalLimit] = useState(false);
   const [tempGlobalLimit, setTempGlobalLimit] = useState(globalSettings.batasHonorBulananGlobal);
@@ -75,9 +79,13 @@ export default function ManajemenHonor() {
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedPplDetails, setSelectedPplDetails] = useState<PPLHonorData | null>(null);
+  
+  // PERBAIKAN: State untuk paginasi
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const { data: pplData = [], isLoading } = useQuery({
-      queryKey: ['honor', globalSettings.selectedMonth, globalSettings.selectedYear], // <-- Tambahkan tahun ke queryKey
+      queryKey: ['honor', globalSettings.selectedMonth, globalSettings.selectedYear],
       queryFn: () => fetchHonorData(globalSettings.selectedMonth, globalSettings.selectedYear),
   });
 
@@ -143,6 +151,15 @@ export default function ManajemenHonor() {
     }
     return sortedData;
   }, [pplData, searchTerm, sortConfig, globalSettings.batasHonorBulananGlobal]);
+  
+  // PERBAIKAN: Logika untuk data yang dipaginasi
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filteredAndSortedData.slice(startIndex, endIndex);
+  }, [filteredAndSortedData, currentPage, rowsPerPage]);
+
+  const totalPages = Math.ceil(filteredAndSortedData.length / rowsPerPage);
 
   const stats = useMemo(() => {
     const totalHonor = pplData.reduce((sum, p) => sum + p.honorBulanIni, 0);
@@ -163,9 +180,8 @@ export default function ManajemenHonor() {
     <Layout>
       <div className="space-y-8">
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-          <div><h1 className="text-3xl font-bold text-gray-900">Manajemen Honor PPL</h1><p className="text-gray-600 mt-1">Kelola akumulasi honor bulanan dengan batas global untuk semua PPL</p></div>
+          <div><h1 className="text-3xl font-bold text-gray-900">Manajemen Honor PPL</h1><p className="text-gray-600 mt-1">Kelola akumulasi honor bulanan dengan batas honor untuk semua PPL</p></div>
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-            {/* PERBAIKAN: Pisahkan pemilihan bulan dan tahun */}
             <div className="flex items-center gap-2">
                 <Label className="text-sm font-medium">Periode:</Label>
                 <Select value={String(globalSettings.selectedMonth)} onValueChange={(val) => setGlobalSettings(p => ({...p, selectedMonth: Number(val)}))}>
@@ -177,7 +193,7 @@ export default function ManajemenHonor() {
                     <SelectContent>{years.map((year) => (<SelectItem key={year} value={String(year)}>{year}</SelectItem>))}</SelectContent>
                 </Select>
             </div>
-            <div className="flex items-center gap-2"><Label className="text-sm font-medium">Batas Global:</Label>{isEditingGlobalLimit ? (<div className="flex items-center gap-2"><Input type="number" value={tempGlobalLimit} onChange={e => setTempGlobalLimit(Number(e.target.value))} className="w-36 h-8" placeholder="Honor limit"/><Button size="sm" onClick={() => { setGlobalSettings(p => ({...p, batasHonorBulananGlobal: tempGlobalLimit})); setIsEditingGlobalLimit(false); }} className="h-8 w-8 p-0"><Save className="w-3 h-3" /></Button><Button size="sm" variant="outline" onClick={() => setIsEditingGlobalLimit(false)} className="h-8 w-8 p-0"><X className="w-3 h-3" /></Button></div>) : (<div className="flex items-center gap-2"><Badge variant="outline" className="bg-bps-blue-50 text-bps-blue-700 font-semibold">Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</Badge><Button size="sm" variant="outline" onClick={() => { setTempGlobalLimit(globalSettings.batasHonorBulananGlobal); setIsEditingGlobalLimit(true); }} className="h-6 w-6 p-0"><Edit className="w-3 h-3" /></Button></div>)}</div>
+            <div className="flex items-center gap-2"><Label className="text-sm font-medium">Batas Honor:</Label>{isEditingGlobalLimit ? (<div className="flex items-center gap-2"><Input type="number" value={tempGlobalLimit} onChange={e => setTempGlobalLimit(Number(e.target.value))} className="w-36 h-8" placeholder="Honor limit"/><Button size="sm" onClick={() => { setGlobalSettings(p => ({...p, batasHonorBulananGlobal: tempGlobalLimit})); setIsEditingGlobalLimit(false); }} className="h-8 w-8 p-0"><Save className="w-3 h-3" /></Button><Button size="sm" variant="outline" onClick={() => setIsEditingGlobalLimit(false)} className="h-8 w-8 p-0"><X className="w-3 h-3" /></Button></div>) : (<div className="flex items-center gap-2"><Badge variant="outline" className="bg-bps-blue-50 text-bps-blue-700 font-semibold">Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</Badge><Button size="sm" variant="outline" onClick={() => { setTempGlobalLimit(globalSettings.batasHonorBulananGlobal); setIsEditingGlobalLimit(true); }} className="h-6 w-6 p-0"><Edit className="w-3 h-3" /></Button></div>)}</div>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -191,7 +207,7 @@ export default function ManajemenHonor() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <CardTitle>Akumulasi Honor PPL - {months[globalSettings.selectedMonth]} {globalSettings.selectedYear}</CardTitle>
-                <div className="text-sm text-gray-600 mt-2">Batas Global: <strong>Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</strong> per PPL per bulan</div>
+                <div className="text-sm text-gray-600 mt-2">Batas Honor: <strong>Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</strong> per PPL per bulan</div>
               </div>
               <div className="sm:w-64">
                 <div className="relative">
@@ -203,28 +219,29 @@ export default function ManajemenHonor() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <Table>
+              {/* PERBAIKAN: Menambahkan table-fixed dan lebar kolom */}
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-40"><button onClick={() => handleSort('nama')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama PPL{getSortIcon('nama')}</button></TableHead>
-                    <TableHead className="min-w-40"><button onClick={() => handleSort('honorBulanIni')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Honor Bulan Terpilih{getSortIcon('honorBulanIni')}</button></TableHead>
-                    <TableHead className="min-w-48"><button onClick={() => handleSort('activitiesCount')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Kegiatan Bulan Ini{getSortIcon('activitiesCount')}</button></TableHead>
-                    <TableHead className="min-w-32"><button onClick={() => handleSort('selisih')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Selisih dengan Batas{getSortIcon('selisih')}</button></TableHead>
-                    <TableHead className="min-w-20"><button onClick={() => handleSort('status')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Status{getSortIcon('status')}</button></TableHead>
+                    <TableHead className="w-1/4"><button onClick={() => handleSort('nama')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama PPL{getSortIcon('nama')}</button></TableHead>
+                    <TableHead className="w-1/5"><button onClick={() => handleSort('honorBulanIni')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Honor Bulan Terpilih{getSortIcon('honorBulanIni')}</button></TableHead>
+                    <TableHead className="w-1/5"><button onClick={() => handleSort('activitiesCount')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Kegiatan Bulan Ini{getSortIcon('activitiesCount')}</button></TableHead>
+                    <TableHead className="w-1/5"><button onClick={() => handleSort('selisih')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Selisih dengan Batas{getSortIcon('selisih')}</button></TableHead>
+                    <TableHead className="w-1/6"><button onClick={() => handleSort('status')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Status{getSortIcon('status')}</button></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow><TableCell colSpan={5} className="text-center py-8">Memuat data...</TableCell></TableRow>
-                  ) : filteredAndSortedData.length === 0 ? (
+                  ) : paginatedData.length === 0 ? (
                     <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{searchTerm ? `Tidak ada PPL yang cocok dengan "${searchTerm}"` : 'Tidak ada data PPL'}</TableCell></TableRow>
                   ) : (
-                    filteredAndSortedData.map((ppl) => {
+                    paginatedData.map((ppl) => {
                       const overLimit = ppl.honorBulanIni > globalSettings.batasHonorBulananGlobal;
                       const difference = ppl.honorBulanIni - globalSettings.batasHonorBulananGlobal;
                       return (
                         <TableRow key={ppl.id} className={overLimit ? "bg-red-50" : ""}>
-                          <TableCell className="font-medium">{ppl.nama}</TableCell>
+                          <TableCell className="font-medium truncate">{ppl.nama}</TableCell>
                           <TableCell className={cn("font-semibold", overLimit && "text-red-600")}>Rp {ppl.honorBulanIni.toLocaleString('id-ID')}</TableCell>
                           <TableCell>
                             <Button variant="link" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailModal(ppl)}>
@@ -239,6 +256,42 @@ export default function ManajemenHonor() {
                   )}
                 </TableBody>
               </Table>
+            </div>
+            {/* PERBAIKAN: Kontrol paginasi baru */}
+            <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-gray-600">
+                    Menampilkan <strong>{paginatedData.length}</strong> dari <strong>{filteredAndSortedData.length}</strong> data
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm">Baris per halaman:</span>
+                        <Select value={String(rowsPerPage)} onValueChange={value => { setRowsPerPage(Number(value)); setCurrentPage(1); }}>
+                            <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {[10, 25, 50, 100].map(size => (
+                                    <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Pagination>
+                        <PaginationContent>
+                            <PaginationItem>
+                                <Button variant="outline" size="sm" onClick={() => { if(currentPage > 1) setCurrentPage(currentPage - 1); }} disabled={currentPage === 1}>
+                                    <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                            </PaginationItem>
+                            <PaginationItem className="text-sm font-medium px-3">
+                                {currentPage} / {totalPages}
+                            </PaginationItem>
+                            <PaginationItem>
+                                <Button variant="outline" size="sm" onClick={() => { if(currentPage < totalPages) setCurrentPage(currentPage + 1); }} disabled={currentPage === totalPages}>
+                                    <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </PaginationItem>
+                        </PaginationContent>
+                    </Pagination>
+                </div>
             </div>
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 // client/pages/DaftarPPL.tsx
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -12,6 +12,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem 
+} from "@/components/ui/pagination";
+// PERBAIKAN: Impor komponen Tooltip
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Users, 
   UserCheck, 
@@ -21,8 +29,10 @@ import {
   UserPlus,
   MapPin,
   Phone,
-  Activity,
-  List
+  List,
+  UserX,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLAdminData } from "@shared/api";
@@ -33,7 +43,6 @@ const fetchPPLs = async (): Promise<PPLAdminData[]> => {
     return res.json();
 };
 
-// Komponen baru untuk Modal Detail Kegiatan
 const ActivityDetailModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, onClose: () => void, pplData: PPLAdminData | null }) => {
     if (!pplData) return null;
 
@@ -76,12 +85,14 @@ export default function DaftarPPL() {
   
   const [showBulkSuccessModal, setShowBulkSuccessModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortConfig, setSortConfig] = useState<{ key: keyof PPLAdminData; direction: 'asc' | 'desc'; } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof PPLAdminData | 'status'; direction: 'asc' | 'desc'; } | null>(null);
   const [selectedPPLs, setSelectedPPLs] = useState<string[]>([]);
   
-  // State untuk modal detail
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedPplDetails, setSelectedPplDetails] = useState<PPLAdminData | null>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const filteredAndSortedData = useMemo(() => {
     let data = [...pplList].filter(ppl => 
@@ -92,8 +103,15 @@ export default function DaftarPPL() {
     );
     if (sortConfig) {
         data.sort((a, b) => {
-            const aValue = a[sortConfig.key] as any;
-            const bValue = b[sortConfig.key] as any;
+            let aValue, bValue;
+            if (sortConfig.key === 'status') {
+                aValue = a.totalKegiatan > 0 ? 1 : 0;
+                bValue = b.totalKegiatan > 0 ? 1 : 0;
+            } else {
+                aValue = a[sortConfig.key as keyof PPLAdminData] as any;
+                bValue = b[sortConfig.key as keyof PPLAdminData] as any;
+            }
+            
             if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
@@ -101,6 +119,14 @@ export default function DaftarPPL() {
     }
     return data;
   }, [pplList, searchTerm, sortConfig]);
+
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filteredAndSortedData.slice(startIndex, endIndex);
+  }, [filteredAndSortedData, currentPage, rowsPerPage]);
+
+  const totalPages = Math.ceil(filteredAndSortedData.length / rowsPerPage);
 
   const isAllSelected = useMemo(() => filteredAndSortedData.length > 0 && selectedPPLs.length === filteredAndSortedData.length, [selectedPPLs, filteredAndSortedData]);
 
@@ -119,7 +145,7 @@ export default function DaftarPPL() {
     setShowBulkSuccessModal(true);
   };
   
-  const handleSort = (key: keyof PPLAdminData) => {
+  const handleSort = (key: keyof PPLAdminData | 'status') => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
     setSortConfig({ key, direction });
@@ -137,9 +163,8 @@ export default function DaftarPPL() {
 
   const stats = useMemo(() => ({
     totalPPL: pplList.length,
-    activePPL: pplList.length,
-    totalKegiatan: pplList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0),
-    avgKegiatan: pplList.length > 0 ? Math.round(pplList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0) / pplList.length) : 0
+    activePPL: pplList.filter(p => p.totalKegiatan > 0).length,
+    inactivePPL: pplList.filter(p => p.totalKegiatan === 0).length,
   }), [pplList]);
 
   return (
@@ -153,11 +178,11 @@ export default function DaftarPPL() {
           </div>
           {selectedPPLs.length > 0 && <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleBulkAddToActivity}><UserPlus className="w-4 h-4 mr-2" />Tambahkan ke Input Kegiatan ({selectedPPLs.length})</Button>}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* PERBAIKAN: Menghapus card rata-rata dan menyesuaikan grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total PPL</p><p className="text-2xl font-bold text-gray-900">{stats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
             <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">PPL Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.activePPL}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
-            <Card className="border-l-4 border-l-orange-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total Kegiatan</p><p className="text-2xl font-bold text-gray-900">{stats.totalKegiatan}</p></div><Activity className="w-8 h-8 text-orange-500" /></div></CardContent></Card>
-            <Card className="border-l-4 border-l-purple-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Rata-rata Kegiatan</p><p className="text-2xl font-bold text-gray-900">{stats.avgKegiatan}</p></div><Activity className="w-8 h-8 text-purple-500" /></div></CardContent></Card>
+            <Card className="border-l-4 border-l-gray-400"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">PPL Non Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.inactivePPL}</p></div><UserX className="w-8 h-8 text-gray-400" /></div></CardContent></Card>
         </div>
         <Card>
           <CardHeader>
@@ -168,51 +193,103 @@ export default function DaftarPPL() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12"><Checkbox checked={isAllSelected} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead>
-                    <TableHead><button onClick={() => handleSort('id')} className="flex items-center gap-1">ID{getSortIcon('id')}</button></TableHead>
-                    <TableHead><button onClick={() => handleSort('namaPPL')} className="flex items-center gap-1">Nama{getSortIcon('namaPPL')}</button></TableHead>
-                    <TableHead><button onClick={() => handleSort('totalKegiatan')} className="flex items-center gap-1">Kegiatan{getSortIcon('totalKegiatan')}</button></TableHead>
-                    <TableHead><button onClick={() => handleSort('alamat')} className="flex items-center gap-1">Alamat{getSortIcon('alamat')}</button></TableHead>
-                    <TableHead><button onClick={() => handleSort('noTelepon')} className="flex items-center gap-1">Telepon{getSortIcon('noTelepon')}</button></TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="w-24"><button onClick={() => handleSort('id')} className="flex items-center gap-1">ID{getSortIcon('id')}</button></TableHead>
+                    <TableHead className="w-48"><button onClick={() => handleSort('namaPPL')} className="flex items-center gap-1">Nama{getSortIcon('namaPPL')}</button></TableHead>
+                    <TableHead className="w-32"><button onClick={() => handleSort('totalKegiatan')} className="flex items-center gap-1">Kegiatan{getSortIcon('totalKegiatan')}</button></TableHead>
+                    <TableHead className="w-64"><button onClick={() => handleSort('alamat')} className="flex items-center gap-1">Alamat{getSortIcon('alamat')}</button></TableHead>
+                    <TableHead className="w-40"><button onClick={() => handleSort('noTelepon')} className="flex items-center gap-1">Telepon{getSortIcon('noTelepon')}</button></TableHead>
+                    <TableHead className="w-28"><button onClick={() => handleSort('status')} className="flex items-center gap-1">Status{getSortIcon('status')}</button></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (<TableRow><TableCell colSpan={7} className="text-center">Memuat...</TableCell></TableRow>) : 
-                  filteredAndSortedData.length === 0 ? (
+                  paginatedData.length === 0 ? (
                       <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-500">Tidak ada data PPL</TableCell></TableRow>
                   ) : (
-                      filteredAndSortedData.map((ppl) => (
-                          <TableRow key={ppl.id} data-state={selectedPPLs.includes(ppl.id) && "selected"}>
-                              <TableCell><Checkbox checked={selectedPPLs.includes(ppl.id)} onCheckedChange={(checked) => handleSelectPPL(ppl.id, !!checked)} /></TableCell>
-                              <TableCell className="font-medium">{ppl.id}</TableCell>
-                              <TableCell className="font-medium">{ppl.namaPPL}</TableCell>
-                              <TableCell>
-                                <Button variant="link" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailModal(ppl)}>
-                                    {ppl.totalKegiatan} Kegiatan
-                                </Button>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="w-4 h-4 text-gray-400" />
-                                  <span>{ppl.alamat}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Phone className="w-4 h-4 text-gray-400" />
-                                  <span>{ppl.noTelepon}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell><Badge variant="default" className="bg-bps-green-600">Aktif</Badge></TableCell>
-                          </TableRow>
-                      ))
+                      paginatedData.map((ppl) => {
+                          const isActive = ppl.totalKegiatan > 0;
+                          return (
+                            <TableRow key={ppl.id} data-state={selectedPPLs.includes(ppl.id) && "selected"}>
+                                <TableCell><Checkbox checked={selectedPPLs.includes(ppl.id)} onCheckedChange={(checked) => handleSelectPPL(ppl.id, !!checked)} /></TableCell>
+                                <TableCell className="font-medium truncate">{ppl.id}</TableCell>
+                                <TableCell className="font-medium truncate">{ppl.namaPPL}</TableCell>
+                                <TableCell>
+                                  <Button variant="link" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailModal(ppl)}>
+                                      {ppl.totalKegiatan} Kegiatan
+                                  </Button>
+                                </TableCell>
+                                <TableCell>
+                                  {/* PERBAIKAN: Menambahkan Tooltip untuk alamat */}
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="flex items-center gap-2 truncate">
+                                          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                          <span className="truncate">{ppl.alamat}</span>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{ppl.alamat}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2 truncate">
+                                    <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                    <span className="truncate">{ppl.noTelepon}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant="default" className={isActive ? "bg-bps-green-600" : "bg-gray-400 text-gray-800"}>
+                                        {isActive ? "Aktif" : "Non Aktif"}
+                                    </Badge>
+                                </TableCell>
+                            </TableRow>
+                          );
+                      })
                   )}
                 </TableBody>
               </Table>
+            </div>
+            <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-gray-600">
+                    Menampilkan <strong>{paginatedData.length}</strong> dari <strong>{filteredAndSortedData.length}</strong> data
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm">Baris per halaman:</span>
+                        <Select value={String(rowsPerPage)} onValueChange={value => { setRowsPerPage(Number(value)); setCurrentPage(1); }}>
+                            <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {[10, 25, 50, 100].map(size => (
+                                    <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Pagination>
+                        <PaginationContent>
+                            <PaginationItem>
+                                <Button variant="outline" size="sm" onClick={() => { if(currentPage > 1) setCurrentPage(currentPage - 1); }} disabled={currentPage === 1}>
+                                    <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                            </PaginationItem>
+                            <PaginationItem className="text-sm font-medium px-3">
+                                {currentPage} / {totalPages}
+                            </PaginationItem>
+                            <PaginationItem>
+                                <Button variant="outline" size="sm" onClick={() => { if(currentPage < totalPages) setCurrentPage(currentPage + 1); }} disabled={currentPage === totalPages}>
+                                    <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </PaginationItem>
+                        </PaginationContent>
+                    </Pagination>
+                </div>
             </div>
           </CardContent>
         </Card>

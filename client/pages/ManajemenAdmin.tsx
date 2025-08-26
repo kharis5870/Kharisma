@@ -1,7 +1,6 @@
 // client/pages/ManajemenAdmin.tsx
 
-import React, { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo } from "react";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
@@ -16,6 +15,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem 
+} from "@/components/ui/pagination";
 import {
   Plus,
   Trash2,
@@ -26,19 +30,17 @@ import {
   ChevronUp,
   ChevronDown,
   Save,
-  X,
   Shield,
   Crown,
   Eye,
   EyeOff,
-  MapPin,
-  Phone,
   Activity,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 
 export default function ManajemenAdmin() {
-  const navigate = useNavigate();
   const {
     userList,
     addUser,
@@ -54,7 +56,6 @@ export default function ManajemenAdmin() {
     updatePPLAdmin
   } = useAdmin();
   
-  // Modal states
   const [activeTab, setActiveTab] = useState("users");
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -68,10 +69,8 @@ export default function ManajemenAdmin() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   
-  // Form Error State
   const [formError, setFormError] = useState<string | null>(null);
 
-  // User form states
   const [newUserData, setNewUserData] = useState<UserData>({
     id: "",
     username: "",
@@ -83,7 +82,6 @@ export default function ManajemenAdmin() {
   const [deleteUserId, setDeleteUserId] = useState("");
   const [deleteUserName, setDeleteUserName] = useState("");
   
-  // Ketua Tim form states
   const [newKetuaTimData, setNewKetuaTimData] = useState<KetuaTimData>({
     id: "",
     nama: "",
@@ -93,7 +91,6 @@ export default function ManajemenAdmin() {
   const [deleteKetuaTimId, setDeleteKetuaTimId] = useState("");
   const [deleteKetuaTimName, setDeleteKetuaTimName] = useState("");
 
-  // PPL form states
   const [newPPLData, setNewPPLData] = useState<PPLAdminData>({
     id: "",
     namaPPL: "",
@@ -106,7 +103,6 @@ export default function ManajemenAdmin() {
   const [deletePPLId, setDeletePPLId] = useState("");
   const [deletePPLName, setDeletePPLName] = useState("");
   
-  // Search and sort states
   const [userSearchTerm, setUserSearchTerm] = useState("");
   const [ketuaTimSearchTerm, setKetuaTimSearchTerm] = useState("");
   const [pplSearchTerm, setPplSearchTerm] = useState("");
@@ -114,17 +110,21 @@ export default function ManajemenAdmin() {
   const [ketuaTimSortConfig, setKetuaTimSortConfig] = useState<{ key: keyof KetuaTimData; direction: 'asc' | 'desc'; } | null>(null);
   const [pplSortConfig, setPplSortConfig] = useState<{ key: keyof PPLAdminData; direction: 'asc' | 'desc'; } | null>(null);
   
-  // Password visibility
   const [showPassword, setShowPassword] = useState(false);
-  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [setShowEditPassword] = useState(false);
   
-  // Validation functions
+  // PERBAIKAN: State paginasi untuk setiap tab
+  const [pagination, setPagination] = useState({
+      users: { currentPage: 1, rowsPerPage: 10 },
+      ketuaTim: { currentPage: 1, rowsPerPage: 10 },
+      ppl: { currentPage: 1, rowsPerPage: 10 },
+  });
+
   const isValidUserId = (id: string) => id.trim().length >= 1;
   const isValidUsername = (username: string) => username.trim().length >= 3;
   const isValidPassword = (password?: string) => !password || password.trim().length >= 6;
   const isValidNamaLengkap = (nama: string) => nama.trim().length >= 2;
   const isValidNip = (nip: string) => nip.trim().length >= 10;
-  // PERBAIKAN: Validasi telepon hanya angka dan minimal 10 karakter
   const isValidTelepon = (telepon: string) => /^\d{10,}$/.test(telepon.trim());
   const isValidAlamat = (alamat: string) => alamat.trim().length >= 5;
   
@@ -254,7 +254,6 @@ export default function ManajemenAdmin() {
     setShowSuccessModal(true);
   };
 
-  // Functiions to open modals and reset form errors
   const openAddUserModal = () => { setFormError(null); setShowAddUserModal(true); };
   const openEditUserModal = (user: UserData) => { setFormError(null); setEditUserData({...user, password: ''}); setShowEditUserModal(true); };
   const openDeleteUserModal = (user: UserData) => { setDeleteUserId(user.id); setDeleteUserName(user.username); setShowDeleteUserModal(true); };
@@ -285,7 +284,36 @@ export default function ManajemenAdmin() {
   const ketuaTimStats = useMemo(() => ({ totalKetuaTim: ketuaTimList.length }), [ketuaTimList]);
   const pplStats = useMemo(() => ({ totalPPL: pplAdminList.length, totalKegiatan: pplAdminList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0), avgKegiatan: pplAdminList.length > 0 ? Math.round(pplAdminList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0) / pplAdminList.length) : 0 }), [pplAdminList]);
 
-  // Komponen untuk menampilkan error
+  // PERBAIKAN: Logika paginasi untuk setiap tab
+  const paginatedUsers = useMemo(() => {
+    const { currentPage, rowsPerPage } = pagination.users;
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredAndSortedUsers.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredAndSortedUsers, pagination.users]);
+  const totalUserPages = Math.ceil(filteredAndSortedUsers.length / pagination.users.rowsPerPage);
+
+  const paginatedKetuaTim = useMemo(() => {
+    const { currentPage, rowsPerPage } = pagination.ketuaTim;
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredAndSortedKetuaTim.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredAndSortedKetuaTim, pagination.ketuaTim]);
+  const totalKetuaTimPages = Math.ceil(filteredAndSortedKetuaTim.length / pagination.ketuaTim.rowsPerPage);
+  
+  const paginatedPPL = useMemo(() => {
+    const { currentPage, rowsPerPage } = pagination.ppl;
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredAndSortedPPL.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredAndSortedPPL, pagination.ppl]);
+  const totalPPLPages = Math.ceil(filteredAndSortedPPL.length / pagination.ppl.rowsPerPage);
+
+  const handlePageChange = (tab: 'users' | 'ketuaTim' | 'ppl', newPage: number) => {
+    setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], currentPage: newPage } }));
+  };
+
+  const handleRowsPerPageChange = (tab: 'users' | 'ketuaTim' | 'ppl', newSize: number) => {
+    setPagination(prev => ({ ...prev, [tab]: { currentPage: 1, rowsPerPage: newSize } }));
+  };
+
   const FormError = ({ message }: { message: string | null }) => {
     if (!message) return null;
     return (
@@ -330,22 +358,22 @@ export default function ManajemenAdmin() {
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="min-w-24"><button onClick={() => handleUserSort('id')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">ID User{getSortIcon('id', userSortConfig)}</button></TableHead>
-                        <TableHead className="min-w-32"><button onClick={() => handleUserSort('username')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Username{getSortIcon('username', userSortConfig)}</button></TableHead>
-                        <TableHead className="min-w-48"><button onClick={() => handleUserSort('namaLengkap')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama Lengkap{getSortIcon('namaLengkap', userSortConfig)}</button></TableHead>
-                        <TableHead className="min-w-24"><button onClick={() => handleUserSort('role')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Role{getSortIcon('role', userSortConfig)}</button></TableHead>
-                        <TableHead className="min-w-32">Aksi</TableHead>
+                        <TableHead className="w-[15%]"><button onClick={() => handleUserSort('id')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">ID User{getSortIcon('id', userSortConfig)}</button></TableHead>
+                        <TableHead className="w-[20%]"><button onClick={() => handleUserSort('username')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Username{getSortIcon('username', userSortConfig)}</button></TableHead>
+                        <TableHead className="w-[30%]"><button onClick={() => handleUserSort('namaLengkap')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama Lengkap{getSortIcon('namaLengkap', userSortConfig)}</button></TableHead>
+                        <TableHead className="w-[20%]"><button onClick={() => handleUserSort('role')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Role{getSortIcon('role', userSortConfig)}</button></TableHead>
+                        <TableHead className="w-[15%]">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredAndSortedUsers.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{userSearchTerm ? `Tidak ada user yang cocok dengan "${userSearchTerm}"` : 'Belum ada data user'}</TableCell></TableRow>) : (filteredAndSortedUsers.map((user) => (
+                      {paginatedUsers.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{userSearchTerm ? `Tidak ada user yang cocok dengan "${userSearchTerm}"` : 'Belum ada data user'}</TableCell></TableRow>) : (paginatedUsers.map((user) => (
                           <TableRow key={user.id}>
-                            <TableCell className="font-medium">{user.id}</TableCell>
-                            <TableCell className="font-medium">{user.username}</TableCell>
-                            <TableCell>{user.namaLengkap}</TableCell>
+                            <TableCell className="font-medium truncate">{user.id}</TableCell>
+                            <TableCell className="font-medium truncate">{user.username}</TableCell>
+                            <TableCell className="truncate">{user.namaLengkap}</TableCell>
                             <TableCell><Badge variant="default" className={`${getRoleBadgeColor(user.role)} flex items-center gap-1 w-fit`}>{getRoleIcon(user.role)}{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</Badge></TableCell>
                             <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEditUserModal(user)} className="text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4" /></Button><Button variant="outline" size="sm" onClick={() => openDeleteUserModal(user)} className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4" /></Button></div></TableCell>
                           </TableRow>
@@ -353,6 +381,13 @@ export default function ManajemenAdmin() {
                       )}
                     </TableBody>
                   </Table>
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-gray-600">Menampilkan <strong>{paginatedUsers.length}</strong> dari <strong>{filteredAndSortedUsers.length}</strong> data</div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2"><span className="text-sm">Baris per halaman:</span><Select value={String(pagination.users.rowsPerPage)} onValueChange={value => handleRowsPerPageChange('users', Number(value))}><SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger><SelectContent>{[10, 25, 50, 100].map(size => (<SelectItem key={size} value={String(size)}>{size}</SelectItem>))}</SelectContent></Select></div>
+                        <Pagination><PaginationContent><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('users', pagination.users.currentPage - 1)} disabled={pagination.users.currentPage === 1}><ChevronLeft className="w-4 h-4" /></Button></PaginationItem><PaginationItem className="text-sm font-medium px-3">{pagination.users.currentPage} / {totalUserPages}</PaginationItem><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('users', pagination.users.currentPage + 1)} disabled={pagination.users.currentPage === totalUserPages}><ChevronRight className="w-4 h-4" /></Button></PaginationItem></PaginationContent></Pagination>
+                    </div>
                 </div>
               </CardContent>
             </Card>
@@ -375,28 +410,35 @@ export default function ManajemenAdmin() {
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
-                        <Table>
+                        <Table className="table-fixed w-full">
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="min-w-24"><button onClick={() => handleKetuaTimSort('id')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">ID{getSortIcon('id', ketuaTimSortConfig)}</button></TableHead>
-                                    <TableHead className="min-w-60"><button onClick={() => handleKetuaTimSort('nama')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama{getSortIcon('nama', ketuaTimSortConfig)}</button></TableHead>
-                                    <TableHead className="min-w-48"><button onClick={() => handleKetuaTimSort('nip')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">NIP{getSortIcon('nip', ketuaTimSortConfig)}</button></TableHead>
-                                    <TableHead className="min-w-32">Status</TableHead>
-                                    <TableHead className="min-w-32">Aksi</TableHead>
+                                    <TableHead className="w-[15%]"><button onClick={() => handleKetuaTimSort('id')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">ID{getSortIcon('id', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[35%]"><button onClick={() => handleKetuaTimSort('nama')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama{getSortIcon('nama', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[25%]"><button onClick={() => handleKetuaTimSort('nip')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">NIP{getSortIcon('nip', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[15%]">Status</TableHead>
+                                    <TableHead className="w-[10%]">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredAndSortedKetuaTim.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{ketuaTimSearchTerm ? `Tidak ada ketua tim yang cocok dengan "${ketuaTimSearchTerm}"` : 'Belum ada data ketua tim'}</TableCell></TableRow>) : (filteredAndSortedKetuaTim.map((ketuaTim) => (
+                                {paginatedKetuaTim.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{ketuaTimSearchTerm ? `Tidak ada ketua tim yang cocok dengan "${ketuaTimSearchTerm}"` : 'Belum ada data ketua tim'}</TableCell></TableRow>) : (paginatedKetuaTim.map((ketuaTim) => (
                                     <TableRow key={ketuaTim.id}>
-                                        <TableCell className="font-medium">{ketuaTim.id}</TableCell>
-                                        <TableCell className="font-medium">{ketuaTim.nama}</TableCell>
-                                        <TableCell>{ketuaTim.nip}</TableCell>
+                                        <TableCell className="font-medium truncate">{ketuaTim.id}</TableCell>
+                                        <TableCell className="font-medium truncate">{ketuaTim.nama}</TableCell>
+                                        <TableCell className="truncate">{ketuaTim.nip}</TableCell>
                                         <TableCell><Badge variant="default" className="bg-bps-green-600">Aktif</Badge></TableCell>
                                         <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEditKetuaTimModal(ketuaTim)} className="text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4"/></Button><Button variant="outline" size="sm" onClick={() => openDeleteKetuaTimModal(ketuaTim)} className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4"/></Button></div></TableCell>
                                     </TableRow>
                                 )))}
                             </TableBody>
                         </Table>
+                    </div>
+                    <div className="flex items-center justify-between mt-4">
+                        <div className="text-sm text-gray-600">Menampilkan <strong>{paginatedKetuaTim.length}</strong> dari <strong>{filteredAndSortedKetuaTim.length}</strong> data</div>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2"><span className="text-sm">Baris per halaman:</span><Select value={String(pagination.ketuaTim.rowsPerPage)} onValueChange={value => handleRowsPerPageChange('ketuaTim', Number(value))}><SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger><SelectContent>{[10, 25, 50, 100].map(size => (<SelectItem key={size} value={String(size)}>{size}</SelectItem>))}</SelectContent></Select></div>
+                            <Pagination><PaginationContent><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('ketuaTim', pagination.ketuaTim.currentPage - 1)} disabled={pagination.ketuaTim.currentPage === 1}><ChevronLeft className="w-4 h-4" /></Button></PaginationItem><PaginationItem className="text-sm font-medium px-3">{pagination.ketuaTim.currentPage} / {totalKetuaTimPages}</PaginationItem><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('ketuaTim', pagination.ketuaTim.currentPage + 1)} disabled={pagination.ketuaTim.currentPage === totalKetuaTimPages}><ChevronRight className="w-4 h-4" /></Button></PaginationItem></PaginationContent></Pagination>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -420,25 +462,23 @@ export default function ManajemenAdmin() {
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
-                        <Table>
+                        <Table className="table-fixed w-full">
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead><button onClick={() => handlePPLSort('id')} className="flex items-center gap-1">ID{getSortIcon('id', pplSortConfig)}</button></TableHead>
-                                    <TableHead><button onClick={() => handlePPLSort('namaPPL')} className="flex items-center gap-1">Nama{getSortIcon('namaPPL', pplSortConfig)}</button></TableHead>
-                                    <TableHead><button onClick={() => handlePPLSort('totalKegiatan')} className="flex items-center gap-1">Kegiatan{getSortIcon('totalKegiatan', pplSortConfig)}</button></TableHead>
-                                    <TableHead><button onClick={() => handlePPLSort('alamat')} className="flex items-center gap-1">Alamat{getSortIcon('alamat', pplSortConfig)}</button></TableHead>
-                                    <TableHead><button onClick={() => handlePPLSort('noTelepon')} className="flex items-center gap-1">Telepon{getSortIcon('noTelepon', pplSortConfig)}</button></TableHead>
-                                    <TableHead>Aksi</TableHead>
+                                    <TableHead className="w-[15%]"><button onClick={() => handlePPLSort('id')} className="flex items-center gap-1">ID{getSortIcon('id', pplSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[25%]"><button onClick={() => handlePPLSort('namaPPL')} className="flex items-center gap-1">Nama{getSortIcon('namaPPL', pplSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[30%]"><button onClick={() => handlePPLSort('alamat')} className="flex items-center gap-1">Alamat{getSortIcon('alamat', pplSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[20%]"><button onClick={() => handlePPLSort('noTelepon')} className="flex items-center gap-1">Telepon{getSortIcon('noTelepon', pplSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[10%]">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredAndSortedPPL.map(ppl => (
+                                {paginatedPPL.map(ppl => (
                                     <TableRow key={ppl.id}>
-                                        <TableCell className="font-medium">{ppl.id}</TableCell>
-                                        <TableCell className="font-medium">{ppl.namaPPL}</TableCell>
-                                        <TableCell>{ppl.totalKegiatan}</TableCell>
-                                        <TableCell>{ppl.alamat}</TableCell>
-                                        <TableCell>{ppl.noTelepon}</TableCell>
+                                        <TableCell className="font-medium truncate">{ppl.id}</TableCell>
+                                        <TableCell className="font-medium truncate">{ppl.namaPPL}</TableCell>
+                                        <TableCell className="truncate">{ppl.alamat}</TableCell>
+                                        <TableCell className="truncate">{ppl.noTelepon}</TableCell>
                                         <TableCell className="flex gap-2">
                                             <Button variant="outline" size="sm" onClick={() => openEditPPLModal(ppl)} className="text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4"/></Button>
                                             <Button variant="outline" size="sm" onClick={() => openDeletePPLModal(ppl)} className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4"/></Button>
@@ -447,6 +487,13 @@ export default function ManajemenAdmin() {
                                 ))}
                             </TableBody>
                         </Table>
+                    </div>
+                     <div className="flex items-center justify-between mt-4">
+                        <div className="text-sm text-gray-600">Menampilkan <strong>{paginatedPPL.length}</strong> dari <strong>{filteredAndSortedPPL.length}</strong> data</div>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2"><span className="text-sm">Baris per halaman:</span><Select value={String(pagination.ppl.rowsPerPage)} onValueChange={value => handleRowsPerPageChange('ppl', Number(value))}><SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger><SelectContent>{[10, 25, 50, 100].map(size => (<SelectItem key={size} value={String(size)}>{size}</SelectItem>))}</SelectContent></Select></div>
+                            <Pagination><PaginationContent><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('ppl', pagination.ppl.currentPage - 1)} disabled={pagination.ppl.currentPage === 1}><ChevronLeft className="w-4 h-4" /></Button></PaginationItem><PaginationItem className="text-sm font-medium px-3">{pagination.ppl.currentPage} / {totalPPLPages}</PaginationItem><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('ppl', pagination.ppl.currentPage + 1)} disabled={pagination.ppl.currentPage === totalPPLPages}><ChevronRight className="w-4 h-4" /></Button></PaginationItem></PaginationContent></Pagination>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

@@ -1,7 +1,7 @@
 // client/pages/InputKegiatan.tsx
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom"; // <-- Impor Link
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import { usePPL } from "@/contexts/PPLContext";
@@ -14,7 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, Plus, Trash2, Link2, X, Lock, Check, ChevronsUpDown } from "lucide-react";
+// PERBAIKAN: Tambahkan ikon Users
+import { CalendarIcon, Plus, Trash2, Link2, X, Lock, Check, ChevronsUpDown, Users } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -28,7 +29,6 @@ type DateFieldName =
   | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
   | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
-// --- Helper Functions untuk Format Angka ---
 const formatHonor = (value: string | number): string => {
   if (value === '' || value === null || value === undefined) return '';
   const numString = String(value).replace(/\./g, '');
@@ -40,13 +40,15 @@ const formatHonor = (value: string | number): string => {
 const parseHonor = (value: string): string => {
   return value.replace(/\./g, '');
 };
-// --- Akhir Helper Functions ---
 
 const createActivity = async (data: any) => {
     const sanitizedData = {
         ...data,
         documents: data.documents.map(({ id, ...rest }: any) => rest),
-        pplAllocations: data.pplAllocations.map(({ id, namaPPL, ...rest }: any) => rest),
+        pplAllocations: data.pplAllocations.map(({ id, namaPPL, besaranHonor, ...rest }: any) => ({
+            ...rest,
+            besaranHonor: parseHonor(besaranHonor)
+        })),
     };
     const res = await fetch('/api/kegiatan', {
         method: 'POST',
@@ -197,7 +199,7 @@ export default function InputKegiatan() {
             <CardHeader><CardTitle>Informasi Kegiatan</CardTitle><CardDescription>Masukkan detail dasar mengenai kegiatan.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={store.namaKegiatan} onChange={(e) => store.updateFormField('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" /></div>
+                <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={store.namaKegiatan} onChange={(e) => store.updateFormField('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2020" /></div>
                 <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
                     <Select value={store.ketua_tim_id} onValueChange={(value) => store.updateFormField('ketua_tim_id', value)}>
                         <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
@@ -205,7 +207,7 @@ export default function InputKegiatan() {
                     </Select>
                 </div>
               </div>
-              <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={store.deskripsiKegiatan} onChange={(e) => store.updateFormField('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan..." /></div>
+              <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={store.deskripsiKegiatan} onChange={(e) => store.updateFormField('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan secara singkat..." /></div>
             </CardContent>
           </Card>
           <Card>
@@ -238,7 +240,21 @@ export default function InputKegiatan() {
           </Tabs>
 
           <Card>
-            <CardHeader><CardTitle>Alokasi PPL & PML</CardTitle><CardDescription>Pilih PPL dari daftar yang tersedia dan isi detail alokasinya.</CardDescription></CardHeader>
+            <CardHeader>
+                {/* PERBAIKAN: Menambahkan Button di sini */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Alokasi PPL & PML</CardTitle>
+                        <CardDescription>Pilih PPL dari daftar yang tersedia dan isi detail alokasinya.</CardDescription>
+                    </div>
+                    <Button variant="outline" asChild>
+                        <Link to="/daftar-ppl">
+                            <Users className="w-4 h-4 mr-2" />
+                            Pilih dari Daftar PPL
+                        </Link>
+                    </Button>
+                </div>
+            </CardHeader>
             <CardContent className="space-y-4">
                 {store.pplAllocations.map((ppl, index) => (
                     <div key={ppl.id} className="p-4 border rounded-lg space-y-4 bg-gray-50">
@@ -260,8 +276,8 @@ export default function InputKegiatan() {
                                     </CommandGroup></CommandList></Command></PopoverContent>
                                 </Popover>
                             </div>
-                            <div className="space-y-2"><Label>Jumlah Beban Kerja *</Label><Input placeholder="Contoh: 20" value={ppl.bebanKerja} onChange={e => store.updatePPL(ppl.id, 'bebanKerja', e.target.value)} /></div>
-                            <div className="space-y-2"><Label>Satuan *</Label><Input placeholder="Contoh: Dokumen" value={ppl.satuanBebanKerja} onChange={e => store.updatePPL(ppl.id, 'satuanBebanKerja', e.target.value)} /></div>
+                            <div className="space-y-2"><Label>Jumlah Beban Kerja *</Label><Input placeholder="Contoh: 12" value={ppl.bebanKerja} onChange={e => store.updatePPL(ppl.id, 'bebanKerja', e.target.value)} /></div>
+                            <div className="space-y-2"><Label>Satuan</Label><Input placeholder="Contoh: Dokumen" value={ppl.satuanBebanKerja} onChange={e => store.updatePPL(ppl.id, 'satuanBebanKerja', e.target.value)} /></div>
                             <div className="space-y-2">
                                 <Label>Honor (Rp) *</Label>
                                 <Input 
@@ -269,7 +285,7 @@ export default function InputKegiatan() {
                                     value={formatHonor(ppl.besaranHonor)} 
                                     onChange={e => {
                                         const parsedValue = parseHonor(e.target.value);
-                                        if (/^\d*$/.test(parsedValue)) { 
+                                        if (/^\d*$/.test(parsedValue)) {
                                             store.updatePPL(ppl.id, 'besaranHonor', parsedValue);
                                         }
                                     }}

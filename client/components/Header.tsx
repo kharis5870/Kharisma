@@ -11,15 +11,15 @@ import { cn } from "@/lib/utils";
 export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth(); // Ganti username menjadi user
+  const { user, logout } = useAuth(); 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const allNavigation = [
+    { name: "Daftar PPL", href: "/daftar-ppl", roles: ['admin', 'supervisor', 'user'] },
     { name: "Input Kegiatan", href: "/input-kegiatan", roles: ['admin', 'supervisor', 'user'] },
     { name: "Dashboard", href: "/dashboard", roles: ['admin', 'supervisor', 'user'] },
     { name: "Manajemen Honor", href: "/manajemen-honor", roles: ['admin', 'supervisor', 'user'] },
-    { name: "Daftar PPL", href: "/daftar-ppl", roles: ['admin', 'supervisor', 'user'] },
-    { name: "Manajemen Admin", href: "/manajemen-admin", roles: ['admin'] }, // <-- Hanya untuk admin
+    { name: "Manajemen Admin", href: "/manajemen-admin", roles: ['admin'] }, 
   ];
 
   // Filter navigasi berdasarkan role user

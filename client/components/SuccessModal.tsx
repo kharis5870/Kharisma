@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface SuccessModalProps {
   isOpen: boolean;
