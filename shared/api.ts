@@ -78,9 +78,10 @@ export interface PPLHonorData {
 export interface UserData {
     id: string;
     username: string;
-    password?: string; // Password bersifat opsional saat mengambil data
+    password?: string; 
     namaLengkap: string;
     role: 'admin' | 'supervisor' | 'user';
+    isPML?: boolean;
 }
 
 export interface KetuaTimData {

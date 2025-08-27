@@ -9,30 +9,29 @@ const SALT_ROUNDS = 10;
 
 // --- User Management ---
 export const getAllUsers = async (): Promise<UserData[]> => {
-    const [rows] = await db.query<RowDataPacket[]>('SELECT id, username, nama_lengkap AS namaLengkap, role FROM users ORDER BY nama_lengkap ASC');
+    const [rows] = await db.query<RowDataPacket[]>('SELECT id, username, nama_lengkap AS namaLengkap, role, isPML FROM users ORDER BY nama_lengkap ASC');
     return rows as UserData[];
 };
 
 export const createUser = async (user: UserData): Promise<UserData> => {
-    const { id, username, password, namaLengkap, role } = user;
+    const { id, username, password, namaLengkap, role, isPML } = user;
     if (!password) throw new Error("Password is required for new user");
     
     // PERBAIKAN: Hash password sebelum disimpan
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     
-    await db.execute('INSERT INTO users (id, username, password, nama_lengkap, role) VALUES (?, ?, ?, ?, ?)', [id, username, hashedPassword, namaLengkap, role]);
+    await db.execute('INSERT INTO users (id, username, password, nama_lengkap, role, isPML) VALUES (?, ?, ?, ?, ?, ?)', [id, username, hashedPassword, namaLengkap, role, isPML || false]);
     return { ...user, password: '' }; // Jangan kembalikan password
 };
 
 export const updateUser = async (id: string, user: UserData): Promise<UserData> => {
-    const { username, password, namaLengkap, role } = user;
+    const { username, password, namaLengkap, role, isPML } = user;
     
-    // PERBAIKAN: Hanya update password jika diisi, dan hash password baru
     if (password) {
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-        await db.execute('UPDATE users SET username = ?, password = ?, nama_lengkap = ?, role = ? WHERE id = ?', [username, hashedPassword, namaLengkap, role, id]);
+        await db.execute('UPDATE users SET username = ?, password = ?, nama_lengkap = ?, role = ?, isPML = ? WHERE id = ?', [username, hashedPassword, namaLengkap, role, isPML || false, id]);
     } else {
-        await db.execute('UPDATE users SET username = ?, nama_lengkap = ?, role = ? WHERE id = ?', [username, namaLengkap, role, id]);
+        await db.execute('UPDATE users SET username = ?, nama_lengkap = ?, role = ?, isPML = ? WHERE id = ?', [username, namaLengkap, role, isPML || false, id]);
     }
     return { ...user, password: '' };
 };
