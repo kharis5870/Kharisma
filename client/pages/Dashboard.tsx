@@ -23,6 +23,7 @@ import { format, isPast, parseISO } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
 import { useAuth } from "@/contexts/AuthContext";
 
+type EditableProgressKey = 'progressSubmit' | 'progressDiperiksa' | 'progressApproved';
 // --- Tipe Data Frontend ---
 type PPLWithProgress = PPL & {
   progressOpen: number;
@@ -218,34 +219,58 @@ export default function Dashboard() {
 
   const handleOpenUpdateModal = (activity: KegiatanWithDynamicStatus) => { setLocalPplProgress(JSON.parse(JSON.stringify(activity.ppl || []))); setUpdateModalActivity(activity); };
 
-  const handleUpdatePPL = (pplId: number, field: keyof PPLWithProgress, value: string) => {
-    setLocalPplProgress(prev =>
-        prev.map(p => {
-            if (p.id === pplId) {
-                const newValue = parseInt(value) || 0;
-                const totalBebanKerja = parseInt(p.bebanKerja, 10) || 0;
+  const handleUpdatePPL = (pplId: number, field: EditableProgressKey, value: string) => {
+    setLocalPplProgress(prev =>
+        prev.map(p => {
+            if (p.id !== pplId) return p;
 
-                const updatedPpl = { ...p, [field]: newValue };
-                const { progressSubmit, progressDiperiksa, progressApproved } = updatedPpl;
+            const originalPpl = { ...p };
+            const updatedPpl = { ...p };
 
-                if (progressSubmit + progressDiperiksa + progressApproved > totalBebanKerja) {
-                    setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Jumlah 'Submit', 'Diperiksa', dan 'Approved' tidak boleh melebihi total beban kerja." });
-                    return p;
-                }
+            const newValue = parseInt(value, 10);
+            if (isNaN(newValue) || newValue < 0) {
+                return originalPpl;
+            }
 
-                updatedPpl.progressOpen = totalBebanKerja - (progressSubmit + progressDiperiksa + progressApproved);
+            const oldValue = originalPpl[field];
+            const delta = newValue - oldValue;
 
-                if (updatedPpl.progressOpen < 0) {
-                     setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Nilai open tidak boleh negatif. Periksa kembali input Anda." });
-                     return p;
-                }
-                
-                return updatedPpl;
+            if (delta === 0) return originalPpl;
+
+            let sourceField: 'progressOpen' | 'progressSubmit' | 'progressDiperiksa' | null = null;
+            
+            if (field === 'progressSubmit')    sourceField = 'progressOpen';
+            else if (field === 'progressDiperiksa') sourceField = 'progressSubmit';
+            else if (field === 'progressApproved')  sourceField = 'progressDiperiksa';
+            
+            updatedPpl[field] = newValue;
+
+            if (delta > 0) {
+                // --- Logika MENAMBAH progress ---
+                if (!sourceField || updatedPpl[sourceField] < delta) {
+                    setAlertModal({ isOpen: true, title: "Aksi Gagal", message: `Progress di tahap sebelumnya tidak mencukupi untuk dipindahkan.` });
+                    return originalPpl;
+                }
+                updatedPpl[sourceField] -= delta;
+            } else {
+                // --- Logika MENGURANGI progress ---
+                if (sourceField) {
+                    updatedPpl[sourceField] += Math.abs(delta);
+                }
+            }
+
+            // Validasi akhir untuk memastikan tidak ada nilai negatif
+            const totalProgress = updatedPpl.progressSubmit + updatedPpl.progressDiperiksa + updatedPpl.progressApproved;
+            const totalBeban = parseInt(updatedPpl.bebanKerja, 10) || 0;
+            if (totalProgress > totalBeban) {
+                setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Total progress tidak boleh melebihi total beban kerja." });
+                return originalPpl;
             }
-            return p;
-        })
-    );
-  };
+
+            return updatedPpl;
+        })
+    );
+  };
 
   const handleSaveProgress = () => {
     localPplProgress.forEach(ppl => {
@@ -332,7 +357,12 @@ export default function Dashboard() {
                         {['submit', 'diperiksa', 'approved'].map(field => (
                             <div key={field} className="text-center">
                                 <Label className="text-xs text-gray-600 capitalize">{field}</Label>
-                                <Input type="number" min="0" value={(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]} onChange={e => handleUpdatePPL(ppl.id!, `progress${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof PPLWithProgress, e.target.value)} className="mt-1 text-center" />
+                                <Input 
+    type="number" min="0" 
+    value={(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]} 
+    onChange={e => handleUpdatePPL(ppl.id!, `progress${field.charAt(0).toUpperCase() + field.slice(1)}` as EditableProgressKey, e.target.value)} 
+    className="mt-1 text-center" 
+/>
                             </div>
                         ))}
                     </div>
