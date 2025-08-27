@@ -1,6 +1,6 @@
 // client/pages/InputKegiatan.tsx
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -46,8 +46,8 @@ const createActivity = async (data: any) => {
     const sanitizedPplAllocations = data.pplAllocations.map((ppl: any) => ({
         ...ppl,
         besaranHonor: parseHonor(ppl.besaranHonor),
-        satuanBebanKerja: data.honorarium[ppl.tahap].satuanBebanKerja,
-        hargaSatuan: parseHonor(data.honorarium[ppl.tahap].hargaSatuan),
+        satuanBebanKerja: data.honorarium[ppl.tahap as keyof typeof data.honorarium].satuanBebanKerja,
+        hargaSatuan: parseHonor(data.honorarium[ppl.tahap as keyof typeof data.honorarium].hargaSatuan),
     }));
 
     const sanitizedData = {
@@ -86,28 +86,24 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
     const [namaPML, setNamaPML] = useState(ppl.namaPML);
     const [isComboboxOpen, setIsComboboxOpen] = useState(false);
     
-    // Ambil data honorarium dari store
-    const honorariumTahap = useInputKegiatanStore(state => state.honorarium[ppl.tahap]);
+    const honorariumTahap = useInputKegiatanStore(state => state.honorarium[ppl.tahap as keyof typeof state.honorarium]);
 
-    // Sinkronisasi state lokal jika prop dari store berubah
     useEffect(() => {
         setBebanKerja(ppl.bebanKerja);
         setNamaPML(ppl.namaPML);
     }, [ppl.bebanKerja, ppl.namaPML]);
 
-    // Kalkulasi honor secara dinamis berdasarkan state lokal dan store
     const totalHonor = useMemo(() => {
-        const beban = parseInt(bebanKerja) || 0;
+        const beban = parseInt(String(bebanKerja)) || 0;
         const harga = parseInt(parseHonor(honorariumTahap.hargaSatuan)) || 0;
         return (beban * harga).toString();
     }, [bebanKerja, honorariumTahap.hargaSatuan]);
-
+    
     const handleBebanKerjaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setBebanKerja(e.target.value);
     };
 
     const handleBebanKerjaBlur = () => {
-        // Hanya update store saat onBlur jika nilainya berubah
         if (bebanKerja !== ppl.bebanKerja) {
             store.getState().updatePPL(ppl.id, 'bebanKerja', bebanKerja);
         }
@@ -123,7 +119,6 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
         }
     };
 
-    // Update honor di store setiap kali hasil kalkulasi berubah
     useEffect(() => {
         if (ppl.besaranHonor !== totalHonor) {
             store.getState().updatePPL(ppl.id, 'besaranHonor', totalHonor);
@@ -140,10 +135,10 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="space-y-2 lg:col-span-2">
-                    <Label>Pilih PPL *</Label>
+                    <Label htmlFor={`ppl-select-${ppl.id}`}>Pilih PPL *</Label>
                     <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
                         <PopoverTrigger asChild>
-                            <Button variant="outline" role="combobox" className="w-full justify-between">
+                            <Button id={`ppl-select-${ppl.id}`} variant="outline" role="combobox" className="w-full justify-between">
                                 {ppl.namaPPL || "Pilih PPL..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -180,6 +175,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
                     <Label htmlFor={`bebanKerja-${ppl.id}`}>Jumlah Beban Kerja *</Label>
                     <Input 
                         id={`bebanKerja-${ppl.id}`}
+                        name={`bebanKerja-${ppl.id}`}
                         placeholder="Contoh: 12" 
                         value={bebanKerja} 
                         onChange={handleBebanKerjaChange}
@@ -188,8 +184,10 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label>Total Honor (Rp) *</Label>
+                    <Label htmlFor={`besaranHonor-${ppl.id}`}>Total Honor (Rp) *</Label>
                     <Input 
+                        id={`besaranHonor-${ppl.id}`}
+                        name={`besaranHonor-${ppl.id}`}
                         value={formatHonor(ppl.besaranHonor)} 
                         readOnly 
                         className="bg-gray-100" 
@@ -199,6 +197,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
                     <Label htmlFor={`namaPML-${ppl.id}`}>Nama PML *</Label>
                     <Input 
                         id={`namaPML-${ppl.id}`}
+                        name={`namaPML-${ppl.id}`}
                         placeholder="Nama PML" 
                         value={namaPML} 
                         onChange={handleNamaPMLChange}
@@ -329,8 +328,10 @@ export default function InputKegiatan() {
                     <h4 className="font-medium text-gray-800">Pengaturan Honorarium Tahap Persiapan</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label>Satuan Beban Kerja</Label>
+                            <Label htmlFor="satuanBebanKerja">Satuan Beban Kerja</Label>
                             <Input 
+                                id="satuanBebanKerja"
+                                name="satuanBebanKerja"
                                 placeholder="Contoh: Dokumen, Responden" 
                                 value={localSatuan} 
                                 onChange={e => setLocalSatuan(e.target.value)}
@@ -338,8 +339,10 @@ export default function InputKegiatan() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>Harga per Satuan (Rp)</Label>
+                            <Label htmlFor="hargaSatuan">Harga per Satuan (Rp)</Label>
                             <Input 
+                                id="hargaSatuan"
+                                name="hargaSatuan"
                                 placeholder="Contoh: 50.000" 
                                 value={localHarga} 
                                 onChange={e => setLocalHarga(formatHonor(e.target.value))}
@@ -451,7 +454,7 @@ export default function InputKegiatan() {
                         <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={store.namaKegiatan} onChange={(e) => store.updateFormField('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2020" /></div>
                         <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
                             <Select value={store.ketua_tim_id} onValueChange={(value) => store.updateFormField('ketua_tim_id', value)}>
-                                <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
+                                <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
                                 <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
                             </Select>
                         </div>

@@ -91,9 +91,8 @@ const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Prom
     const sanitizedPpl = kegiatan.ppl?.map(({ clientId, namaPPL, besaranHonor, ...rest }) => ({
         ...rest,
         besaranHonor: parseHonor(besaranHonor),
-        // Tambahkan kembali properti honor per PPL untuk dikirim ke backend
-        satuanBebanKerja: kegiatan.honorarium?.[rest.tahap]?.satuanBebanKerja || '',
-        hargaSatuan: parseHonor(kegiatan.honorarium?.[rest.tahap]?.hargaSatuan || '0'),
+        satuanBebanKerja: kegiatan.honorarium?.[rest.tahap as keyof typeof kegiatan.honorarium]?.satuanBebanKerja || '',
+        hargaSatuan: parseHonor(kegiatan.honorarium?.[rest.tahap as keyof typeof kegiatan.honorarium]?.hargaSatuan || '0'),
     }));
 
     const sanitizedData = {
@@ -122,12 +121,20 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
         setNamaPML(ppl.namaPML);
     }, [ppl.bebanKerja, ppl.namaPML]);
 
+    const totalHonor = useMemo(() => {
+        const beban = parseInt(String(bebanKerja)) || 0;
+        const harga = parseInt(parseHonor(honorariumTahap.hargaSatuan)) || 0;
+        return (beban * harga).toString();
+    }, [bebanKerja, honorariumTahap.hargaSatuan]);
+
     const handleBebanKerjaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setBebanKerja(e.target.value);
     };
 
     const handleBebanKerjaBlur = () => {
-        onUpdate(ppl.clientId, 'bebanKerja', bebanKerja);
+        if (bebanKerja !== ppl.bebanKerja) {
+            onUpdate(ppl.clientId, 'bebanKerja', bebanKerja);
+        }
     };
     
     const handleNamaPMLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,15 +142,11 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
     };
 
     const handleNamaPMLBlur = () => {
-        onUpdate(ppl.clientId, 'namaPML', namaPML);
+        if (namaPML !== ppl.namaPML) {
+            onUpdate(ppl.clientId, 'namaPML', namaPML);
+        }
     };
-
-    const totalHonor = useMemo(() => {
-        const beban = parseInt(bebanKerja) || 0;
-        const harga = parseInt(parseHonor(honorariumTahap.hargaSatuan)) || 0;
-        return (beban * harga).toString();
-    }, [bebanKerja, honorariumTahap.hargaSatuan]);
-
+    
     useEffect(() => {
       if (ppl.besaranHonor !== totalHonor) {
         onUpdate(ppl.clientId, 'besaranHonor', totalHonor);
@@ -160,10 +163,10 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="space-y-2 lg:col-span-2">
-                    <Label>Pilih PPL *</Label>
+                    <Label htmlFor={`ppl-select-${ppl.clientId}`}>Pilih PPL *</Label>
                      <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
                         <PopoverTrigger asChild>
-                            <Button variant="outline" role="combobox" className="w-full justify-between">
+                            <Button id={`ppl-select-${ppl.clientId}`} variant="outline" role="combobox" className="w-full justify-between">
                                 {ppl.namaPPL || "Pilih PPL..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -200,6 +203,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
                     <Label htmlFor={`bebanKerja-${ppl.clientId}`}>Jumlah Beban Kerja *</Label>
                     <Input 
                         id={`bebanKerja-${ppl.clientId}`}
+                        name={`bebanKerja-${ppl.clientId}`}
                         placeholder="Contoh: 12" 
                         value={bebanKerja}
                         onChange={handleBebanKerjaChange}
@@ -208,13 +212,14 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label>Total Honor (Rp) *</Label>
-                    <Input value={formatHonor(totalHonor)} readOnly className="bg-gray-100"/>
+                    <Label htmlFor={`besaranHonor-${ppl.clientId}`}>Total Honor (Rp) *</Label>
+                    <Input id={`besaranHonor-${ppl.clientId}`} name={`besaranHonor-${ppl.clientId}`} value={formatHonor(totalHonor)} readOnly className="bg-gray-100"/>
                 </div>
                 <div className="space-y-2 lg:col-span-5">
                     <Label htmlFor={`namaPML-${ppl.clientId}`}>Nama PML *</Label>
                     <Input 
                         id={`namaPML-${ppl.clientId}`}
+                        name={`namaPML-${ppl.clientId}`}
                         placeholder="Nama PML" 
                         value={namaPML} 
                         onChange={handleNamaPMLChange}
@@ -456,8 +461,10 @@ export default function EditActivity() {
                         <h4 className="font-medium text-gray-800">Pengaturan Honorarium Tahap {titleCase(tahap)}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Satuan Beban Kerja</Label>
+                                <Label htmlFor={`satuanBebanKerja-${tahap}`}>Satuan Beban Kerja</Label>
                                 <Input 
+                                    id={`satuanBebanKerja-${tahap}`}
+                                    name={`satuanBebanKerja-${tahap}`}
                                     placeholder="Contoh: Dokumen" 
                                     value={localSatuan} 
                                     onChange={e => setLocalSatuan(e.target.value)} 
@@ -465,8 +472,10 @@ export default function EditActivity() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Harga per Satuan (Rp)</Label>
+                                <Label htmlFor={`hargaSatuan-${tahap}`}>Harga per Satuan (Rp)</Label>
                                 <Input 
+                                    id={`hargaSatuan-${tahap}`}
+                                    name={`hargaSatuan-${tahap}`}
                                     placeholder="Contoh: 50.000" 
                                     value={localHarga} 
                                     onChange={e => setLocalHarga(formatHonor(e.target.value))} 
@@ -567,7 +576,7 @@ export default function EditActivity() {
                                 <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" /></div>
                                 <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
                                     <Select value={formData.ketua_tim_id} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
-                                        <SelectTrigger><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
+                                        <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
                                         <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
                                     </Select>
                                 </div>
