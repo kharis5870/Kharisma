@@ -443,9 +443,57 @@ useEffect(() => {
         successModalConfig.action();
     };
 
+    const validateDates = (data: Partial<FormState>): boolean => {
+        const {
+            tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
+            tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
+            tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
+            tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi
+        } = data;
+
+        if (!tanggalMulaiPersiapan || !tanggalSelesaiPersiapan || !tanggalMulaiPengumpulanData || !tanggalSelesaiPengumpulanData || !tanggalMulaiPengolahanAnalisis || !tanggalSelesaiPengolahanAnalisis || !tanggalMulaiDiseminasiEvaluasi || !tanggalSelesaiDiseminasiEvaluasi) {
+            setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Semua field jadwal kegiatan wajib diisi." });
+            return false;
+        }
+
+        // Validasi urutan tanggal
+    if (tanggalSelesaiPersiapan < tanggalMulaiPersiapan) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Persiapan harus setelah atau sama dengan Tanggal Mulai Persiapan." });
+        return false;
+    }
+    if (tanggalMulaiPengumpulanData < tanggalMulaiPersiapan) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Pengumpulan Data harus setelah atau sama dengan Tanggal Mulai Persiapan." });
+        return false;
+    }
+    if (tanggalSelesaiPengumpulanData < tanggalMulaiPengumpulanData) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Pengumpulan Data harus setelah atau sama dengan Tanggal Mulai Pengumpulan Data." });
+        return false;
+    }
+    if (tanggalMulaiPengolahanAnalisis < tanggalMulaiPengumpulanData) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Pengolahan & Analisis harus setelah atau sama dengan Tanggal Mulai Pengumpulan Data." });
+        return false;
+    }
+    if (tanggalSelesaiPengolahanAnalisis < tanggalMulaiPengolahanAnalisis) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Pengolahan & Analisis harus setelah atau sama dengan Tanggal Mulai Pengolahan & Analisis." });
+        return false;
+    }
+    if (tanggalMulaiDiseminasiEvaluasi < tanggalMulaiPengolahanAnalisis) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Diseminasi & Evaluasi harus setelah atau sama dengan Tanggal Mulai Pengolahan & Analisis." });
+        return false;
+    }
+    if (tanggalSelesaiDiseminasiEvaluasi < tanggalMulaiDiseminasiEvaluasi) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Diseminasi & Evaluasi harus setelah atau sama dengan Tanggal Mulai Diseminasi & Evaluasi." });
+        return false;
+    }
+        return true;
+    };
+
     const handleSubmit = () => {
         if (!formData.id) {
             alert("Error: ID Kegiatan tidak ditemukan.");
+            return;
+        }
+         if (!validateDates(formData)) { // <-- PANGGIL FUNGSI VALIDASI DI SINI
             return;
         }
         const dataToSubmit = {

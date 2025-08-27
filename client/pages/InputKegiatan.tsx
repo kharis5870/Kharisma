@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore, { PPLItem, DocumentItem } from "@/stores/useInputKegiatanStore"; // <-- Impor PPLItem di sini
 import { PPLMaster, KetuaTim, PPL, Kegiatan } from "@shared/api";
 import { useAuth } from "@/contexts/AuthContext";
+import AlertModal from "@/components/AlertModal";
 
 type DateFieldName =
   | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
@@ -211,12 +212,14 @@ export default function InputKegiatan() {
   const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
   const [addedPPLCount, setAddedPPLCount] = useState(0);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi' | null}>({isOpen: false, tahap: null});
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
   const [topLevelTab, setTopLevelTab] = useState("alokasi-ppl");
   const [stageTab, setStageTab] = useState("info-dasar");
 
   const store = useInputKegiatanStore();
 
   useEffect(() => {
+    // Jalankan hanya jika ada PPL yang baru dipilih
     if (selectedPPLsForActivity.length > 0) {
         const tahap = "persiapan" as const;
         
@@ -230,11 +233,15 @@ export default function InputKegiatan() {
             tahap: tahap
         }));
 
-        const currentPpls = useInputKegiatanStore.getState().pplAllocations;
+        // Ambil state PPL saat ini dari store
+        const currentPpls = store.pplAllocations;
+        
+        // Filter PPL baru untuk menghindari duplikasi
         const newPplsToAdd = newAllocations.filter(np => 
             !currentPpls.some((ep: PPLItem) => ep.ppl_master_id === np.ppl_master_id && ep.tahap === tahap)
         );
 
+        // Hanya update state jika ada PPL baru yang akan ditambahkan
         if (newPplsToAdd.length > 0) {
             store.setPplAllocations([...currentPpls, ...newPplsToAdd]);
             setAddedPPLCount(newPplsToAdd.length);
@@ -242,13 +249,15 @@ export default function InputKegiatan() {
             setTimeout(() => setShowAutoPopulateMessage(false), 5000);
         }
         
+        // Atur tab aktif ke lokasi yang benar
         setStageTab(tahap);
         setTopLevelTab('alokasi-ppl');
         
+        // Bersihkan PPL yang dipilih dari context agar useEffect tidak berjalan lagi
         clearSelectedPPLsForActivity();
     }
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [selectedPPLsForActivity, clearSelectedPPLsForActivity]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPPLsForActivity]);
 
 
   const mutation = useMutation({
@@ -261,34 +270,95 @@ export default function InputKegiatan() {
     },
   });
 
+  const isFormIncomplete = (): boolean => {
+    const {
+        namaKegiatan, ketua_tim_id,
+        tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
+        tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
+        tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
+        tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi
+    } = store;
+
+    return !namaKegiatan || !ketua_tim_id || !tanggalMulaiPersiapan || !tanggalSelesaiPersiapan || !tanggalMulaiPengumpulanData || !tanggalSelesaiPengumpulanData || !tanggalMulaiPengolahanAnalisis || !tanggalSelesaiPengolahanAnalisis || !tanggalMulaiDiseminasiEvaluasi || !tanggalSelesaiDiseminasiEvaluasi;
+  };
+
   const validateForm = () => {
-    return store.namaKegiatan && store.ketua_tim_id && 
-           store.tanggalMulaiPersiapan && store.tanggalSelesaiPersiapan &&
-           store.tanggalMulaiPengumpulanData && store.tanggalSelesaiPengumpulanData &&
-           store.tanggalMulaiPengolahanAnalisis && store.tanggalSelesaiPengolahanAnalisis &&
-           store.tanggalMulaiDiseminasiEvaluasi && store.tanggalSelesaiDiseminasiEvaluasi &&
-           store.pplAllocations.filter(p=>p.tahap === 'persiapan').every(ppl => ppl.ppl_master_id && ppl.bebanKerja && ppl.namaPML);
+    const {
+        namaKegiatan, ketua_tim_id, pplAllocations,
+        tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
+        tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
+        tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
+        tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi
+    } = store;
+
+    // Validasi field wajib
+    if (!namaKegiatan || !ketua_tim_id || !tanggalMulaiPersiapan || !tanggalSelesaiPersiapan || !tanggalMulaiPengumpulanData || !tanggalSelesaiPengumpulanData || !tanggalMulaiPengolahanAnalisis || !tanggalSelesaiPengolahanAnalisis || !tanggalMulaiDiseminasiEvaluasi || !tanggalSelesaiDiseminasiEvaluasi) {
+        setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Harap lengkapi semua field jadwal yang bertanda *." });
+        return false;
+    }
+    
+    // Validasi urutan tanggal
+    if (tanggalSelesaiPersiapan < tanggalMulaiPersiapan) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Persiapan harus setelah atau sama dengan Tanggal Mulai Persiapan." });
+        return false;
+    }
+    if (tanggalMulaiPengumpulanData < tanggalMulaiPersiapan) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Pengumpulan Data harus setelah atau sama dengan Tanggal Mulai Persiapan." });
+        return false;
+    }
+    if (tanggalSelesaiPengumpulanData < tanggalMulaiPengumpulanData) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Pengumpulan Data harus setelah atau sama dengan Tanggal Mulai Pengumpulan Data." });
+        return false;
+    }
+    if (tanggalMulaiPengolahanAnalisis < tanggalMulaiPengumpulanData) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Pengolahan & Analisis harus setelah atau sama dengan Tanggal Mulai Pengumpulan Data." });
+        return false;
+    }
+    if (tanggalSelesaiPengolahanAnalisis < tanggalMulaiPengolahanAnalisis) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Pengolahan & Analisis harus setelah atau sama dengan Tanggal Mulai Pengolahan & Analisis." });
+        return false;
+    }
+    if (tanggalMulaiDiseminasiEvaluasi < tanggalMulaiPengolahanAnalisis) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Diseminasi & Evaluasi harus setelah atau sama dengan Tanggal Mulai Pengolahan & Analisis." });
+        return false;
+    }
+    if (tanggalSelesaiDiseminasiEvaluasi < tanggalMulaiDiseminasiEvaluasi) {
+        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Diseminasi & Evaluasi harus setelah atau sama dengan Tanggal Mulai Diseminasi & Evaluasi." });
+        return false;
+    }
+
+    // Validasi PPL
+    if (!pplAllocations.filter(p => p.tahap === 'persiapan').every(ppl => ppl.ppl_master_id && ppl.bebanKerja && ppl.namaPML)) {
+        setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Harap lengkapi semua data alokasi PPL di tahap persiapan." });
+        return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Panggil fungsi validasi lengkap di sini. Jika gagal, modal akan muncul dan proses berhenti.
     if (!validateForm()) {
-        alert("Harap lengkapi semua field bertanda *.");
         return;
     }
+    
     setLastActivityName(store.namaKegiatan);
-    mutation.mutate({
-        ...store,
-        username: user?.username,
-        tanggalMulaiPersiapan: format(store.tanggalMulaiPersiapan!, 'yyyy-MM-dd'),
-        tanggalSelesaiPersiapan: format(store.tanggalSelesaiPersiapan!, 'yyyy-MM-dd'),
-        tanggalMulaiPengumpulanData: format(store.tanggalMulaiPengumpulanData!, 'yyyy-MM-dd'),
-        tanggalSelesaiPengumpulanData: format(store.tanggalSelesaiPengumpulanData!, 'yyyy-MM-dd'),
-        tanggalMulaiPengolahanAnalisis: format(store.tanggalMulaiPengolahanAnalisis!, 'yyyy-MM-dd'),
-        tanggalSelesaiPengolahanAnalisis: format(store.tanggalSelesaiPengolahanAnalisis!, 'yyyy-MM-dd'),
-        tanggalMulaiDiseminasiEvaluasi: format(store.tanggalMulaiDiseminasiEvaluasi!, 'yyyy-MM-dd'),
-        tanggalSelesaiDiseminasiEvaluasi: format(store.tanggalSelesaiDiseminasiEvaluasi!, 'yyyy-MM-dd'),
-    });
+    const dataToSubmit = {
+      ...store,
+      ppl: store.pplAllocations,
+      dokumen: store.documents,
+      honorarium: store.honorarium,
+      tanggalMulaiPersiapan: store.tanggalMulaiPersiapan?.toISOString(),
+      tanggalSelesaiPersiapan: store.tanggalSelesaiPersiapan?.toISOString(),
+      tanggalMulaiPengumpulanData: store.tanggalMulaiPengumpulanData?.toISOString(),
+      tanggalSelesaiPengumpulanData: store.tanggalSelesaiPengumpulanData?.toISOString(),
+      tanggalMulaiPengolahanAnalisis: store.tanggalMulaiPengolahanAnalisis?.toISOString(),
+      tanggalSelesaiPengolahanAnalisis: store.tanggalSelesaiPengolahanAnalisis?.toISOString(),
+      tanggalMulaiDiseminasiEvaluasi: store.tanggalMulaiDiseminasiEvaluasi?.toISOString(),
+      tanggalSelesaiDiseminasiEvaluasi: store.tanggalSelesaiDiseminasiEvaluasi?.toISOString()
+    };
+    mutation.mutate(dataToSubmit);
   };
 
   const handleSuccessAction = () => {
@@ -561,9 +631,9 @@ export default function InputKegiatan() {
             </Tabs>
 
             <div className="flex justify-center mt-8">
-                <Button type="submit" size="lg" disabled={!validateForm() || mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700">
-                    {mutation.isPending ? "Menyimpan..." : "Simpan Kegiatan"}
-                </Button>
+                <Button type="submit" size="lg" disabled={isFormIncomplete() || mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700">
+    {mutation.isPending ? "Menyimpan..." : "Simpan Kegiatan"}
+</Button>
             </div>
         </form>
         <SuccessModal 
@@ -574,6 +644,7 @@ export default function InputKegiatan() {
             description={`Kegiatan "${lastActivityName}" telah berhasil dibuat.`} 
             actionLabel="Ke Dashboard" 
         />
+        <AlertModal isOpen={alertModal.isOpen} onClose={() => setAlertModal({ isOpen: false, title: "", message: "" })} title={alertModal.title} description={alertModal.message} />
       </div>
     </Layout>
   );
