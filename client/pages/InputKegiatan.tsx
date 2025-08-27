@@ -20,8 +20,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import useInputKegiatanStore, { PPLItem, DocumentItem } from "@/stores/useInputKegiatanStore"; // <-- Impor PPLItem di sini
-import { PPLMaster, KetuaTim, PPL, Kegiatan } from "@shared/api";
+import useInputKegiatanStore, { PPLItem, DocumentItem } from "@/stores/useInputKegiatanStore"; 
+import { PPLMaster, KetuaTim, PPL, Kegiatan, UserData } from "@shared/api";
 import { useAuth } from "@/contexts/AuthContext";
 import AlertModal from "@/components/AlertModal";
 
@@ -82,16 +82,21 @@ const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
     return res.json();
 };
 
+const fetchPMLs = async (): Promise<UserData[]> => {
+    const res = await fetch('/api/admin/pml');
+    if (!res.ok) throw new Error('Gagal memuat daftar PML');
+    return res.json();
+};
+
 // **Komponen PPL Item yang Dioptimalkan**
-const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: any) => {
+const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, pmlList, store }: any) => {
     const [bebanKerja, setBebanKerja] = useState(ppl.bebanKerja);
-    const [namaPML, setNamaPML] = useState(ppl.namaPML);
     const [isComboboxOpen, setIsComboboxOpen] = useState(false);
+    const [isPmlComboboxOpen, setIsPmlComboboxOpen] = useState(false);
     
     useEffect(() => {
         setBebanKerja(ppl.bebanKerja);
-        setNamaPML(ppl.namaPML);
-    }, [ppl.bebanKerja, ppl.namaPML]);
+    }, [ppl.bebanKerja]);
 
     const handleBebanKerjaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setBebanKerja(e.target.value);
@@ -100,16 +105,6 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
     const handleBebanKerjaBlur = () => {
         if (bebanKerja !== ppl.bebanKerja) {
             store.getState().updatePPL(ppl.id, 'bebanKerja', bebanKerja);
-        }
-    };
-    
-    const handleNamaPMLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setNamaPML(e.target.value);
-    };
-    
-    const handleNamaPMLBlur = () => {
-        if (namaPML !== ppl.namaPML) {
-            store.getState().updatePPL(ppl.id, 'namaPML', namaPML);
         }
     };
     
@@ -183,14 +178,39 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
                 </div>
                 <div className="space-y-2 lg:col-span-5">
                     <Label htmlFor={`namaPML-${ppl.id}`}>Nama PML *</Label>
-                    <Input 
-                        id={`namaPML-${ppl.id}`}
-                        name={`namaPML-${ppl.id}`}
-                        placeholder="Nama PML" 
-                        value={namaPML} 
-                        onChange={handleNamaPMLChange}
-                        onBlur={handleNamaPMLBlur}
-                    />
+                    <Popover open={isPmlComboboxOpen} onOpenChange={setIsPmlComboboxOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" className="w-full justify-between">
+                                {ppl.namaPML || "Pilih PML..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <Command>
+                                <CommandInput placeholder="Cari nama PML..." />
+                                <CommandList>
+                                    <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                        {pmlList.map((pml: UserData) => (
+                                            <CommandItem
+                                                key={pml.id}
+                                                value={`${pml.id} ${pml.namaLengkap}`}
+                                                onSelect={() => {
+                                                    store.getState().updatePPL(ppl.id, 'namaPML', pml.namaLengkap);
+                                                    setIsPmlComboboxOpen(false);
+                                                }}>
+                                                <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
+                                                <div className="flex flex-col">
+                                                    <span>{pml.namaLengkap}</span>
+                                                    <span className="text-xs text-gray-500">ID: {pml.id}</span>
+                                                </div>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                 </div>
             </div>
         </div>
@@ -204,6 +224,7 @@ export default function InputKegiatan() {
   const { selectedPPLsForActivity, clearSelectedPPLsForActivity } = usePPL();
   const { data: pplList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
   const { data: ketuaTimList = [] } = useQuery({ queryKey: ['ketuaTim'], queryFn: fetchKetuaTim });
+  const { data: pmlList = [] } = useQuery({ queryKey: ['pmls'], queryFn: fetchPMLs });
   
   const [activeTab, setActiveTab] = useState("info-dasar");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -466,6 +487,7 @@ export default function InputKegiatan() {
                             index={index}
                             onRemove={() => removePPL(ppl.id)}
                             pplList={pplList}
+                            pmlList={pmlList}
                             store={useInputKegiatanStore}
                         />
                     ))}
