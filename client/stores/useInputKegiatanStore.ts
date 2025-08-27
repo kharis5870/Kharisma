@@ -16,7 +16,7 @@ export interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId' | 'namaPPL' | 'sa
   namaPPL: string;
 }
 
-interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'uploadedAt'> {
+export interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'uploadedAt'> {
   id: string;
 }
 

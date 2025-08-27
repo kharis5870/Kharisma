@@ -587,10 +587,54 @@ useEffect(() => {
         );
     };
 
+    const DokumenItem = ({ doc, updateDocument, removeDocument }: { doc: ClientDokumen, updateDocument: (id: string, field: 'nama' | 'link', value: string) => void, removeDocument: (id: string) => void }) => {
+    const [nama, setNama] = useState(doc.nama);
+    const [link, setLink] = useState(doc.link);
+    const isApproved = doc.status === 'Approved';
+
+    const handleNamaBlur = () => {
+        if (nama !== doc.nama) {
+            updateDocument(doc.clientId, 'nama', nama);
+        }
+    };
+
+    const handleLinkBlur = () => {
+        if (link !== doc.link) {
+            updateDocument(doc.clientId, 'link', link);
+        }
+    };
+
+    useEffect(() => {
+        setNama(doc.nama);
+        setLink(doc.link);
+    }, [doc.nama, doc.link]);
+
+    return (
+        <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50 border-green-200" : (doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50"))}>
+            <div className="flex-grow space-y-2">
+                {doc.isWajib ? <Label className="font-semibold">{doc.nama} *</Label> : <Input placeholder="Nama Dokumen Pendukung" value={nama} onChange={(e) => setNama(e.target.value)} onBlur={handleNamaBlur} disabled={isApproved} />}
+                <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-gray-400"/><Input placeholder="https://drive.google.com/..." value={link} onChange={(e) => setLink(e.target.value)} onBlur={handleLinkBlur} disabled={isApproved} /></div>
+            </div>
+            {!doc.isWajib && !isApproved ? (<Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>) : (<div className="self-center p-2" title={isApproved ? "Dokumen Disetujui" : "Dokumen Wajib"}><Lock className="w-4 h-4 text-gray-400"/></div>)}
+        </div>
+    );
+};
+
     const DokumenContent = ({ tipe, title }: { tipe: Dokumen['tipe'], title: string }) => {
         const documents = useMemo(() => formData.dokumen?.filter(d => d.tipe === tipe && d.jenis !== 'catatan') || [], [formData.dokumen, tipe]);
         const note = useMemo(() => formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan'), [formData.dokumen, tipe]);
         const isNoteApproved = note?.status === 'Approved';
+
+        const updateDocument = (clientId: string, field: 'nama' | 'link', value: string) => {
+            setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.map(d => (d.clientId === clientId ? { ...d, [field]: value } : d)) }));
+        };
+        const removeDocument = (clientId: string) => {
+            setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) }));
+        };
+        const addDocument = (tipe: Dokumen['tipe']) => {
+            const newDoc: ClientDokumen = { clientId: `new-doc-${Date.now()}`, tipe, nama: "", link: "", jenis: 'link', isWajib: false };
+            setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
+        };
 
         return (
             <Card>
@@ -610,17 +654,9 @@ useEffect(() => {
                             <Button type="button" variant="ghost" size="icon" onClick={() => setNoteModal({ isOpen: true, tipe, content: note.link, isApproved: isNoteApproved })} className="self-center"><Notebook className="w-4 h-4 text-gray-500"/></Button>
                         </div>
                     )}
-                    {documents.map(doc => {
-                        const isApproved = doc.status === 'Approved';
-                        return (
-                         <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50 border-green-200" : (doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50"))}>
-                            <div className="flex-grow space-y-2">
-                                {doc.isWajib ? <Label className="font-semibold">{doc.nama} *</Label> : <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.clientId, 'nama', e.target.value)} disabled={isApproved} />}
-                                <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-gray-400"/><Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.clientId, 'link', e.target.value)} disabled={isApproved} /></div>
-                            </div>
-                            {!doc.isWajib && !isApproved ? (<Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>) : (<div className="self-center p-2" title={isApproved ? "Dokumen Disetujui" : "Dokumen Wajib"}><Lock className="w-4 h-4 text-gray-400"/></div>)}
-                        </div>
-                    )})}
+                    {documents.map(doc => (
+                        <DokumenItem key={doc.clientId} doc={doc} updateDocument={updateDocument} removeDocument={removeDocument} />
+                    ))}
                     {documents.length === 0 && !note && (<div className="text-center py-8 text-gray-500"><p>Belum ada dokumen atau catatan untuk fase ini.</p></div>)}
                 </CardContent>
             </Card>

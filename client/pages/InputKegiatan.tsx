@@ -20,7 +20,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import useInputKegiatanStore, { PPLItem } from "@/stores/useInputKegiatanStore"; // <-- Impor PPLItem di sini
+import useInputKegiatanStore, { PPLItem, DocumentItem } from "@/stores/useInputKegiatanStore"; // <-- Impor PPLItem di sini
 import { PPLMaster, KetuaTim, PPL, Kegiatan } from "@shared/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -415,40 +415,68 @@ export default function InputKegiatan() {
     );
   };
   
+  const DokumenItem = ({ doc, store }: { doc: DocumentItem, store: any }) => {
+    const [nama, setNama] = useState(doc.nama);
+    const [link, setLink] = useState(doc.link);
+
+    const handleNamaBlur = () => {
+        if (nama !== doc.nama) {
+            store.updateDocument(doc.id, 'nama', nama);
+        }
+    };
+
+    const handleLinkBlur = () => {
+        if (link !== doc.link) {
+            store.updateDocument(doc.id, 'link', link);
+        }
+    };
+    
+    // Sinkronisasi jika data dari store berubah (misalnya setelah reset)
+    useEffect(() => {
+        setNama(doc.nama);
+        setLink(doc.link);
+    }, [doc.nama, doc.link]);
+
+    return (
+        <div key={doc.id} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
+            <div className="flex-grow space-y-2">
+                {doc.isWajib ? (
+                    <Label className="font-semibold">{doc.nama}</Label>
+                ) : (
+                    <Input placeholder="Nama Dokumen Pendukung" value={nama} onChange={(e) => setNama(e.target.value)} onBlur={handleNamaBlur} />
+                )}
+                <div className="flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-gray-400"/>
+                    <Input placeholder="https://drive.google.com/..." value={link} onChange={(e) => setLink(e.target.value)} onBlur={handleLinkBlur} />
+                </div>
+            </div>
+            {!doc.isWajib ? (<Button type="button" variant="ghost" size="icon" onClick={() => store.removeDocument(doc.id)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>) : (<div className="self-center p-2" title="Dokumen Wajib"><Lock className="w-4 h-4 text-gray-400"/></div>)}
+        </div>
+    );
+};
+  
   const DokumenContent = ({ tipe, title }: { tipe: "persiapan" | "pengumpulan-data" | "pengolahan-analisis" | "diseminasi-evaluasi", title: string }) => {
-    const documents = store.documents.filter(d => d.tipe === tipe);
+    const documents = useInputKegiatanStore(state => state.documents.filter(d => d.tipe === tipe));
+    const storeActions = useInputKegiatanStore.getState();
     
     return (
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <CardTitle>Dokumen {title}</CardTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={() => store.addDocumentLink(tipe)} className="flex items-center gap-2"><Plus className="w-4 h-4" />Tambah Dokumen Pendukung</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => storeActions.addDocumentLink(tipe)} className="flex items-center gap-2"><Plus className="w-4 h-4" />Tambah Dokumen Pendukung</Button>
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
                 {documents.length === 0 ? (<div className="text-center py-8 text-gray-500"><p>Belum ada dokumen untuk fase ini.</p></div>) : (
                     documents.map(doc => (
-                         <div key={doc.id} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
-                            <div className="flex-grow space-y-2">
-                                {doc.isWajib ? (
-                                    <Label className="font-semibold">{doc.nama}</Label>
-                                ) : (
-                                    <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => store.updateDocument(doc.id, 'nama', e.target.value)} />
-                                )}
-                                <div className="flex items-center gap-2">
-                                    <Link2 className="w-4 h-4 text-gray-400"/>
-                                    <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => store.updateDocument(doc.id, 'link', e.target.value)} />
-                                </div>
-                            </div>
-                            {!doc.isWajib ? (<Button type="button" variant="ghost" size="icon" onClick={() => store.removeDocument(doc.id)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>) : (<div className="self-center p-2" title="Dokumen Wajib"><Lock className="w-4 h-4 text-gray-400"/></div>)}
-                        </div>
+                         <DokumenItem key={doc.id} doc={doc} store={storeActions} />
                     ))
                 )}
             </CardContent>
         </Card>
     );
-  };
+};
 
   const StageContent = ({ tipe, title }: { tipe: PPL['tahap'], title: string }) => {
     // Konten stage sekarang bergantung pada topLevelTab
