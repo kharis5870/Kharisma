@@ -1,9 +1,10 @@
 // client/pages/EditActivity.tsx
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
+import ConfirmationModal from "@/components/ConfirmationModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook, FileText, Check, ChevronsUpDown, Users } from "lucide-react";
+import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook, FileText, Check, ChevronsUpDown, Users, XCircle } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format, parseISO, isValid } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -90,7 +91,7 @@ const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
 const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Promise<Kegiatan> => {
     const sanitizedPpl = kegiatan.ppl?.map(({ clientId, namaPPL, besaranHonor, ...rest }) => ({
         ...rest,
-        besaranHonor: parseHonor(besaranHonor),
+        besaranHonor: parseHonor(besaranHonor as string),
         satuanBebanKerja: kegiatan.honorarium?.[rest.tahap as keyof typeof kegiatan.honorarium]?.satuanBebanKerja || '',
         hargaSatuan: parseHonor(kegiatan.honorarium?.[rest.tahap as keyof typeof kegiatan.honorarium]?.hargaSatuan || '0'),
     }));
@@ -111,7 +112,7 @@ const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Prom
 }
 
 // **Komponen PPL Item yang Dioptimalkan untuk Edit**
-const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList, honorariumTahap }: any) => {
+const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList }: any) => {
     const [bebanKerja, setBebanKerja] = useState(ppl.bebanKerja);
     const [namaPML, setNamaPML] = useState(ppl.namaPML);
     const [isComboboxOpen, setIsComboboxOpen] = useState(false);
@@ -211,7 +212,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
                         placeholder="Nama PML" 
                         value={namaPML} 
                         onChange={handleNamaPMLChange}
-                        onBlur={handleBebanKerjaBlur}
+                        onBlur={handleNamaPMLBlur}
                     />
                 </div>
             </div>
@@ -224,11 +225,15 @@ export default function EditActivity() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const queryClient = useQueryClient();
+    const location = useLocation();
     const [activeTab, setActiveTab] = useState("info-dasar");
     const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [successModalConfig, setSuccessModalConfig] = useState({ title: "", description: "", action: () => {} });
     const [noteModal, setNoteModal] = useState<{ isOpen: boolean; tipe: Dokumen['tipe'] | null; content: string; isApproved: boolean }>({ isOpen: false, tipe: null, content: '', isApproved: false });
     const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
+    const [notification, setNotification] = useState<string | null>(null);
+    const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: Tahap | null}>({isOpen: false, tahap: null});
 
     const { data: initialData, isLoading, isError } = useQuery({
         queryKey: ['kegiatan', id],
@@ -275,17 +280,60 @@ export default function EditActivity() {
                 tanggalSelesaiPengolahanAnalisis: parseDate(initialData.tanggalSelesaiPengolahanAnalisis),
                 tanggalMulaiDiseminasiEvaluasi: parseDate(initialData.tanggalMulaiDiseminasiEvaluasi),
                 tanggalSelesaiDiseminasiEvaluasi: parseDate(initialData.tanggalSelesaiDiseminasiEvaluasi),
-                dokumen: initialData.dokumen.map((d, i) => ({...d, clientId: d.id?.toString() || `doc-${Date.now()}-${i}` })),
+                dokumen: initialData.dokumen.map((d: Dokumen, i) => ({...d, clientId: d.id?.toString() || `doc-${Date.now()}-${i}` })),
                 ppl: initialData.ppl.map((p, i) => ({...p, clientId: p.id?.toString() || `ppl-${Date.now()}-${i}` }))
             });
+
+            if (location.state?.from === 'create') {
+                setActiveTab(location.state.tahap);
+            }
         }
-    }, [initialData]);
+    }, [initialData, location.state]);
+
+    useEffect(() => {
+        if (location.state?.newPpls && location.state?.tahap) {
+            const { newPpls, tahap } = location.state;
+            const existingPplIds = formData.ppl?.filter(p => p.tahap === tahap).map(p => p.ppl_master_id) || [];
+            
+            const pplsToAdd = newPpls.filter((ppl: PPLMaster) => !existingPplIds.includes(ppl.id));
+            const duplicates = newPpls.filter((ppl: PPLMaster) => existingPplIds.includes(ppl.id));
+
+            if (duplicates.length > 0) {
+                setAlertModal({ isOpen: true, title: "PPL Sudah Ada", message: `PPL berikut sudah dialokasikan pada tahap ini: ${duplicates.map((d: PPLMaster) => d.namaPPL).join(', ')}.` });
+            }
+
+            if (pplsToAdd.length > 0) {
+                const newAllocations: ClientPPL[] = pplsToAdd.map((ppl: PPLMaster) => ({
+                    clientId: `new-ppl-${Date.now()}-${ppl.id}`,
+                    ppl_master_id: ppl.id,
+                    namaPPL: ppl.namaPPL,
+                    namaPML: "",
+                    bebanKerja: "",
+                    besaranHonor: "0",
+                    tahap: tahap,
+                }));
+    
+                setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), ...newAllocations] }));
+                setNotification(`${pplsToAdd.length} PPL berhasil ditambahkan ke tahap ${tahap.replace(/-/g, ' ')}.`);
+                setTimeout(() => setNotification(null), 5000);
+                setActiveTab(tahap);
+            }
+
+            navigate(location.pathname, { replace: true, state: {} }); // Hapus state setelah digunakan
+        }
+    }, [location.state, formData.ppl, navigate]);
+
 
     const mutation = useMutation({
         mutationFn: updateActivity,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['kegiatan', id] });
             queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
+            setSuccessModalConfig({
+                title: "Kegiatan Berhasil Diperbarui!",
+                description: `Perubahan untuk "${formData.namaKegiatan}" telah disimpan.`,
+                action: () => navigate('/dashboard')
+            });
             setShowSuccessModal(true);
         },
         onError: (error) => {
@@ -357,10 +405,10 @@ export default function EditActivity() {
         });
     };
 
-    const updatePPL = useCallback((clientId: string, field: keyof PPL, value: string) => {
+    const updatePPL = useCallback((clientId: string, field: keyof PPL, value: string | number) => {
         setFormData(prev => {
             if (!prev.ppl) return prev;
-
+    
             const newPplList = prev.ppl.map(p => {
                 if (p.clientId === clientId) {
                     const updatedPpl = { ...p, [field]: value };
@@ -376,8 +424,13 @@ export default function EditActivity() {
             return { ...prev, ppl: newPplList };
         });
     }, []);
+    
 
-    const handleSuccessAction = () => navigate('/dashboard');
+    const handleSuccessAction = () => {
+        setShowSuccessModal(false);
+        successModalConfig.action();
+    };
+
     const handleSubmit = () => {
         if (!formData.id) {
             alert("Error: ID Kegiatan tidak ditemukan.");
@@ -436,13 +489,33 @@ export default function EditActivity() {
             }
         };
 
+        const handleClearPPLs = () => {
+            setFormData(prev => ({ ...prev, ppl: prev.ppl?.filter(p => p.tahap !== tahap)}));
+            setShowClearConfirmModal({isOpen: false, tahap: null});
+        }
+
         if (!honorariumTahap) return <div>Memuat...</div>;
 
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Alokasi PPL & PML</CardTitle>
-                    <CardDescription>Atur detail honorarium untuk tahap ini, lalu alokasikan PPL.</CardDescription>
+                     <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Alokasi PPL & PML</CardTitle>
+                            <CardDescription>Atur detail honorarium untuk tahap ini, lalu alokasikan PPL.</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {pplForStage.length > 0 && (
+                                <Button variant="destructive" size="sm" onClick={() => setShowClearConfirmModal({isOpen: true, tahap})}>
+                                    <XCircle className="w-4 h-4 mr-2" />
+                                    Clear PPL
+                                </Button>
+                            )}
+                            <Button variant="outline" size="sm" asChild>
+                                <Link to="/daftar-ppl" state={{ from: 'edit', kegiatanId: id, tahap: tahap, existingPplIds: pplForStage.map(p => p.ppl_master_id) }}><Users className="w-4 h-4 mr-2" />Pilih dari Daftar PPL</Link>
+                            </Button>
+                         </div>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                      <div className="p-4 border rounded-lg bg-blue-50/50 space-y-4">
@@ -488,6 +561,15 @@ export default function EditActivity() {
                         ))}
                         <Button type="button" variant="outline" onClick={() => addPPL(tahap)} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL</Button>
                     </div>
+                    <ConfirmationModal
+                        isOpen={showClearConfirmModal.isOpen && showClearConfirmModal.tahap === tahap}
+                        onClose={() => setShowClearConfirmModal({isOpen: false, tahap: null})}
+                        onConfirm={handleClearPPLs}
+                        title="Hapus Semua PPL?"
+                        description={`Anda akan menghapus semua (${pplForStage.length}) alokasi PPL di tahap ini. Aksi ini tidak dapat dibatalkan.`}
+                        confirmLabel="Ya, Hapus Semua"
+                        variant="danger"
+                    />
                 </CardContent>
             </Card>
         );
@@ -555,6 +637,11 @@ export default function EditActivity() {
                     <Button variant="outline" asChild><Link to={`/view-documents/${id}`}><FileText className="w-4 h-4 mr-2" />Lihat Dokumen</Link></Button>
                     <div className="ml-4"><h1 className="text-3xl font-bold">Edit Kegiatan</h1><p className="text-gray-600">Perbarui informasi dan kelola dokumen.</p></div>
                 </div>
+                {notification && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
+                        ✅ {notification}
+                    </div>
+                )}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                     <TabsList className="grid w-full grid-cols-5"><TabsTrigger value="info-dasar">Info Dasar</TabsTrigger><TabsTrigger value="persiapan">Persiapan</TabsTrigger><TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger><TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger><TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger></TabsList>
                     <TabsContent value="info-dasar" className="space-y-6">
@@ -591,7 +678,14 @@ export default function EditActivity() {
                 <div className="flex justify-center mt-8">
                     <Button onClick={handleSubmit} disabled={mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" size="lg"><Save className="w-4 h-4 mr-2" />{mutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
                 </div>
-                <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} onAction={handleSuccessAction} title="Kegiatan Berhasil Diperbarui!" description={`Perubahan untuk "${formData.namaKegiatan}" telah disimpan.`} actionLabel="Ke Dashboard" />
+                <SuccessModal 
+                    isOpen={showSuccessModal} 
+                    onClose={() => setShowSuccessModal(false)} 
+                    onAction={handleSuccessAction} 
+                    title={successModalConfig.title} 
+                    description={successModalConfig.description} 
+                    actionLabel="Ke Dashboard" 
+                />
             </div>
             <Dialog open={noteModal.isOpen} onOpenChange={(isOpen) => !isOpen && setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false })}>
                 <DialogContent><DialogHeader><DialogTitle>Tambah/Edit Catatan</DialogTitle><DialogDescription>Isi catatan untuk tahap ini. {noteModal.isApproved && "Catatan ini sudah disetujui dan tidak bisa diedit."}</DialogDescription></DialogHeader><Textarea value={noteModal.content} onChange={(e) => setNoteModal(prev => ({...prev, content: e.target.value}))} rows={8} placeholder="Tulis catatan di sini..." disabled={noteModal.isApproved} /><DialogFooter><Button variant="outline" onClick={() => setNoteModal({ isOpen: false, tipe: null, content: '', isApproved: false })}>Batal</Button><Button onClick={handleNoteSubmit} disabled={noteModal.isApproved}>Simpan Catatan</Button></DialogFooter></DialogContent>

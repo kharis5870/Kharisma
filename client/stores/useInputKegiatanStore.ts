@@ -4,7 +4,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Dokumen, PPL } from "@shared/api";
 
-// --- Tipe Data Frontend ---
 type Tahap = 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi';
 
 interface HonorariumTahap {
@@ -12,10 +11,9 @@ interface HonorariumTahap {
   hargaSatuan: string;
 }
 
-// PPLItem sekarang lebih ramping
 interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId' | 'namaPPL' | 'satuanBebanKerja' | 'hargaSatuan'> {
-  id: string; // ID unik untuk state di frontend
-  namaPPL: string; // Nama tetap disimpan untuk UI
+  id: string;
+  namaPPL: string;
 }
 
 interface DocumentItem extends Omit<Dokumen, 'id' | 'kegiatanId' | 'status' | 'uploadedAt'> {
@@ -29,9 +27,7 @@ export type State = {
   adaListing: boolean;
   pplAllocations: PPLItem[];
   documents: DocumentItem[];
-  honorarium: Record<Tahap, HonorariumTahap>; // State baru untuk honor per tahap
-
-  // Jadwal per tahapan
+  honorarium: Record<Tahap, HonorariumTahap>;
   tanggalMulaiPersiapan?: Date;
   tanggalSelesaiPersiapan?: Date;
   tanggalMulaiPengumpulanData?: Date;
@@ -54,6 +50,8 @@ export type Actions = {
   setPplAllocations: (allocations: PPLItem[]) => void;
   setDocuments: (documents: DocumentItem[]) => void;
   resetForm: () => void;
+  duplicatePersiapanToPengumpulanData: () => void;
+  clearPPLsByTahap: (tahap: Tahap) => void;
 };
 
 const mandatoryDocs: Omit<DocumentItem, 'id' | 'link'>[] = [
@@ -83,7 +81,7 @@ const initialHonorariumState: Record<Tahap, HonorariumTahap> = {
   'diseminasi-evaluasi': { satuanBebanKerja: '', hargaSatuan: '' },
 };
 
-const initialState: State = {
+export const initialState: State = {
   namaKegiatan: "",
   ketua_tim_id: undefined,
   deskripsiKegiatan: "",
@@ -103,7 +101,7 @@ const initialState: State = {
 
 const useInputKegiatanStore = create<State & Actions>()(
   persist(
-    (set, get): State & Actions => ({
+    (set): State & Actions => ({
       ...initialState,
       updateFormField: (field, value) => set({ [field as any]: value }),
       
@@ -113,7 +111,6 @@ const useInputKegiatanStore = create<State & Actions>()(
               [tahap]: { ...state.honorarium[tahap], [field]: value }
           };
 
-          // Recalculate honor for all PPLs in this stage
           const updatedPplAllocations = state.pplAllocations.map(ppl => {
               if (ppl.tahap === tahap) {
                   const bebanKerja = parseInt(ppl.bebanKerja) || 0;
@@ -175,6 +172,25 @@ const useInputKegiatanStore = create<State & Actions>()(
       setDocuments: (documents) => set({ documents }),
       
       resetForm: () => set(initialState),
+
+      duplicatePersiapanToPengumpulanData: () => set(state => {
+        const persiapanPpls = state.pplAllocations.filter(p => p.tahap === 'persiapan');
+        const pengumpulanDataPpls = persiapanPpls.map(ppl => ({
+          ...ppl,
+          id: `ppl-${ppl.ppl_master_id}-${Date.now()}`,
+          tahap: 'pengumpulan-data' as const,
+          bebanKerja: "",
+          besaranHonor: "0",
+          namaPML: "",
+        }));
+        return {
+          pplAllocations: [...state.pplAllocations, ...pengumpulanDataPpls]
+        };
+      }),
+      
+      clearPPLsByTahap: (tahap: Tahap) => set(state => ({
+        pplAllocations: state.pplAllocations.filter(p => p.tahap !== tahap)
+      }))
     }),
     {
       name: 'input-kegiatan-storage',

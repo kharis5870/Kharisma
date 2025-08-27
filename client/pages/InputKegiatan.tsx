@@ -1,9 +1,10 @@
 // client/pages/InputKegiatan.tsx
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
+import ConfirmationModal from "@/components/ConfirmationModal";
 import { usePPL } from "@/contexts/PPLContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,13 +15,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, Plus, Trash2, Link2, X, Lock, Check, ChevronsUpDown, Users } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Link2, X, Lock, Check, ChevronsUpDown, Users, XCircle } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore from "@/stores/useInputKegiatanStore";
-import { PPLMaster, KetuaTim, PPL } from "@shared/api";
+import { PPLMaster, KetuaTim, PPL, Kegiatan } from "@shared/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 type DateFieldName =
@@ -41,7 +42,7 @@ const formatHonor = (value: string | number): string => {
 const parseHonor = (value: string): string => String(value).replace(/\./g, '');
 
 // API functions
-const createActivity = async (data: any) => {
+const createActivity = async (data: any): Promise<Kegiatan> => {
     // Menyesuaikan data PPL untuk backend
     const sanitizedPplAllocations = data.pplAllocations.map((ppl: any) => ({
         ...ppl,
@@ -85,7 +86,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
     const [bebanKerja, setBebanKerja] = useState(ppl.bebanKerja);
     const [namaPML, setNamaPML] = useState(ppl.namaPML);
     const [isComboboxOpen, setIsComboboxOpen] = useState(false);
-
+    
     useEffect(() => {
         setBebanKerja(ppl.bebanKerja);
         setNamaPML(ppl.namaPML);
@@ -100,11 +101,11 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
             store.getState().updatePPL(ppl.id, 'bebanKerja', bebanKerja);
         }
     };
-
+    
     const handleNamaPMLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setNamaPML(e.target.value);
     };
-
+    
     const handleNamaPMLBlur = () => {
         if (namaPML !== ppl.namaPML) {
             store.getState().updatePPL(ppl.id, 'namaPML', namaPML);
@@ -205,7 +206,10 @@ export default function InputKegiatan() {
   
   const [activeTab, setActiveTab] = useState("info-dasar");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [newActivityId, setNewActivityId] = useState<number | null>(null);
   const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi' | null}>({isOpen: false, tahap: null});
+
 
   const store = useInputKegiatanStore();
 
@@ -220,7 +224,7 @@ export default function InputKegiatan() {
             namaPML: "",
             tahap: "persiapan" as const
         }));
-        store.setPplAllocations(newAllocations);
+        store.setPplAllocations([...store.pplAllocations, ...newAllocations]);
         setShowAutoPopulateMessage(true);
         setActiveTab("persiapan"); 
         setTimeout(() => setShowAutoPopulateMessage(false), 5000);
@@ -231,8 +235,10 @@ export default function InputKegiatan() {
 
   const mutation = useMutation({
     mutationFn: createActivity,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
+      store.duplicatePersiapanToPengumpulanData();
+      setNewActivityId(data.id);
       setShowSuccessModal(true);
       store.resetForm();
     },
@@ -244,7 +250,7 @@ export default function InputKegiatan() {
            store.tanggalMulaiPengumpulanData && store.tanggalSelesaiPengumpulanData &&
            store.tanggalMulaiPengolahanAnalisis && store.tanggalSelesaiPengolahanAnalisis &&
            store.tanggalMulaiDiseminasiEvaluasi && store.tanggalSelesaiDiseminasiEvaluasi &&
-           store.pplAllocations.every(ppl => ppl.ppl_master_id && ppl.bebanKerja && ppl.besaranHonor && ppl.namaPML);
+           store.pplAllocations.filter(p=>p.tahap === 'persiapan').every(ppl => ppl.ppl_master_id && ppl.bebanKerja && ppl.namaPML);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -267,13 +273,19 @@ export default function InputKegiatan() {
     });
   };
 
-  const handleSuccessAction = () => navigate('/dashboard');
+  const handleSuccessAction = () => {
+    if (newActivityId) {
+        navigate(`/edit-activity/${newActivityId}`, { state: { from: 'create', tahap: 'pengumpulan-data' } });
+    } else {
+        navigate('/dashboard');
+    }
+  };
 
   const AlokasiPPLContent = () => {
     const tahap = 'persiapan';
     const pplForStage = useInputKegiatanStore(state => state.pplAllocations.filter(p => p.tahap === tahap));
     const honorariumTahap = useInputKegiatanStore(state => state.honorarium[tahap]);
-    const { updateHonorariumTahap, addPPL, removePPL } = useInputKegiatanStore.getState();
+    const { updateHonorariumTahap, addPPL, removePPL, clearPPLsByTahap } = useInputKegiatanStore.getState();
     
     // State lokal untuk input honorarium agar tidak lag
     const [localSatuan, setLocalSatuan] = useState(honorariumTahap.satuanBebanKerja);
@@ -296,6 +308,11 @@ export default function InputKegiatan() {
         }
     };
 
+    const handleClearPPLs = () => {
+        clearPPLsByTahap(tahap);
+        setShowClearConfirmModal({isOpen: false, tahap: null});
+    }
+
     return (
         <Card>
             <CardHeader>
@@ -304,9 +321,17 @@ export default function InputKegiatan() {
                         <CardTitle>Alokasi PPL & PML (Tahap Persiapan)</CardTitle>
                         <CardDescription>Atur detail honorarium untuk tahap ini, lalu alokasikan PPL.</CardDescription>
                     </div>
-                    <Button variant="outline" asChild>
-                        <Link to="/daftar-ppl"><Users className="w-4 h-4 mr-2" />Pilih dari Daftar PPL</Link>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {pplForStage.length > 0 && (
+                            <Button variant="destructive" size="sm" onClick={() => setShowClearConfirmModal({isOpen: true, tahap})}>
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Clear PPL
+                            </Button>
+                        )}
+                        <Button variant="outline" size="sm" asChild>
+                            <Link to="/daftar-ppl"><Users className="w-4 h-4 mr-2" />Pilih dari Daftar PPL</Link>
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -353,6 +378,15 @@ export default function InputKegiatan() {
                     ))}
                     <Button type="button" variant="outline" onClick={() => addPPL('persiapan')} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL</Button>
                 </div>
+                <ConfirmationModal
+                    isOpen={showClearConfirmModal.isOpen && showClearConfirmModal.tahap === tahap}
+                    onClose={() => setShowClearConfirmModal({isOpen: false, tahap: null})}
+                    onConfirm={handleClearPPLs}
+                    title="Hapus Semua PPL?"
+                    description={`Anda akan menghapus semua (${pplForStage.length}) alokasi PPL di tahap ini. Aksi ini tidak dapat dibatalkan.`}
+                    confirmLabel="Ya, Hapus Semua"
+                    variant="danger"
+                />
             </CardContent>
         </Card>
     );
@@ -418,7 +452,7 @@ export default function InputKegiatan() {
             <p className="text-gray-600">Lengkapi semua informasi kegiatan dalam satu halaman</p>
             {showAutoPopulateMessage && (
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-blue-800 text-sm">✅ {store.pplAllocations.length} PPL telah ditambahkan ke Tahap Persiapan.</p>
+                    <p className="text-blue-800 text-sm">✅ {selectedPPLsForActivity.length} PPL telah ditambahkan ke Tahap Persiapan.</p>
                 </div>
             )}
         </div>
@@ -478,7 +512,14 @@ export default function InputKegiatan() {
                 </Button>
             </div>
         </form>
-        <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} onAction={handleSuccessAction} title="Kegiatan Berhasil Disimpan!" description={`Kegiatan "${store.namaKegiatan}" telah berhasil dibuat.`} actionLabel="Ke Dashboard" />
+        <SuccessModal 
+            isOpen={showSuccessModal} 
+            onClose={() => setShowSuccessModal(false)} 
+            onAction={handleSuccessAction} 
+            title="Kegiatan Berhasil Disimpan!" 
+            description={`Kegiatan "${store.namaKegiatan}" telah berhasil dibuat. Alokasi PPL tahap persiapan telah disalin ke tahap pengumpulan data.`} 
+            actionLabel="Lanjutkan Edit" 
+        />
       </div>
     </Layout>
   );
