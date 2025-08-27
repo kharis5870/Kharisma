@@ -207,10 +207,12 @@ export default function InputKegiatan() {
   const [activeTab, setActiveTab] = useState("info-dasar");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [newActivityId, setNewActivityId] = useState<number | null>(null);
+  const [lastActivityName, setLastActivityName] = useState("");
   const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
   const [addedPPLCount, setAddedPPLCount] = useState(0);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi' | null}>({isOpen: false, tahap: null});
-
+  const [topLevelTab, setTopLevelTab] = useState("alokasi-ppl");
+  const [stageTab, setStageTab] = useState("info-dasar");
 
   const store = useInputKegiatanStore();
 
@@ -239,7 +241,6 @@ export default function InputKegiatan() {
     mutationFn: createActivity,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
-      store.duplicatePersiapanToPengumpulanData();
       setNewActivityId(data.id);
       setShowSuccessModal(true);
       store.resetForm();
@@ -261,6 +262,7 @@ export default function InputKegiatan() {
         alert("Harap lengkapi semua field bertanda *.");
         return;
     }
+    setLastActivityName(store.namaKegiatan);
     mutation.mutate({
         ...store,
         username: user?.username,
@@ -276,11 +278,7 @@ export default function InputKegiatan() {
   };
 
   const handleSuccessAction = () => {
-    if (newActivityId) {
-        navigate(`/edit-activity/${newActivityId}`, { state: { from: 'create', tahap: 'pengumpulan-data' } });
-    } else {
-        navigate('/dashboard');
-    }
+    navigate('/dashboard'); // Selalu arahkan ke dashboard
   };
 
   const AlokasiPPLContent = () => {
@@ -331,7 +329,16 @@ export default function InputKegiatan() {
                             </Button>
                         )}
                         <Button variant="outline" size="sm" asChild>
-                            <Link to="/daftar-ppl"><Users className="w-4 h-4 mr-2" />Pilih dari Daftar PPL</Link>
+                            <Link 
+                                to="/daftar-ppl"
+                                state={{ 
+                                    from: 'input-kegiatan',
+                                    existingPplIds: pplForStage.map(p => p.ppl_master_id).filter(Boolean)
+                                }}
+                            >
+                                <Users className="w-4 h-4 mr-2" />
+                                Pilih dari Daftar PPL
+                            </Link>
                         </Button>
                     </div>
                 </div>
@@ -429,22 +436,19 @@ export default function InputKegiatan() {
     );
   };
 
-  const StageTabContent = ({ tipe, title }: { tipe: PPL['tahap'], title: string }) => (
-    <Tabs defaultValue="alokasi-ppl" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="alokasi-ppl">Alokasi PPL</TabsTrigger>
-            <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
-        </TabsList>
-        <TabsContent value="alokasi-ppl">
-            {tipe === 'persiapan' ? <AlokasiPPLContent /> : (
-                <Card><CardContent className="p-6 text-center text-gray-500">Manajemen alokasi PPL untuk tahap ini tersedia di halaman Edit Kegiatan setelah kegiatan dibuat.</CardContent></Card>
-            )}
-        </TabsContent>
-        <TabsContent value="dokumen">
-            <DokumenContent tipe={tipe} title={title} />
-        </TabsContent>
-    </Tabs>
-  );
+  const StageContent = ({ tipe, title }: { tipe: PPL['tahap'], title: string }) => {
+    // Konten stage sekarang bergantung pada topLevelTab
+    if (topLevelTab === 'alokasi-ppl') {
+      // Hanya tahap persiapan yang punya alokasi PPL di halaman input
+      return tipe === 'persiapan' 
+        ? <AlokasiPPLContent /> 
+        : <Card><CardContent className="p-6 text-center text-gray-500">Manajemen alokasi PPL untuk tahap ini tersedia di halaman Edit Kegiatan setelah kegiatan dibuat.</CardContent></Card>;
+    }
+    if (topLevelTab === 'dokumen') {
+      return <DokumenContent tipe={tipe} title={title} />;
+    }
+    return null;
+  };
 
   return (
     <Layout>
@@ -459,53 +463,59 @@ export default function InputKegiatan() {
             )}
         </div>
         <form onSubmit={handleSubmit} className="space-y-8">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="info-dasar">Info Dasar</TabsTrigger>
-                  <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
-                  <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
-                  <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger>
-                  <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
-              </TabsList>
+          {stageTab !== 'info-dasar' && (
+                        <Tabs value={topLevelTab} onValueChange={setTopLevelTab}>
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="alokasi-ppl">Alokasi PPL</TabsTrigger>
+                                <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    )}
+            
+            <Tabs value={stageTab} onValueChange={setStageTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="info-dasar">Info Dasar</TabsTrigger>
+            <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
+            <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
+            <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger>
+            <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
+          </TabsList>
               
-              <TabsContent value="info-dasar" className="space-y-6">
-                <Card>
-                    <CardHeader><CardTitle>Informasi Kegiatan</CardTitle><CardDescription>Masukkan detail dasar mengenai kegiatan.</CardDescription></CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={store.namaKegiatan} onChange={(e) => store.updateFormField('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2020" /></div>
-                        <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
-                            <Select value={store.ketua_tim_id} onValueChange={(value) => store.updateFormField('ketua_tim_id', value)}>
-                                <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
-                                <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
-                            </Select>
-                        </div>
-                      </div>
-                      <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={store.deskripsiKegiatan} onChange={(e) => store.updateFormField('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan secara singkat..." /></div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                        {([ 
-                            {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},
-                            {label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'}, {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'},
-                            {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'}, {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'},
-                            {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'}, {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}
-                        ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
-                            <div key={field} className="space-y-2">
-                                <Label>{label}</Label>
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start", !store[field] && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{store[field] ? format(store[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={store[field] as Date} onSelect={(date) => store.updateFormField(field, date)} /></PopoverContent></Popover>
+              <div className={cn(stageTab !== 'info-dasar' && 'hidden')}>
+                            <div className="space-y-6">
+                                <Card>
+                                    <CardHeader><CardTitle>Informasi Kegiatan</CardTitle><CardDescription>Masukkan detail dasar mengenai kegiatan.</CardDescription></CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={store.namaKegiatan} onChange={(e) => store.updateFormField('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2020" /></div>
+                                            <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
+                                                <Select value={store.ketua_tim_id} onValueChange={(value) => store.updateFormField('ketua_tim_id', value)}>
+                                                    <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
+                                                    <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={store.deskripsiKegiatan} onChange={(e) => store.updateFormField('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan secara singkat..." /></div>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
+                                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                                        {([ {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'}, {label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'}, {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'}, {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'}, {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'}, {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'}, {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'} ] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
+                                            <div key={field} className="space-y-2">
+                                                <Label>{label}</Label>
+                                                <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start", !store[field] && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{store[field] ? format(store[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={store[field] as Date} onSelect={(date) => store.updateFormField(field, date)} /></PopoverContent></Popover>
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
                             </div>
-                        ))}
-                    </CardContent>
-                </Card>
-              </TabsContent>
+                        </div>
               
-              <TabsContent value="persiapan"><StageTabContent tipe="persiapan" title="Persiapan"/></TabsContent>
-              <TabsContent value="pengumpulan-data"><StageTabContent tipe="pengumpulan-data" title="Pengumpulan Data"/></TabsContent>
-              <TabsContent value="pengolahan-analisis"><StageTabContent tipe="pengolahan-analisis" title="Pengolahan & Analisis"/></TabsContent>
-              <TabsContent value="diseminasi-evaluasi"><StageTabContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi"/></TabsContent>
+              <TabsContent value="persiapan"><StageContent tipe="persiapan" title="Persiapan" /></TabsContent>
+          <TabsContent value="pengumpulan-data"><StageContent tipe="pengumpulan-data" title="Pengumpulan Data" /></TabsContent>
+          <TabsContent value="pengolahan-analisis"><StageContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" /></TabsContent>
+          <TabsContent value="diseminasi-evaluasi"><StageContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" /></TabsContent>
             </Tabs>
 
             <div className="flex justify-center mt-8">
@@ -519,8 +529,8 @@ export default function InputKegiatan() {
             onClose={() => setShowSuccessModal(false)} 
             onAction={handleSuccessAction} 
             title="Kegiatan Berhasil Disimpan!" 
-            description={`Kegiatan "${store.namaKegiatan}" telah berhasil dibuat. Alokasi PPL tahap persiapan telah disalin ke tahap pengumpulan data.`} 
-            actionLabel="Lanjutkan Edit" 
+            description={`Kegiatan "${lastActivityName}" telah berhasil dibuat.`} 
+            actionLabel="Ke Dashboard" 
         />
       </div>
     </Layout>

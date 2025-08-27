@@ -208,17 +208,19 @@ export default function DaftarPPL() {
   }), [pplList]);
 
   const handleCancelSelection = () => {
-    if (selectedPPLs.length === 0) {
-        setSelectionMode(false);
-        return;
+    if (selectedPPLs.length > 0) {
+      setShowCancelConfirmModal(true);
+    } else {
+      // Jika tidak ada PPL yang dipilih, langsung kembali
+      navigate(-1);
     }
-    setShowCancelConfirmModal(true);
   };
 
   const confirmCancelSelection = () => {
-      setSelectedPPLs([]);
-      setSelectionMode(false);
-      setShowCancelConfirmModal(false);
+    // Jika user mengonfirmasi, kosongkan pilihan dan kembali
+    setSelectedPPLs([]);
+    setShowCancelConfirmModal(false);
+    navigate(-1);
   };
   
   const selectedPPLObjects = useMemo(() => {

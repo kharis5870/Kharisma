@@ -227,7 +227,8 @@ export default function EditActivity() {
     const { user } = useAuth();
     const queryClient = useQueryClient();
     const location = useLocation();
-    const [activeTab, setActiveTab] = useState("info-dasar");
+    const [topLevelTab, setTopLevelTab] = useState("alokasi-ppl"); 
+    const [stageTab, setStageTab] = useState("info-dasar");
     const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [successModalConfig, setSuccessModalConfig] = useState({ title: "", description: "", action: () => {} });
@@ -289,7 +290,7 @@ export default function EditActivity() {
             setIsInitializing(false); // <-- TAMBAHKAN INI
 
             if (location.state?.from === 'create') {
-                setActiveTab(location.state.tahap);
+                setStageTab(location.state.tahap);
             }
         }
     }, [initialData]);
@@ -320,7 +321,7 @@ useEffect(() => {
                 setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), ...newAllocations] }));
                 setNotification(`${pplsToAdd.length} PPL berhasil ditambahkan ke tahap ${tahap.replace(/-/g, ' ')}.`);
                 setTimeout(() => setNotification(null), 5000);
-                setActiveTab(tahap);
+                setStageTab(tahap);
             }
 
             navigate(location.pathname, { replace: true, state: {} }); // Hapus state setelah digunakan
@@ -619,17 +620,6 @@ useEffect(() => {
         );
     };
 
-    const StageTabContent = ({ tipe, title }: { tipe: PPL['tahap'], title: string }) => (
-        <Tabs defaultValue="alokasi-ppl" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="alokasi-ppl">Alokasi PPL</TabsTrigger>
-                <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
-            </TabsList>
-            <TabsContent value="alokasi-ppl"><AlokasiPPLContent tahap={tipe} /></TabsContent>
-            <TabsContent value="dokumen"><DokumenContent tipe={tipe} title={title} /></TabsContent>
-        </Tabs>
-      );
-
     if (isLoading || isInitializing) {
         return (
             <Layout>
@@ -657,6 +647,7 @@ useEffect(() => {
     return (
         <Layout>
             <div className="max-w-4xl mx-auto">
+                {/* Header and Notifications */}
                 <div className="flex items-center gap-4 mb-8">
                     <Button variant="outline" asChild><Link to="/dashboard"><ArrowLeft className="w-4 h-4 mr-2" />Kembali</Link></Button>
                     <Button variant="outline" asChild><Link to={`/view-documents/${id}`}><FileText className="w-4 h-4 mr-2" />Lihat Dokumen</Link></Button>
@@ -667,42 +658,76 @@ useEffect(() => {
                         ✅ {notification}
                     </div>
                 )}
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-5"><TabsTrigger value="info-dasar">Info Dasar</TabsTrigger><TabsTrigger value="persiapan">Persiapan</TabsTrigger><TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger><TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger><TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger></TabsList>
-                    <TabsContent value="info-dasar" className="space-y-6">
-                        <Card><CardHeader><CardTitle>Informasi Kegiatan</CardTitle><CardDescription>Perbarui detail dasar mengenai kegiatan.</CardDescription></CardHeader>
-                            <CardContent className="space-y-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" /></div>
-                                <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
-                                    <Select value={formData.ketua_tim_id} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
-                                        <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
-                                        <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
-                                    </Select>
-                                </div>
-                              </div>
-                              <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={formData.deskripsiKegiatan || ''} onChange={(e) => handleFormFieldChange('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan dan pembagian tugas secara singkat." /></div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                                {([ {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},{label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'}, {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'}, {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'}, {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'}, {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'}, {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
-                                    <div key={field} className="space-y-2"><Label>{label}</Label>
-                                        <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start", !formData[field] && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{formData[field] ? format(formData[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date as Date)} /></PopoverContent></Popover>
+
+                {/* Top Level Tabs (conditional) */}
+                {stageTab !== 'info-dasar' && (
+                    <Tabs value={topLevelTab} onValueChange={setTopLevelTab} className="mb-6">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="alokasi-ppl">Alokasi PPL</TabsTrigger>
+                            <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                )}
+                
+                {/* Stage Level Tabs */}
+                <Tabs value={stageTab} onValueChange={setStageTab} className="space-y-6">
+                    <TabsList className="grid w-full grid-cols-5">
+                        <TabsTrigger value="info-dasar">Info Dasar</TabsTrigger>
+                        <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
+                        <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
+                        <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis</TabsTrigger>
+                        <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
+                    </TabsList>
+                    
+                    {/* Content for Stages */}
+                    <div className={cn(stageTab !== 'info-dasar' && 'hidden')}>
+                        <div className="space-y-6">
+                           <Card>
+                                <CardHeader><CardTitle>Informasi Kegiatan</CardTitle><CardDescription>Perbarui detail dasar mengenai kegiatan.</CardDescription></CardHeader>
+                                <CardContent className="space-y-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" /></div>
+                                    <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
+                                        <Select value={formData.ketua_tim_id} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
+                                            <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
+                                            <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={ketua.id}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
+                                        </Select>
                                     </div>
-                                ))}
-                            </CardContent>
-                        </Card>
+                                  </div>
+                                  <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={formData.deskripsiKegiatan || ''} onChange={(e) => handleFormFieldChange('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan dan pembagian tugas secara singkat." /></div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
+                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                                    {([ {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},{label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'}, {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'}, {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'}, {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'}, {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'}, {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
+                                        <div key={field} className="space-y-2"><Label>{label}</Label>
+                                            <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start", !formData[field] && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{formData[field] ? format(formData[field]!, "dd MMMM yyyy") : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date as Date)} /></PopoverContent></Popover>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+
+                    <TabsContent value="persiapan">
+                        {topLevelTab === 'alokasi-ppl' ? <AlokasiPPLContent tahap="persiapan" /> : <DokumenContent tipe="persiapan" title="Persiapan"/>}
                     </TabsContent>
-                    <TabsContent value="persiapan"><StageTabContent tipe="persiapan" title="Persiapan"/></TabsContent>
-                    <TabsContent value="pengumpulan-data"><StageTabContent tipe="pengumpulan-data" title="Pengumpulan Data"/></TabsContent>
-                    <TabsContent value="pengolahan-analisis"><StageTabContent tipe="pengolahan-analisis" title="Pengolahan & Analisis"/></TabsContent>
-                    <TabsContent value="diseminasi-evaluasi"><StageTabContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi"/></TabsContent>
+                    <TabsContent value="pengumpulan-data">
+                        {topLevelTab === 'alokasi-ppl' ? <AlokasiPPLContent tahap="pengumpulan-data" /> : <DokumenContent tipe="pengumpulan-data" title="Pengumpulan Data"/>}
+                    </TabsContent>
+                    <TabsContent value="pengolahan-analisis">
+                        {topLevelTab === 'alokasi-ppl' ? <AlokasiPPLContent tahap="pengolahan-analisis" /> : <DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis"/>}
+                    </TabsContent>
+                    <TabsContent value="diseminasi-evaluasi">
+                        {topLevelTab === 'alokasi-ppl' ? <AlokasiPPLContent tahap="diseminasi-evaluasi" /> : <DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi"/>}
+                    </TabsContent>
                 </Tabs>
+                
                 <div className="flex justify-center mt-8">
                     <Button onClick={handleSubmit} disabled={mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" size="lg"><Save className="w-4 h-4 mr-2" />{mutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
                 </div>
+                
                 <SuccessModal 
                     isOpen={showSuccessModal} 
                     onClose={() => setShowSuccessModal(false)} 
