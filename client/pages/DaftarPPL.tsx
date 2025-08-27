@@ -1,6 +1,6 @@
 // client/pages/DaftarPPL.tsx
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -33,7 +33,8 @@ import {
   UserX,
   ChevronLeft,
   ChevronRight,
-  XCircle
+  XCircle,
+  CheckSquare
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLAdminData, PPLMaster } from "@shared/api";
@@ -82,33 +83,38 @@ const ActivityDetailModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, on
 
 export default function DaftarPPL() {
   const location = useLocation();
-  const sourceTahap = location.state?.tahap || 'persiapan';
-  const isFromEdit = location.state?.from === 'edit';
-  const existingPplIds = location.state?.existingPplIds || [];
-
   const navigate = useNavigate();
   const { setSelectedPPLsForActivity } = usePPL();
+
+  const sourcePage = location.state?.from || 'daftar-ppl'; 
+  const sourceTahap = location.state?.tahap || 'persiapan';
+  const kegiatanId = location.state?.kegiatanId;
+  const existingPplIds = location.state?.existingPplIds || [];
+
   const { data: pplList = [], isLoading } = useQuery({ queryKey: ['pplAdmin'], queryFn: fetchPPLs });
   
-  const [showBulkSuccessModal, setShowBulkSuccessModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successModalConfig, setSuccessModalConfig] = useState({ title: "", description: "", actionLabel: "", onAction: () => {} });
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{ key: keyof PPLAdminData | 'status'; direction: 'asc' | 'desc'; } | null>(null);
   const [selectedPPLs, setSelectedPPLs] = useState<string[]>([]);
+  const [selectionMode, setSelectionMode] = useState(sourcePage !== 'daftar-ppl');
 
   const [showSelectedPPLsModal, setShowSelectedPPLsModal] = useState(false);
   const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
-
-  
-  const selectedPPLObjects = useMemo(() => {
-      return pplList.filter(ppl => selectedPPLs.includes(ppl.id));
-  }, [selectedPPLs, pplList]);
-
   
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedPplDetails, setSelectedPplDetails] = useState<PPLAdminData | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  useEffect(() => {
+    if (location.state?.from) {
+      setSelectionMode(true);
+    }
+  }, [location.state]);
 
   const filteredAndSortedData = useMemo(() => {
     let data = [...pplList].filter(ppl => 
@@ -144,25 +150,9 @@ export default function DaftarPPL() {
 
   const totalPages = Math.ceil(filteredAndSortedData.length / rowsPerPage);
 
-  const isAllSelected = useMemo(() => {
-      const selectablePPLs = filteredAndSortedData.filter(ppl => !existingPplIds.includes(ppl.id));
-      return selectablePPLs.length > 0 && selectedPPLs.length === selectablePPLs.length;
-  }, [selectedPPLs, filteredAndSortedData, existingPplIds]);
-  
-  const handleSelectAll = (checked: boolean) => {
-      if (checked) {
-          const selectableIds = filteredAndSortedData
-              .filter(ppl => !existingPplIds.includes(ppl.id))
-              .map(ppl => ppl.id);
-          setSelectedPPLs(selectableIds);
-      } else {
-          setSelectedPPLs([]);
-      }
-  };
-  
-  
-  const handleSelectPPL = (pplId: string, checked: boolean) => {
-    setSelectedPPLs(prev => checked ? [...prev, pplId] : prev.filter(id => id !== pplId));
+  const handleSelectPPL = (pplId: string) => {
+    if (!selectionMode || existingPplIds.includes(pplId)) return;
+    setSelectedPPLs(prev => prev.includes(pplId) ? prev.filter(id => id !== pplId) : [...prev, pplId]);
   };
   
   const handleBulkAddToActivity = () => {
@@ -170,16 +160,29 @@ export default function DaftarPPL() {
         .filter(ppl => selectedPPLs.includes(ppl.id))
         .map(p => ({ id: p.id, namaPPL: p.namaPPL }));
 
-    if (isFromEdit) {
-        navigate(`/edit-activity/${location.state.kegiatanId}`, {
+    if (sourcePage === 'edit') {
+      setShowSuccessModal(true);
+      setSuccessModalConfig({
+        title: "PPL Berhasil Ditambahkan!",
+        description: `${selectedPPLObjects.length} PPL yang dipilih akan ditambahkan ke tahap ${sourceTahap.replace(/-/g, ' ')}.`,
+        actionLabel: "Kembali ke Edit Kegiatan",
+        onAction: () => navigate(`/edit-activity/${kegiatanId}`, {
             state: { newPpls: selectedPPLObjects, tahap: sourceTahap }
-        });
-    } else {
+        })
+      });
+    } else { // from 'input-kegiatan'
         setSelectedPPLsForActivity(selectedPPLObjects);
-        setShowBulkSuccessModal(true);
+        setShowSuccessModal(true);
+        setSuccessModalConfig({
+            title: "PPL Berhasil Ditambahkan!",
+            description: `${selectedPPLObjects.length} PPL yang dipilih telah ditambahkan ke form Input Kegiatan.`,
+            actionLabel: "Ke Input Kegiatan",
+            onAction: () => navigate('/input-kegiatan')
+        });
     }
 
     setSelectedPPLs([]);
+    setSelectionMode(false);
   };
   
   const handleSort = (key: keyof PPLAdminData | 'status') => {
@@ -205,37 +208,60 @@ export default function DaftarPPL() {
   }), [pplList]);
 
   const handleCancelSelection = () => {
+    if (selectedPPLs.length === 0) {
+        setSelectionMode(false);
+        return;
+    }
+    setShowCancelConfirmModal(true);
+  };
+
+  const confirmCancelSelection = () => {
       setSelectedPPLs([]);
+      setSelectionMode(false);
       setShowCancelConfirmModal(false);
   };
+  
+  const selectedPPLObjects = useMemo(() => {
+    return pplList.filter(ppl => selectedPPLs.includes(ppl.id));
+  }, [selectedPPLs, pplList]);
 
   return (
     <Layout>
       <div className="space-y-8">
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Daftar PPL</h1>
-            <p className="text-gray-600 mt-1">Pilih PPL untuk ditambahkan ke kegiatan</p>
-            {selectedPPLs.length > 0 && (
+            <p className="text-gray-600 mt-1">{selectionMode ? "Pilih PPL untuk ditambahkan ke kegiatan" : "Lihat dan kelola daftar PPL"}</p>
+            {selectionMode && selectedPPLs.length > 0 && (
                  <button onClick={() => setShowSelectedPPLsModal(true)} className="text-sm text-blue-600 mt-1 hover:underline">
                     {selectedPPLs.length} PPL dipilih
                 </button>
             )}
           </div>
-          {selectedPPLs.length > 0 && (
-              <div className="flex items-center gap-2">
-                  <Button variant="destructive" onClick={() => setShowCancelConfirmModal(true)}>
-                      <XCircle className="w-4 h-4 mr-2"/>
-                      Batal Pilih
-                  </Button>
-                  <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleBulkAddToActivity}>
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      {isFromEdit ? `Tambahkan ke Tahap ${sourceTahap.replace(/-/g, ' ')}` : 'Tambahkan ke Input Kegiatan'} ({selectedPPLs.length})
-                  </Button>
-              </div>
-          )}
+          <div className="flex items-center gap-2">
+            {selectionMode ? (
+              <>
+                <Button variant="destructive" onClick={handleCancelSelection}>
+                    <XCircle className="w-4 h-4 mr-2"/>
+                    Batal Pilih
+                </Button>
+                <Button 
+                    className="bg-blue-600 hover:bg-blue-700" 
+                    onClick={handleBulkAddToActivity}
+                    disabled={selectedPPLs.length === 0}
+                >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Tambahkan PPL ({selectedPPLs.length})
+                </Button>
+              </>
+            ) : (
+                <Button variant="outline" onClick={() => setSelectionMode(true)}>
+                    <CheckSquare className="w-4 h-4 mr-2"/>
+                    Pilih PPL
+                </Button>
+            )}
+          </div>
         </div>
-        {/* PERBAIKAN: Menghapus card rata-rata dan menyesuaikan grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total PPL</p><p className="text-2xl font-bold text-gray-900">{stats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
             <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">PPL Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.activePPL}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
@@ -253,7 +279,7 @@ export default function DaftarPPL() {
               <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12"><Checkbox checked={isAllSelected} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead>
+                    {selectionMode && <TableHead className="w-12"></TableHead>}
                     <TableHead className="w-24"><button onClick={() => handleSort('id')} className="flex items-center gap-1">ID{getSortIcon('id')}</button></TableHead>
                     <TableHead className="w-48"><button onClick={() => handleSort('namaPPL')} className="flex items-center gap-1">Nama{getSortIcon('namaPPL')}</button></TableHead>
                     <TableHead className="w-32"><button onClick={() => handleSort('totalKegiatan')} className="flex items-center gap-1">Kegiatan{getSortIcon('totalKegiatan')}</button></TableHead>
@@ -270,28 +296,33 @@ export default function DaftarPPL() {
                       paginatedData.map((ppl) => {
                           const isActive = ppl.totalKegiatan > 0;
                           const isAlreadyAdded = existingPplIds.includes(ppl.id);
+                          const isSelected = selectedPPLs.includes(ppl.id);
                           return (
                             <TableRow 
                                 key={ppl.id} 
-                                data-state={selectedPPLs.includes(ppl.id) && "selected"}
-                                className={cn(isAlreadyAdded && "bg-gray-100 text-gray-400")}
+                                data-state={isSelected && "selected"}
+                                className={cn(
+                                    isAlreadyAdded && "bg-gray-100 text-gray-400 cursor-not-allowed",
+                                    selectionMode && !isAlreadyAdded && "cursor-pointer"
+                                )}
+                                onClick={() => handleSelectPPL(ppl.id)}
                             >
-                                <TableCell>
-                                    <Checkbox 
-                                        checked={selectedPPLs.includes(ppl.id)} 
-                                        onCheckedChange={(checked) => handleSelectPPL(ppl.id, !!checked)}
-                                        disabled={isAlreadyAdded}
-                                    />
-                                </TableCell>
+                                {selectionMode && (
+                                    <TableCell className="w-12">
+                                        <Checkbox 
+                                            checked={isSelected}
+                                            disabled={isAlreadyAdded}
+                                        />
+                                    </TableCell>
+                                )}
                                 <TableCell className="font-medium truncate">{ppl.id}</TableCell>
                                 <TableCell className="font-medium truncate">{ppl.namaPPL}</TableCell>
                                 <TableCell>
-                                  <Button variant="link" className="p-0 h-auto text-blue-600" onClick={() => handleOpenDetailModal(ppl)}>
+                                  <Button variant="link" className="p-0 h-auto text-blue-600" onClick={(e) => { e.stopPropagation(); handleOpenDetailModal(ppl); }}>
                                       {ppl.totalKegiatan} Kegiatan
                                   </Button>
                                 </TableCell>
                                 <TableCell>
-                                  {/* PERBAIKAN: Menambahkan Tooltip untuk alamat */}
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
@@ -362,12 +393,12 @@ export default function DaftarPPL() {
           </CardContent>
         </Card>
         <SuccessModal 
-            isOpen={showBulkSuccessModal} 
-            onClose={() => setShowBulkSuccessModal(false)} 
-            onAction={() => { setShowBulkSuccessModal(false); navigate('/input-kegiatan'); }} 
-            title="PPL Berhasil Ditambahkan!" 
-            description={`${selectedPPLObjects.length} PPL yang dipilih telah ditambahkan ke form Input Kegiatan.`} 
-            actionLabel="Ke Input Kegiatan" 
+            isOpen={showSuccessModal} 
+            onClose={() => setShowSuccessModal(false)} 
+            onAction={() => { setShowSuccessModal(false); successModalConfig.onAction(); }} 
+            title={successModalConfig.title} 
+            description={successModalConfig.description} 
+            actionLabel={successModalConfig.actionLabel} 
         />
         <ActivityDetailModal 
             isOpen={isDetailModalOpen}
@@ -399,7 +430,7 @@ export default function DaftarPPL() {
         <ConfirmationModal
             isOpen={showCancelConfirmModal}
             onClose={() => setShowCancelConfirmModal(false)}
-            onConfirm={handleCancelSelection}
+            onConfirm={confirmCancelSelection}
             title="Batalkan Pilihan?"
             description={`Anda akan menghapus ${selectedPPLs.length} PPL yang telah dipilih. Lanjutkan?`}
             confirmLabel="Ya, Batalkan"

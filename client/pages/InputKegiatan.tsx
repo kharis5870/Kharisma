@@ -208,6 +208,7 @@ export default function InputKegiatan() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [newActivityId, setNewActivityId] = useState<number | null>(null);
   const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
+  const [addedPPLCount, setAddedPPLCount] = useState(0);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi' | null}>({isOpen: false, tahap: null});
 
 
@@ -225,6 +226,7 @@ export default function InputKegiatan() {
             tahap: "persiapan" as const
         }));
         store.setPplAllocations([...store.pplAllocations, ...newAllocations]);
+        setAddedPPLCount(selectedPPLsForActivity.length);
         setShowAutoPopulateMessage(true);
         setActiveTab("persiapan"); 
         setTimeout(() => setShowAutoPopulateMessage(false), 5000);
@@ -452,7 +454,7 @@ export default function InputKegiatan() {
             <p className="text-gray-600">Lengkapi semua informasi kegiatan dalam satu halaman</p>
             {showAutoPopulateMessage && (
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-blue-800 text-sm">✅ {selectedPPLsForActivity.length} PPL telah ditambahkan ke Tahap Persiapan.</p>
+                    <p className="text-blue-800 text-sm">✅ {addedPPLCount} PPL telah ditambahkan ke Tahap Persiapan.</p>
                 </div>
             )}
         </div>
