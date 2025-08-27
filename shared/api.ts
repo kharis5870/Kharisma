@@ -51,6 +51,8 @@ export interface Kegiatan {
   progressKeseluruhan: number;
   lastUpdated: string;
   lastUpdatedBy?: string; 
+  lastEdited?: string;
+  lastEditedBy?: string;
   dokumen: Dokumen[];
   ppl: PPL[];
   tanggalMulaiPersiapan?: string;

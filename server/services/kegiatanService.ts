@@ -33,7 +33,7 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
 };
 
 export const getAllKegiatan = async (): Promise<Kegiatan[]> => {
-    return getKegiatanWithRelations('ORDER BY k.id DESC', []);
+    return getKegiatanWithRelations('ORDER BY k.lastUpdated DESC', []);
 };
 
 export const getKegiatanById = async (id: number): Promise<Kegiatan | null> => {
@@ -62,8 +62,8 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
              tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
              tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
              tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
-             status, progressKeseluruhan, lastUpdatedBy)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?)
+             status, progressKeseluruhan, lastUpdatedBy, lastEditedBy)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?, ?)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
             namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false,
@@ -71,7 +71,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
             tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
             tanggalMulaiDiseminasiEvaluasi || null, tanggalSelesaiDiseminasiEvaluasi || null,
-            username
+            username, username
         ]);
         const kegiatanId = kegiatanResult.insertId;
 
@@ -93,19 +93,18 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             });
             await connection.query(pplQuery, [pplValues]);
 
-            // Duplicate PPLs from 'persiapan' to 'pengumpulan-data'
             const persiapanPpls = pplAllocations.filter((p: PPL) => p.tahap === 'persiapan');
             if (persiapanPpls.length > 0) {
                 const pengumpulanDataPpls = persiapanPpls.map((ppl: PPL) => [
                     kegiatanId,
                     ppl.ppl_master_id,
-                    '', // Reset namaPML
-                    0, // Reset bebanKerja
-                    '', // Reset satuanBebanKerja
-                    0, // Reset hargaSatuan
-                    0, // Reset besaranHonor
+                    '', 
+                    0, 
+                    '', 
+                    0, 
+                    0, 
                     'pengumpulan-data',
-                    0, // Reset progressOpen
+                    0, 
                 ]);
                 await connection.query(pplQuery, [pengumpulanDataPpls]);
             }
@@ -154,8 +153,8 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             tanggalMulaiPengumpulanData = ?, tanggalSelesaiPengumpulanData = ?,
             tanggalMulaiPengolahanAnalisis = ?, tanggalSelesaiPengolahanAnalisis = ?,
             tanggalMulaiDiseminasiEvaluasi = ?, tanggalSelesaiDiseminasiEvaluasi = ?,
-            lastUpdated = CURRENT_TIMESTAMP,
-            lastUpdatedBy = ?
+            lastEdited = CURRENT_TIMESTAMP,
+            lastEditedBy = ?
             WHERE id = ?
         `;
         await connection.execute(kegiatanQuery, [
@@ -213,7 +212,6 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             await connection.query(docQuery, [docValues]);
         }
 
-        // --- PERBAIKAN: Hitung ulang progress keseluruhan setelah update ---
         const [allPplForKegiatan] = await connection.query<RowDataPacket[]>('SELECT bebanKerja, progressApproved FROM ppl WHERE kegiatanId = ?', [id]);
         const totalBebanKerja = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja) || 0), 0);
         const totalApproved = allPplForKegiatan.reduce((acc, p) => acc + (p.progressApproved || 0), 0);
@@ -223,7 +221,6 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             'UPDATE kegiatan SET progressKeseluruhan = ? WHERE id = ?',
             [progressKeseluruhan, id]
         );
-        // --- AKHIR PERBAIKAN ---
 
         await connection.commit();
 

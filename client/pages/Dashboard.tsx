@@ -479,7 +479,8 @@ export default function Dashboard() {
                                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
                                         {getStageDates()}
                                     </div>
-                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-2"><span>Update:</span><span className="font-medium text-bps-blue-600">{getRelativeTime(activity.lastUpdated)}</span>{activity.lastUpdatedBy && (<><span>oleh</span><span className="font-medium text-bps-blue-600">{activity.lastUpdatedBy}</span></>)}</div>
+                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-2"><span>Edit:</span><span className="font-medium text-bps-blue-600">{getRelativeTime(activity.lastEdited || activity.lastUpdated)}</span>{activity.lastEditedBy && (<><span>oleh</span><span className="font-medium text-bps-blue-600">{activity.lastEditedBy}</span></>)}</div>
+                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-1"><span>Update:</span><span className="font-medium text-bps-blue-600">{getRelativeTime(activity.lastUpdated)}</span>{activity.lastUpdatedBy && (<><span>oleh</span><span className="font-medium text-bps-blue-600">{activity.lastUpdatedBy}</span></>)}</div>
                                     {warnings.length > 0 && (
                                         <Button
                                             variant="link"
