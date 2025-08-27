@@ -15,8 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare, Notebook, List } from "lucide-react";
+import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
 import { cn } from "@/lib/utils";
@@ -58,7 +57,10 @@ const updatePplProgress = async ({ pplId, progressData }: { pplId: number; progr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(progressData)
     });
-    if (!res.ok) throw new Error("Gagal update progress");
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Gagal update progress");
+    }
     return res.json();
 };
 
@@ -172,7 +174,19 @@ export default function Dashboard() {
     },
   });
 
-  const progressMutation = useMutation({ mutationFn: updatePplProgress, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); } });
+  const progressMutation = useMutation({ 
+    mutationFn: updatePplProgress, 
+    onSuccess: () => { 
+        queryClient.invalidateQueries({ queryKey: ['kegiatan'] }); 
+    },
+    onError: (error) => {
+        setAlertModal({ isOpen: true, title: "Update Gagal", message: error.message });
+        // Revert local state if needed
+        if (updateModalActivity) {
+            setLocalPplProgress(JSON.parse(JSON.stringify(updateModalActivity.ppl || [])));
+        }
+    }
+  });
 
   const filteredActivities = useMemo(() => {
     return processedActivities.filter(activity => {
@@ -209,44 +223,23 @@ export default function Dashboard() {
         prev.map(p => {
             if (p.id === pplId) {
                 const newValue = parseInt(value) || 0;
-                const oldValue = p[field] as number;
-                const diff = newValue - oldValue;
-                const bebanKerja = parseInt(p.bebanKerja) || 0;
+                const totalBebanKerja = parseInt(p.bebanKerja, 10) || 0;
 
-                if (newValue > bebanKerja) {
-                    setAlertModal({ isOpen: true, title: "Validasi Gagal", message: `Nilai tidak boleh melebihi total beban kerja (${bebanKerja}).` });
+                const updatedPpl = { ...p, [field]: newValue };
+                const { progressSubmit, progressDiperiksa, progressApproved } = updatedPpl;
+
+                if (progressSubmit + progressDiperiksa + progressApproved > totalBebanKerja) {
+                    setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Jumlah 'Submit', 'Diperiksa', dan 'Approved' tidak boleh melebihi total beban kerja." });
                     return p;
                 }
 
-                const updatedPpl = { ...p, [field]: newValue };
+                updatedPpl.progressOpen = totalBebanKerja - (progressSubmit + progressDiperiksa + progressApproved);
 
-                if (diff !== 0) {
-                    switch (field) {
-                        case 'progressSubmit':
-                            if (diff > 0 && p.progressOpen - diff < 0) {
-                                setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Submit tidak bisa lebih besar dari Open!" });
-                                return p;
-                            }
-                            updatedPpl.progressOpen -= diff;
-                            break;
-                        case 'progressDiperiksa':
-                            if (diff > 0 && p.progressSubmit - diff < 0) {
-                                setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Diperiksa tidak bisa lebih besar dari Submit!" });
-                                return p;
-                            }
-                            updatedPpl.progressSubmit -= diff;
-                            break;
-                        case 'progressApproved':
-                            if (diff > 0 && p.progressDiperiksa - diff < 0) {
-                                setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Approved tidak bisa lebih besar dari Diperiksa!" });
-                                return p;
-                            }
-                            updatedPpl.progressDiperiksa -= diff;
-                            break;
-                        default:
-                            break;
-                    }
+                if (updatedPpl.progressOpen < 0) {
+                     setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Nilai open tidak boleh negatif. Periksa kembali input Anda." });
+                     return p;
                 }
+                
                 return updatedPpl;
             }
             return p;
@@ -256,16 +249,19 @@ export default function Dashboard() {
 
   const handleSaveProgress = () => {
     localPplProgress.forEach(ppl => {
-      progressMutation.mutate({
-        pplId: ppl.id!,
-        progressData: {
-          open: ppl.progressOpen,
-          submit: ppl.progressSubmit,
-          diperiksa: ppl.progressDiperiksa,
-          approved: ppl.progressApproved,
-          username: user?.username
-        }
-      });
+      const originalPpl = updateModalActivity?.ppl.find(op => op.id === ppl.id);
+      if (JSON.stringify(ppl) !== JSON.stringify(originalPpl)) {
+          progressMutation.mutate({
+            pplId: ppl.id!,
+            progressData: {
+              open: ppl.progressOpen,
+              submit: ppl.progressSubmit,
+              diperiksa: ppl.progressDiperiksa,
+              approved: ppl.progressApproved,
+              username: user?.username
+            }
+          });
+      }
     });
     setUpdateModalActivity(null);
     setShowProgressSuccessModal(true);
@@ -522,10 +518,10 @@ export default function Dashboard() {
                                         <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
                                     </TabsList>
                                     <div className="mt-4 max-h-[40vh] overflow-y-auto pr-2">
-                                        <TabsContent value="persiapan">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'persiapan'), pplSearchView)}</TabsContent>
-                                        <TabsContent value="pengumpulan-data">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'pengumpulan-data'), pplSearchView)}</TabsContent>
-                                        <TabsContent value="pengolahan-analisis">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'pengolahan-analisis'), pplSearchView)}</TabsContent>
-                                        <TabsContent value="diseminasi-evaluasi">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'diseminasi-evaluasi'), pplSearchView)}</TabsContent>
+                                        <TabsContent value="persiapan">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'persiapan') as PPLWithProgress[], pplSearchView)}</TabsContent>
+                                        <TabsContent value="pengumpulan-data">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'pengumpulan-data') as PPLWithProgress[], pplSearchView)}</TabsContent>
+                                        <TabsContent value="pengolahan-analisis">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'pengolahan-analisis') as PPLWithProgress[], pplSearchView)}</TabsContent>
+                                        <TabsContent value="diseminasi-evaluasi">{renderPPLProgress(selectedActivity.ppl.filter(p => p.tahap === 'diseminasi-evaluasi') as PPLWithProgress[], pplSearchView)}</TabsContent>
                                     </div>
                                 </Tabs>
                                 </div>

@@ -321,7 +321,7 @@ export default function EditActivity() {
 
             navigate(location.pathname, { replace: true, state: {} }); // Hapus state setelah digunakan
         }
-    }, [location.state, formData.ppl, navigate]);
+    }, [location.state, navigate]);
 
 
     const mutation = useMutation({
