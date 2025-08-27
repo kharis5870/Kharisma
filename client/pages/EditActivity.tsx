@@ -23,6 +23,7 @@ import { Kegiatan, PPL, Dokumen, PPLMaster, KetuaTim } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import AlertModal from "@/components/AlertModal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Tahap = 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi';
 
@@ -234,6 +235,7 @@ export default function EditActivity() {
     const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
     const [notification, setNotification] = useState<string | null>(null);
     const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: Tahap | null}>({isOpen: false, tahap: null});
+    const [isInitializing, setIsInitializing] = useState(true);
 
     const { data: initialData, isLoading, isError } = useQuery({
         queryKey: ['kegiatan', id],
@@ -283,15 +285,17 @@ export default function EditActivity() {
                 dokumen: initialData.dokumen.map((d: Dokumen, i) => ({...d, clientId: d.id?.toString() || `doc-${Date.now()}-${i}` })),
                 ppl: initialData.ppl.map((p, i) => ({...p, clientId: p.id?.toString() || `ppl-${Date.now()}-${i}` }))
             });
+            
+            setIsInitializing(false); // <-- TAMBAHKAN INI
 
             if (location.state?.from === 'create') {
                 setActiveTab(location.state.tahap);
             }
         }
-    }, [initialData, location.state]);
+    }, [initialData]);
 
-    useEffect(() => {
-        if (location.state?.newPpls && location.state?.tahap) {
+useEffect(() => {
+        if (!isInitializing && location.state?.newPpls && location.state?.tahap) {
             const { newPpls, tahap } = location.state;
             const existingPplIds = formData.ppl?.filter(p => p.tahap === tahap).map(p => p.ppl_master_id) || [];
             
@@ -321,7 +325,7 @@ export default function EditActivity() {
 
             navigate(location.pathname, { replace: true, state: {} }); // Hapus state setelah digunakan
         }
-    }, [location.state, navigate]);
+    }, [location.state, isInitializing, formData.ppl, navigate]);
 
 
     const mutation = useMutation({
@@ -626,7 +630,28 @@ export default function EditActivity() {
         </Tabs>
       );
 
-    if (isLoading) return <Layout><div>Memuat data kegiatan...</div></Layout>;
+    if (isLoading || isInitializing) {
+        return (
+            <Layout>
+                <div className="max-w-4xl mx-auto space-y-8 animate-pulse">
+                    <div className="flex items-center gap-4 mb-8">
+                        <Skeleton className="h-10 w-48" />
+                        <Skeleton className="h-10 w-48" />
+                    </div>
+                     <Skeleton className="h-12 w-full mb-6" />
+                     <Card>
+                        <CardHeader>
+                            <Skeleton className="h-8 w-1/2" />
+                            <Skeleton className="h-4 w-3/4 mt-2" />
+                        </CardHeader>
+                        <CardContent>
+                            <Skeleton className="h-40 w-full" />
+                        </CardContent>
+                     </Card>
+                </div>
+            </Layout>
+        );
+    }
     if (isError) return <Layout><div>Gagal memuat data. Silakan coba lagi.</div></Layout>;
 
     return (

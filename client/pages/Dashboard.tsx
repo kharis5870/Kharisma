@@ -283,7 +283,7 @@ export default function Dashboard() {
                         <div>
                             <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
                             <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
-                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
+                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
                             <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
                         </div>
                         <div className="text-right">
@@ -298,7 +298,7 @@ export default function Dashboard() {
                         <div className="text-center"><Label className="text-xs text-gray-600">Approved</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressApproved}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressApproved} {ppl.satuanBebanKerja}</div></div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-bps-green-600 h-2 rounded-full transition-all duration-300" style={{ width: `${getProgressBarValue(ppl)}%` }}></div></div>
-                    <div className="text-xs text-gray-500 text-center">Total: {ppl.progressOpen + ppl.progressSubmit + ppl.progressDiperiksa + ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
+                    <div className="text-xs text-gray-500 text-center">Total Beban Kerja: {ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
                 </div>
             </Card>
         ))}
@@ -319,7 +319,7 @@ export default function Dashboard() {
                         <div>
                             <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
                             <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
-                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
+                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
                             <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
                         </div>
                         <div className="text-right">
@@ -337,7 +337,7 @@ export default function Dashboard() {
                         ))}
                     </div>
                     <Progress value={getProgressBarValue(ppl)} className="h-2" />
-                    <div className="text-xs text-gray-500 text-center">Total: {ppl.progressOpen + ppl.progressSubmit + ppl.progressDiperiksa + ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
+                    <div className="text-xs text-gray-500 text-center">Total Beban Kerja: {ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
                 </div>
             </Card>
         ))}
