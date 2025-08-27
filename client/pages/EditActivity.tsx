@@ -19,7 +19,7 @@ import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Notebook, 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format, parseISO, isValid } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Kegiatan, PPL, Dokumen, PPLMaster, KetuaTim } from "@shared/api";
+import { Kegiatan, PPL, Dokumen, PPLMaster, KetuaTim, UserData } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import AlertModal from "@/components/AlertModal";
@@ -32,7 +32,6 @@ interface HonorariumTahap {
   hargaSatuan: string;
 }
 
-// Tipe PPL di client tidak lagi menyimpan harga/satuan
 type ClientPPL = Omit<PPL, 'satuanBebanKerja' | 'hargaSatuan'> & { clientId: string };
 type ClientDokumen = Dokumen & { clientId: string };
 
@@ -47,7 +46,7 @@ type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'lastUpdated
     tanggalSelesaiDiseminasiEvaluasi?: Date;
     ppl: ClientPPL[];
     dokumen: ClientDokumen[];
-    honorarium: Record<Tahap, HonorariumTahap>; // State baru untuk honor per tahap
+    honorarium: Record<Tahap, HonorariumTahap>;
 };
 
 type DateFieldName =
@@ -56,20 +55,18 @@ type DateFieldName =
   | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
   | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
-// --- Helper Functions untuk Format Angka ---
 const formatHonor = (value: string | number): string => {
-  if (value === '' || value === null || value === undefined) return '';
-  const numString = String(value).replace(/[^0-9]/g, '');
-  const num = Number(numString);
-  if (isNaN(num)) return '';
-  return num.toLocaleString('id-ID');
+    if (value === '' || value === null || value === undefined) return '';
+    const numString = String(value).replace(/[^0-9]/g, '');
+    const num = Number(numString);
+    if (isNaN(num)) return '';
+    return num.toLocaleString('id-ID');
 };
 
 const parseHonor = (value: string | number): string => {
-  if (value === '' || value === null || value === undefined) return '';
-  return String(value).replace(/\./g, '');
+    if (value === '' || value === null || value === undefined) return '';
+    return String(value).replace(/\./g, '');
 };
-// --- Akhir Helper Functions ---
 
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     const res = await fetch(`/api/kegiatan/${id}`);
@@ -86,6 +83,12 @@ const fetchPPLs = async (): Promise<PPLMaster[]> => {
 const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
     const res = await fetch('/api/ketua-tim');
     if (!res.ok) throw new Error('Gagal memuat daftar Ketua Tim');
+    return res.json();
+};
+
+const fetchPMLs = async (): Promise<UserData[]> => {
+    const res = await fetch('/api/admin/pml');
+    if (!res.ok) throw new Error('Gagal memuat daftar PML');
     return res.json();
 };
 
@@ -110,18 +113,23 @@ const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Prom
         throw new Error(errorData.message || "Gagal memperbarui kegiatan");
     }
     return res.json();
-}
+};
 
-// **Komponen PPL Item yang Dioptimalkan untuk Edit**
-const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList }: any) => {
+const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList, pmlList }: {
+    ppl: ClientPPL;
+    index: number;
+    onRemove: (clientId: string) => void;
+    onUpdate: (clientId: string, field: keyof PPL, value: string | number) => void;
+    pplList: PPLMaster[];
+    pmlList: UserData[];
+}) => {
     const [bebanKerja, setBebanKerja] = useState(ppl.bebanKerja);
-    const [namaPML, setNamaPML] = useState(ppl.namaPML);
+    const [isPmlComboboxOpen, setIsPmlComboboxOpen] = useState(false);
     const [isComboboxOpen, setIsComboboxOpen] = useState(false);
     
     useEffect(() => {
         setBebanKerja(ppl.bebanKerja);
-        setNamaPML(ppl.namaPML);
-    }, [ppl.bebanKerja, ppl.namaPML]);
+    }, [ppl.bebanKerja]);
 
     const handleBebanKerjaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setBebanKerja(e.target.value);
@@ -133,16 +141,6 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList 
         }
     };
     
-    const handleNamaPMLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setNamaPML(e.target.value);
-    };
-
-    const handleNamaPMLBlur = () => {
-        if (namaPML !== ppl.namaPML) {
-            onUpdate(ppl.clientId, 'namaPML', namaPML);
-        }
-    };
-
     return (
         <div className="p-4 border rounded-lg space-y-4 bg-gray-50">
             <div className="flex justify-between items-center">
@@ -207,16 +205,78 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList 
                 </div>
                 <div className="space-y-2 lg:col-span-5">
                     <Label htmlFor={`namaPML-${ppl.clientId}`}>Nama PML *</Label>
-                    <Input 
-                        id={`namaPML-${ppl.clientId}`}
-                        name={`namaPML-${ppl.clientId}`}
-                        placeholder="Nama PML" 
-                        value={namaPML} 
-                        onChange={handleNamaPMLChange}
-                        onBlur={handleNamaPMLBlur}
-                    />
+                    <Popover open={isPmlComboboxOpen} onOpenChange={setIsPmlComboboxOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" className="w-full justify-between">
+                                {ppl.namaPML || "Pilih PML..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <Command>
+                                <CommandInput placeholder="Cari nama PML..." />
+                                <CommandList>
+                                    <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
+                                    <CommandGroup>
+                                        {pmlList.map((pml: UserData) => (
+                                            <CommandItem
+                                                key={pml.id}
+                                                value={`${pml.id} ${pml.namaLengkap}`}
+                                                onSelect={() => {
+                                                    onUpdate(ppl.clientId, 'namaPML', pml.namaLengkap);
+                                                    setIsPmlComboboxOpen(false);
+                                                }}>
+                                                <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
+                                                <div className="flex flex-col">
+                                                    <span>{pml.namaLengkap}</span>
+                                                    <span className="text-xs text-gray-500">ID: {pml.id}</span>
+                                                </div>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                 </div>
             </div>
+        </div>
+    );
+});
+
+const DokumenItem = React.memo(({ doc, updateDocument, removeDocument }: {
+    doc: ClientDokumen;
+    updateDocument: (clientId: string, field: 'nama' | 'link', value: string) => void;
+    removeDocument: (clientId: string) => void;
+}) => {
+    const [nama, setNama] = useState(doc.nama);
+    const [link, setLink] = useState(doc.link);
+    const isApproved = doc.status === 'Approved';
+
+    const handleNamaBlur = () => {
+        if (nama !== doc.nama) {
+            updateDocument(doc.clientId, 'nama', nama);
+        }
+    };
+
+    const handleLinkBlur = () => {
+        if (link !== doc.link) {
+            updateDocument(doc.clientId, 'link', link);
+        }
+    };
+
+    useEffect(() => {
+        setNama(doc.nama);
+        setLink(doc.link);
+    }, [doc.nama, doc.link]);
+
+    return (
+        <div className={cn("flex items-center gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50 border-green-200" : (doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50"))}>
+            <div className="flex-grow space-y-2">
+                {doc.isWajib ? <Label className="font-semibold">{doc.nama} *</Label> : <Input placeholder="Nama Dokumen Pendukung" value={nama} onChange={(e) => setNama(e.target.value)} onBlur={handleNamaBlur} disabled={isApproved} />}
+                <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-gray-400"/><Input placeholder="https://drive.google.com/..." value={link} onChange={(e) => setLink(e.target.value)} onBlur={handleLinkBlur} disabled={isApproved} /></div>
+            </div>
+            {!doc.isWajib && !isApproved ? (<Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>) : (<div className="self-center p-2" title={isApproved ? "Dokumen Disetujui" : "Dokumen Wajib"}><Lock className="w-4 h-4 text-gray-400"/></div>)}
         </div>
     );
 });
@@ -227,7 +287,7 @@ export default function EditActivity() {
     const { user } = useAuth();
     const queryClient = useQueryClient();
     const location = useLocation();
-    const [topLevelTab, setTopLevelTab] = useState("alokasi-ppl"); 
+    const [topLevelTab, setTopLevelTab] = useState("alokasi-ppl");
     const [stageTab, setStageTab] = useState("info-dasar");
     const [formData, setFormData] = useState<Partial<FormState>>({ dokumen: [], ppl: [] });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -246,6 +306,7 @@ export default function EditActivity() {
 
     const { data: pplList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
     const { data: ketuaTimList = [] } = useQuery({ queryKey: ['ketuaTim'], queryFn: fetchKetuaTim });
+    const { data: pmlList = [] } = useQuery({ queryKey: ['pmls'], queryFn: fetchPMLs });
 
     useEffect(() => {
         if (initialData) {
@@ -287,7 +348,7 @@ export default function EditActivity() {
                 ppl: initialData.ppl.map((p, i) => ({...p, clientId: p.id?.toString() || `ppl-${Date.now()}-${i}` }))
             });
             
-            setIsInitializing(false); // <-- TAMBAHKAN INI
+            setIsInitializing(false);
 
             if (location.state?.from === 'create') {
                 setStageTab(location.state.tahap);
@@ -295,11 +356,10 @@ export default function EditActivity() {
         }
     }, [initialData]);
 
-useEffect(() => {
+    useEffect(() => {
         if (!isInitializing && location.state?.newPpls && location.state?.tahap) {
             const { newPpls, tahap } = location.state;
 
-            // Gunakan callback pada setFormData untuk mendapatkan state terbaru
             setFormData(prev => {
                 const existingPplIds = prev.ppl?.filter(p => p.tahap === tahap).map(p => p.ppl_master_id) || [];
                 
@@ -335,7 +395,6 @@ useEffect(() => {
         }
     }, [location.state, isInitializing, navigate]);
 
-
     const mutation = useMutation({
         mutationFn: updateActivity,
         onSuccess: () => {
@@ -350,7 +409,7 @@ useEffect(() => {
         },
         onError: (error) => {
             console.error("Gagal menyimpan:", error);
-            alert(`Terjadi kesalahan saat menyimpan: ${error.message}`);
+            setAlertModal({ isOpen: true, title: "Gagal Menyimpan", message: `Terjadi kesalahan saat menyimpan: ${error.message}` });
         }
     });
 
@@ -436,7 +495,6 @@ useEffect(() => {
             return { ...prev, ppl: newPplList };
         });
     }, []);
-    
 
     const handleSuccessAction = () => {
         setShowSuccessModal(false);
@@ -456,35 +514,34 @@ useEffect(() => {
             return false;
         }
 
-        // Validasi urutan tanggal
-    if (tanggalSelesaiPersiapan < tanggalMulaiPersiapan) {
-        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Persiapan harus setelah atau sama dengan Tanggal Mulai Persiapan." });
-        return false;
-    }
-    if (tanggalMulaiPengumpulanData < tanggalMulaiPersiapan) {
-        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Pengumpulan Data harus setelah atau sama dengan Tanggal Mulai Persiapan." });
-        return false;
-    }
-    if (tanggalSelesaiPengumpulanData < tanggalMulaiPengumpulanData) {
-        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Pengumpulan Data harus setelah atau sama dengan Tanggal Mulai Pengumpulan Data." });
-        return false;
-    }
-    if (tanggalMulaiPengolahanAnalisis < tanggalMulaiPengumpulanData) {
-        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Pengolahan & Analisis harus setelah atau sama dengan Tanggal Mulai Pengumpulan Data." });
-        return false;
-    }
-    if (tanggalSelesaiPengolahanAnalisis < tanggalMulaiPengolahanAnalisis) {
-        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Pengolahan & Analisis harus setelah atau sama dengan Tanggal Mulai Pengolahan & Analisis." });
-        return false;
-    }
-    if (tanggalMulaiDiseminasiEvaluasi < tanggalMulaiPengolahanAnalisis) {
-        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Diseminasi & Evaluasi harus setelah atau sama dengan Tanggal Mulai Pengolahan & Analisis." });
-        return false;
-    }
-    if (tanggalSelesaiDiseminasiEvaluasi < tanggalMulaiDiseminasiEvaluasi) {
-        setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Diseminasi & Evaluasi harus setelah atau sama dengan Tanggal Mulai Diseminasi & Evaluasi." });
-        return false;
-    }
+        if (tanggalSelesaiPersiapan < tanggalMulaiPersiapan) {
+            setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Persiapan harus setelah atau sama dengan Tanggal Mulai Persiapan." });
+            return false;
+        }
+        if (tanggalMulaiPengumpulanData < tanggalMulaiPersiapan) {
+            setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Pengumpulan Data harus setelah atau sama dengan Tanggal Mulai Persiapan." });
+            return false;
+        }
+        if (tanggalSelesaiPengumpulanData < tanggalMulaiPengumpulanData) {
+            setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Pengumpulan Data harus setelah atau sama dengan Tanggal Mulai Pengumpulan Data." });
+            return false;
+        }
+        if (tanggalMulaiPengolahanAnalisis < tanggalMulaiPengumpulanData) {
+            setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Pengolahan & Analisis harus setelah atau sama dengan Tanggal Mulai Pengumpulan Data." });
+            return false;
+        }
+        if (tanggalSelesaiPengolahanAnalisis < tanggalMulaiPengolahanAnalisis) {
+            setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Pengolahan & Analisis harus setelah atau sama dengan Tanggal Mulai Pengolahan & Analisis." });
+            return false;
+        }
+        if (tanggalMulaiDiseminasiEvaluasi < tanggalMulaiPengolahanAnalisis) {
+            setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Mulai Diseminasi & Evaluasi harus setelah atau sama dengan Tanggal Mulai Pengolahan & Analisis." });
+            return false;
+        }
+        if (tanggalSelesaiDiseminasiEvaluasi < tanggalMulaiDiseminasiEvaluasi) {
+            setAlertModal({ isOpen: true, title: "Tanggal Tidak Valid", message: "Tanggal Selesai Diseminasi & Evaluasi harus setelah atau sama dengan Tanggal Mulai Diseminasi & Evaluasi." });
+            return false;
+        }
         return true;
     };
 
@@ -493,7 +550,7 @@ useEffect(() => {
             alert("Error: ID Kegiatan tidak ditemukan.");
             return;
         }
-         if (!validateDates(formData)) { // <-- PANGGIL FUNGSI VALIDASI DI SINI
+        if (!validateDates(formData)) {
             return;
         }
         const dataToSubmit = {
@@ -510,17 +567,6 @@ useEffect(() => {
             tanggalSelesaiDiseminasiEvaluasi: formData.tanggalSelesaiDiseminasiEvaluasi && isValid(formData.tanggalSelesaiDiseminasiEvaluasi) ? format(formData.tanggalSelesaiDiseminasiEvaluasi, 'yyyy-MM-dd') : undefined,
         };
         mutation.mutate(dataToSubmit as Partial<FormState> & {id: number});
-    };
-
-    const addDocument = (tipe: Dokumen['tipe']) => {
-        const newDoc: ClientDokumen = { clientId: `new-doc-${Date.now()}`, tipe, nama: "", link: "", jenis: 'link', isWajib: false };
-        setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
-    };
-    const updateDocument = (clientId: string, field: 'nama' | 'link', value: string) => {
-        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.map(d => (d.clientId === clientId ? { ...d, [field]: value } : d)) }));
-    };
-    const removeDocument = (clientId: string) => {
-        setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) }));
     };
 
     const AlokasiPPLContent = ({ tahap }: { tahap: PPL['tahap'] }) => {
@@ -616,7 +662,7 @@ useEffect(() => {
                                 onRemove={removePPL}
                                 onUpdate={updatePPL}
                                 pplList={pplList}
-                                honorariumTahap={honorariumTahap}
+                                pmlList={pmlList}
                             />
                         ))}
                         <Button type="button" variant="outline" onClick={() => addPPL(tahap)} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL</Button>
@@ -634,40 +680,7 @@ useEffect(() => {
             </Card>
         );
     };
-
-    const DokumenItem = ({ doc, updateDocument, removeDocument }: { doc: ClientDokumen, updateDocument: (id: string, field: 'nama' | 'link', value: string) => void, removeDocument: (id: string) => void }) => {
-    const [nama, setNama] = useState(doc.nama);
-    const [link, setLink] = useState(doc.link);
-    const isApproved = doc.status === 'Approved';
-
-    const handleNamaBlur = () => {
-        if (nama !== doc.nama) {
-            updateDocument(doc.clientId, 'nama', nama);
-        }
-    };
-
-    const handleLinkBlur = () => {
-        if (link !== doc.link) {
-            updateDocument(doc.clientId, 'link', link);
-        }
-    };
-
-    useEffect(() => {
-        setNama(doc.nama);
-        setLink(doc.link);
-    }, [doc.nama, doc.link]);
-
-    return (
-        <div key={doc.clientId} className={cn("flex items-center gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50 border-green-200" : (doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50"))}>
-            <div className="flex-grow space-y-2">
-                {doc.isWajib ? <Label className="font-semibold">{doc.nama} *</Label> : <Input placeholder="Nama Dokumen Pendukung" value={nama} onChange={(e) => setNama(e.target.value)} onBlur={handleNamaBlur} disabled={isApproved} />}
-                <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-gray-400"/><Input placeholder="https://drive.google.com/..." value={link} onChange={(e) => setLink(e.target.value)} onBlur={handleLinkBlur} disabled={isApproved} /></div>
-            </div>
-            {!doc.isWajib && !isApproved ? (<Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>) : (<div className="self-center p-2" title={isApproved ? "Dokumen Disetujui" : "Dokumen Wajib"}><Lock className="w-4 h-4 text-gray-400"/></div>)}
-        </div>
-    );
-};
-
+    
     const DokumenContent = ({ tipe, title }: { tipe: Dokumen['tipe'], title: string }) => {
         const documents = useMemo(() => formData.dokumen?.filter(d => d.tipe === tipe && d.jenis !== 'catatan') || [], [formData.dokumen, tipe]);
         const note = useMemo(() => formData.dokumen?.find(d => d.tipe === tipe && d.jenis === 'catatan'), [formData.dokumen, tipe]);
@@ -679,7 +692,7 @@ useEffect(() => {
         const removeDocument = (clientId: string) => {
             setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) }));
         };
-        const addDocument = (tipe: Dokumen['tipe']) => {
+         const addDocument = (tipe: Dokumen['tipe']) => {
             const newDoc: ClientDokumen = { clientId: `new-doc-${Date.now()}`, tipe, nama: "", link: "", jenis: 'link', isWajib: false };
             setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
         };
@@ -738,7 +751,6 @@ useEffect(() => {
     return (
         <Layout>
             <div className="max-w-4xl mx-auto">
-                {/* Header and Notifications */}
                 <div className="flex items-center gap-4 mb-8">
                     <Button variant="outline" asChild><Link to="/dashboard"><ArrowLeft className="w-4 h-4 mr-2" />Kembali</Link></Button>
                     <Button variant="outline" asChild><Link to={`/view-documents/${id}`}><FileText className="w-4 h-4 mr-2" />Lihat Dokumen</Link></Button>
@@ -749,8 +761,7 @@ useEffect(() => {
                         ✅ {notification}
                     </div>
                 )}
-
-                {/* Top Level Tabs (conditional) */}
+                
                 {stageTab !== 'info-dasar' && (
                     <Tabs value={topLevelTab} onValueChange={setTopLevelTab} className="mb-6">
                         <TabsList className="grid w-full grid-cols-2">
@@ -760,7 +771,6 @@ useEffect(() => {
                     </Tabs>
                 )}
                 
-                {/* Stage Level Tabs */}
                 <Tabs value={stageTab} onValueChange={setStageTab} className="space-y-6">
                     <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="info-dasar">Info Dasar</TabsTrigger>
@@ -770,7 +780,6 @@ useEffect(() => {
                         <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi</TabsTrigger>
                     </TabsList>
                     
-                    {/* Content for Stages */}
                     <div className={cn(stageTab !== 'info-dasar' && 'hidden')}>
                         <div className="space-y-6">
                            <Card>
@@ -800,6 +809,8 @@ useEffect(() => {
                             </Card>
                         </div>
                     </div>
+                    
+                    <TabsContent value="info-dasar" />
 
                     <TabsContent value="persiapan">
                         {topLevelTab === 'alokasi-ppl' ? <AlokasiPPLContent tahap="persiapan" /> : <DokumenContent tipe="persiapan" title="Persiapan"/>}

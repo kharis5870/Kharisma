@@ -12,6 +12,8 @@ router.delete('/users/:id', async (req, res) => {
     res.status(204).send();
 });
 
+router.get('/pml', async (_req, res) => res.json(await adminService.getAllPMLs()));
+
 // Ketua Tim routes
 router.get('/ketua-tim', async (_req, res) => res.json(await adminService.getAllKetuaTim()));
 router.post('/ketua-tim', async (req, res) => res.status(201).json(await adminService.createKetuaTim(req.body)));

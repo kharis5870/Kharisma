@@ -41,8 +41,11 @@ export const deleteUser = async (id: string): Promise<boolean> => {
     return result.affectedRows > 0;
 };
 
-// --- Ketua Tim & PPL Management (Tidak ada perubahan) ---
-// ... (sisa kode tetap sama)
+export const getAllPMLs = async (): Promise<UserData[]> => {
+    const [rows] = await db.query<RowDataPacket[]>("SELECT id, nama_lengkap AS namaLengkap FROM users WHERE isPML = TRUE ORDER BY nama_lengkap ASC");
+    return rows as UserData[];
+};
+
 export const getAllKetuaTim = async (): Promise<KetuaTimData[]> => {
     const [rows] = await db.query<RowDataPacket[]>('SELECT id, nama_ketua AS nama, nip FROM ketua_tim ORDER BY nama_ketua ASC');
     return rows as KetuaTimData[];
