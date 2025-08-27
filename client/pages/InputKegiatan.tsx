@@ -20,7 +20,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import useInputKegiatanStore from "@/stores/useInputKegiatanStore";
+import useInputKegiatanStore, { PPLItem } from "@/stores/useInputKegiatanStore"; // <-- Impor PPLItem di sini
 import { PPLMaster, KetuaTim, PPL, Kegiatan } from "@shared/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -218,23 +218,37 @@ export default function InputKegiatan() {
 
   useEffect(() => {
     if (selectedPPLsForActivity.length > 0) {
-        const newAllocations = selectedPPLsForActivity.map(ppl => ({
+        const tahap = "persiapan" as const;
+        
+        const newAllocations: PPLItem[] = selectedPPLsForActivity.map(ppl => ({
             id: `ppl-${ppl.id}-${Date.now()}`,
             ppl_master_id: ppl.id,
             namaPPL: ppl.namaPPL,
             bebanKerja: "",
             besaranHonor: "0",
             namaPML: "",
-            tahap: "persiapan" as const
+            tahap: tahap
         }));
-        store.setPplAllocations([...store.pplAllocations, ...newAllocations]);
-        setAddedPPLCount(selectedPPLsForActivity.length);
-        setShowAutoPopulateMessage(true);
-        setActiveTab("persiapan"); 
-        setTimeout(() => setShowAutoPopulateMessage(false), 5000);
+
+        const currentPpls = useInputKegiatanStore.getState().pplAllocations;
+        const newPplsToAdd = newAllocations.filter(np => 
+            !currentPpls.some((ep: PPLItem) => ep.ppl_master_id === np.ppl_master_id && ep.tahap === tahap)
+        );
+
+        if (newPplsToAdd.length > 0) {
+            store.setPplAllocations([...currentPpls, ...newPplsToAdd]);
+            setAddedPPLCount(newPplsToAdd.length);
+            setShowAutoPopulateMessage(true);
+            setTimeout(() => setShowAutoPopulateMessage(false), 5000);
+        }
+        
+        setStageTab(tahap);
+        setTopLevelTab('alokasi-ppl');
+        
         clearSelectedPPLsForActivity();
     }
-  }, [selectedPPLsForActivity, store.setPplAllocations, clearSelectedPPLsForActivity]);
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [selectedPPLsForActivity, clearSelectedPPLsForActivity]);
 
 
   const mutation = useMutation({

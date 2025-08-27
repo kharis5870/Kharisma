@@ -298,35 +298,42 @@ export default function EditActivity() {
 useEffect(() => {
         if (!isInitializing && location.state?.newPpls && location.state?.tahap) {
             const { newPpls, tahap } = location.state;
-            const existingPplIds = formData.ppl?.filter(p => p.tahap === tahap).map(p => p.ppl_master_id) || [];
-            
-            const pplsToAdd = newPpls.filter((ppl: PPLMaster) => !existingPplIds.includes(ppl.id));
-            const duplicates = newPpls.filter((ppl: PPLMaster) => existingPplIds.includes(ppl.id));
 
-            if (duplicates.length > 0) {
-                setAlertModal({ isOpen: true, title: "PPL Sudah Ada", message: `PPL berikut sudah dialokasikan pada tahap ini: ${duplicates.map((d: PPLMaster) => d.namaPPL).join(', ')}.` });
-            }
+            // Gunakan callback pada setFormData untuk mendapatkan state terbaru
+            setFormData(prev => {
+                const existingPplIds = prev.ppl?.filter(p => p.tahap === tahap).map(p => p.ppl_master_id) || [];
+                
+                const pplsToAdd = newPpls.filter((ppl: PPLMaster) => !existingPplIds.includes(ppl.id));
+                const duplicates = newPpls.filter((ppl: PPLMaster) => existingPplIds.includes(ppl.id));
 
-            if (pplsToAdd.length > 0) {
-                const newAllocations: ClientPPL[] = pplsToAdd.map((ppl: PPLMaster) => ({
-                    clientId: `new-ppl-${Date.now()}-${ppl.id}`,
-                    ppl_master_id: ppl.id,
-                    namaPPL: ppl.namaPPL,
-                    namaPML: "",
-                    bebanKerja: "",
-                    besaranHonor: "0",
-                    tahap: tahap,
-                }));
-    
-                setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), ...newAllocations] }));
-                setNotification(`${pplsToAdd.length} PPL berhasil ditambahkan ke tahap ${tahap.replace(/-/g, ' ')}.`);
-                setTimeout(() => setNotification(null), 5000);
-                setStageTab(tahap);
-            }
+                if (duplicates.length > 0) {
+                    setAlertModal({ isOpen: true, title: "PPL Sudah Ada", message: `PPL berikut sudah dialokasikan pada tahap ini: ${duplicates.map((d: PPLMaster) => d.namaPPL).join(', ')}.` });
+                }
 
-            navigate(location.pathname, { replace: true, state: {} }); // Hapus state setelah digunakan
+                if (pplsToAdd.length > 0) {
+                    const newAllocations: ClientPPL[] = pplsToAdd.map((ppl: PPLMaster) => ({
+                        clientId: `new-ppl-${Date.now()}-${ppl.id}`,
+                        ppl_master_id: ppl.id,
+                        namaPPL: ppl.namaPPL,
+                        namaPML: "",
+                        bebanKerja: "",
+                        besaranHonor: "0",
+                        tahap: tahap,
+                    }));
+        
+                    setNotification(`${pplsToAdd.length} PPL berhasil ditambahkan ke tahap ${tahap.replace(/-/g, ' ')}.`);
+                    setTimeout(() => setNotification(null), 5000);
+                    setStageTab(tahap);
+                    setTopLevelTab('alokasi-ppl');
+
+                    return { ...prev, ppl: [...(prev.ppl || []), ...newAllocations] };
+                }
+                return prev;
+            });
+
+            navigate(location.pathname, { replace: true, state: {} });
         }
-    }, [location.state, isInitializing, formData.ppl, navigate]);
+    }, [location.state, isInitializing, navigate]);
 
 
     const mutation = useMutation({

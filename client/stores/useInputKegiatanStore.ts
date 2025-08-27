@@ -11,7 +11,7 @@ interface HonorariumTahap {
   hargaSatuan: string;
 }
 
-interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId' | 'namaPPL' | 'satuanBebanKerja' | 'hargaSatuan'> {
+export interface PPLItem extends Omit<PPL, 'id' | 'kegiatanId' | 'namaPPL' | 'satuanBebanKerja' | 'hargaSatuan'> {
   id: string;
   namaPPL: string;
 }
