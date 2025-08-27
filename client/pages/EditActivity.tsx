@@ -121,12 +121,6 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
         setNamaPML(ppl.namaPML);
     }, [ppl.bebanKerja, ppl.namaPML]);
 
-    const totalHonor = useMemo(() => {
-        const beban = parseInt(String(bebanKerja)) || 0;
-        const harga = parseInt(parseHonor(honorariumTahap.hargaSatuan)) || 0;
-        return (beban * harga).toString();
-    }, [bebanKerja, honorariumTahap.hargaSatuan]);
-
     const handleBebanKerjaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setBebanKerja(e.target.value);
     };
@@ -146,12 +140,6 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
             onUpdate(ppl.clientId, 'namaPML', namaPML);
         }
     };
-    
-    useEffect(() => {
-      if (ppl.besaranHonor !== totalHonor) {
-        onUpdate(ppl.clientId, 'besaranHonor', totalHonor);
-      }
-    }, [totalHonor, ppl.clientId, ppl.besaranHonor, onUpdate]);
 
     return (
         <div className="p-4 border rounded-lg space-y-4 bg-gray-50">
@@ -213,7 +201,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor={`besaranHonor-${ppl.clientId}`}>Total Honor (Rp) *</Label>
-                    <Input id={`besaranHonor-${ppl.clientId}`} name={`besaranHonor-${ppl.clientId}`} value={formatHonor(totalHonor)} readOnly className="bg-gray-100"/>
+                    <Input id={`besaranHonor-${ppl.clientId}`} name={`besaranHonor-${ppl.clientId}`} value={formatHonor(ppl.besaranHonor)} readOnly className="bg-gray-100"/>
                 </div>
                 <div className="space-y-2 lg:col-span-5">
                     <Label htmlFor={`namaPML-${ppl.clientId}`}>Nama PML *</Label>
@@ -223,7 +211,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
                         placeholder="Nama PML" 
                         value={namaPML} 
                         onChange={handleNamaPMLChange}
-                        onBlur={handleNamaPMLBlur}
+                        onBlur={handleBebanKerjaBlur}
                     />
                 </div>
             </div>

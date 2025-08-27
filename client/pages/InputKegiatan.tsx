@@ -85,20 +85,12 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
     const [bebanKerja, setBebanKerja] = useState(ppl.bebanKerja);
     const [namaPML, setNamaPML] = useState(ppl.namaPML);
     const [isComboboxOpen, setIsComboboxOpen] = useState(false);
-    
-    const honorariumTahap = useInputKegiatanStore(state => state.honorarium[ppl.tahap as keyof typeof state.honorarium]);
 
     useEffect(() => {
         setBebanKerja(ppl.bebanKerja);
         setNamaPML(ppl.namaPML);
     }, [ppl.bebanKerja, ppl.namaPML]);
 
-    const totalHonor = useMemo(() => {
-        const beban = parseInt(String(bebanKerja)) || 0;
-        const harga = parseInt(parseHonor(honorariumTahap.hargaSatuan)) || 0;
-        return (beban * harga).toString();
-    }, [bebanKerja, honorariumTahap.hargaSatuan]);
-    
     const handleBebanKerjaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setBebanKerja(e.target.value);
     };
@@ -108,22 +100,16 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pplList, store }: 
             store.getState().updatePPL(ppl.id, 'bebanKerja', bebanKerja);
         }
     };
-    
+
     const handleNamaPMLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setNamaPML(e.target.value);
     };
-    
+
     const handleNamaPMLBlur = () => {
         if (namaPML !== ppl.namaPML) {
             store.getState().updatePPL(ppl.id, 'namaPML', namaPML);
         }
     };
-
-    useEffect(() => {
-        if (ppl.besaranHonor !== totalHonor) {
-            store.getState().updatePPL(ppl.id, 'besaranHonor', totalHonor);
-        }
-    }, [totalHonor, ppl.id, ppl.besaranHonor, store]);
     
     return (
         <div className="p-4 border rounded-lg space-y-4 bg-gray-50">
