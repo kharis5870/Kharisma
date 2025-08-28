@@ -10,13 +10,15 @@ export interface Dokumen {
   status?: 'Pending' | 'Reviewed' | 'Approved';
   uploadedAt?: string;
   isWajib?: boolean;
+  lastApproved?: string;
+  lastApprovedBy?: string;
 }
 
 export interface PPL {
-  id?: number; 
+  id?: number;
   kegiatanId?: number;
-  ppl_master_id: string; 
-  namaPPL?: string; 
+  ppl_master_id: string;
+  namaPPL?: string;
   namaPML: string;
   bebanKerja: string;
   satuanBebanKerja: string;
@@ -44,7 +46,7 @@ export interface Kegiatan {
   id: number;
   namaKegiatan: string;
   ketua_tim_id: string;
-  namaKetua?: string; 
+  namaKetua?: string;
   deskripsiKegiatan: string;
   adaListing: boolean;
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';
@@ -54,7 +56,7 @@ export interface Kegiatan {
   progressPendataanSubmit: number;
   progressPengolahanSubmit: number;
   lastUpdated: string;
-  lastUpdatedBy?: string; 
+  lastUpdatedBy?: string;
   lastEdited?: string;
   lastEditedBy?: string;
   dokumen: Dokumen[];
@@ -75,7 +77,7 @@ export interface PPLHonorData {
   honorBulanIni: number;
   activitiesCount: number;
   kegiatanNames: string[];
-  honorPerBulan: number[]; 
+  honorPerBulan: number[];
 }
 
 
@@ -84,7 +86,7 @@ export interface PPLHonorData {
 export interface UserData {
     id: string;
     username: string;
-    password?: string; 
+    password?: string;
     namaLengkap: string;
     role: 'admin' | 'supervisor' | 'user';
     isPML?: boolean;

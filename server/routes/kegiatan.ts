@@ -1,3 +1,4 @@
+// server/routes/kegiatan.ts
 import { Router } from 'express';
 import {
   getAllKegiatan,
@@ -7,7 +8,7 @@ import {
   updatePplProgress,
   deleteKegiatan,
   updateDocumentStatus,
-  approveDocumentsByTipe // <-- Impor fungsi baru
+  approveDocumentsByTipe
 } from '../services/kegiatanService';
 
 const router = Router();
@@ -75,13 +76,16 @@ router.put('/ppl/:pplId/progress', async (req, res) => {
 router.put('/dokumen/:dokumenId/status', async (req, res) => {
     try {
         const { dokumenId } = req.params;
-        const { status } = req.body;
+        const { status, username } = req.body;
 
         if (!status || !['Pending', 'Reviewed', 'Approved'].includes(status)) {
             return res.status(400).json({ message: 'Status tidak valid' });
         }
+        if (!username) {
+            return res.status(400).json({ message: 'Username diperlukan' });
+        }
 
-        const updatedDokumen = await updateDocumentStatus(parseInt(dokumenId), status);
+        const updatedDokumen = await updateDocumentStatus(parseInt(dokumenId), status, username);
         res.json(updatedDokumen);
     } catch (error) {
         console.error("Error updating document status:", error);
@@ -93,19 +97,23 @@ router.put('/dokumen/:dokumenId/status', async (req, res) => {
 router.put('/:kegiatanId/tahapan/approve', async (req, res) => {
     try {
         const { kegiatanId } = req.params;
-        const { tipe } = req.body;
+        const { tipe, username } = req.body;
 
         if (!tipe || !['persiapan', 'pengumpulan-data', 'pengolahan-analisis', 'diseminasi-evaluasi'].includes(tipe)) {
             return res.status(400).json({ message: 'Tipe tahapan tidak valid' });
         }
+        if (!username) {
+            return res.status(400).json({ message: 'Username diperlukan' });
+        }
 
-        await approveDocumentsByTipe(parseInt(kegiatanId), tipe);
+        await approveDocumentsByTipe(parseInt(kegiatanId), tipe, username);
         res.status(200).json({ message: `Semua dokumen untuk tahap ${tipe} telah disetujui.` });
     } catch (error) {
         console.error("Error approving documents by stage:", error);
         res.status(500).json({ message: 'Gagal menyetujui dokumen tahapan' });
     }
 });
+
 
 // DELETE kegiatan
 router.delete('/:id', async (req, res) => {

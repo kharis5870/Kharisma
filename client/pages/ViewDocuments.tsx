@@ -22,21 +22,21 @@ const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     return res.json();
 };
 
-const updateDocumentStatus = async ({ dokumenId, status }: { dokumenId: number, status: Dokumen['status'] }) => {
+const updateDocumentStatus = async ({ dokumenId, status, username }: { dokumenId: number, status: Dokumen['status'], username: string }) => {
     const res = await fetch(`/api/kegiatan/dokumen/${dokumenId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, username }),
     });
     if (!res.ok) throw new Error("Gagal memperbarui status dokumen");
     return res.json();
 };
 
-const approveTahapan = async ({ kegiatanId, tipe }: { kegiatanId: number, tipe: Dokumen['tipe'] }) => {
+const approveTahapan = async ({ kegiatanId, tipe, username }: { kegiatanId: number, tipe: Dokumen['tipe'], username: string }) => {
     const res = await fetch(`/api/kegiatan/${kegiatanId}/tahapan/approve`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipe }),
+        body: JSON.stringify({ tipe, username }),
     });
     if (!res.ok) throw new Error("Gagal menyetujui tahapan");
     return res.json();
@@ -72,7 +72,7 @@ export default function ViewDocuments() {
 
     const handleStatusChange = (dokumenId: number, currentStatus: Dokumen['status']) => {
         const newStatus = currentStatus === 'Approved' ? 'Pending' : 'Approved';
-        statusMutation.mutate({ dokumenId, status: newStatus });
+        statusMutation.mutate({ dokumenId, status: newStatus, username: user!.username });
     };
     
     const handleApproveTahapan = (tipe: Dokumen['tipe']) => {
@@ -80,7 +80,7 @@ export default function ViewDocuments() {
             isOpen: true,
             title: `Setujui Semua Dokumen?`,
             description: `Anda akan menyetujui semua dokumen untuk tahap "${tipe.replace(/-/g, ' ')}". Aksi ini tidak dapat dibatalkan secara massal.`,
-            onConfirm: () => tahapanMutation.mutate({ kegiatanId: parseInt(id!), tipe })
+            onConfirm: () => tahapanMutation.mutate({ kegiatanId: parseInt(id!), tipe, username: user!.username })
         });
     };
 
@@ -120,6 +120,7 @@ export default function ViewDocuments() {
                         <TableHead>Jenis</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Tanggal</TableHead>
+                        <TableHead>Last Approved</TableHead>
                         <TableHead>Aksi</TableHead>
                         <TableHead>Persetujuan</TableHead>
                     </TableRow>
@@ -137,6 +138,14 @@ export default function ViewDocuments() {
                                 <TableCell><Badge variant="outline">{doc.jenis === 'link' ? 'Drive Link' : doc.jenis === 'catatan' ? 'Catatan' : 'File'}</Badge></TableCell>
                                 <TableCell><Badge className={cn("flex items-center gap-1 w-fit", getStatusColor(doc.status))}>{getStatusIcon(doc.status)} {doc.status || 'N/A'}</Badge></TableCell>
                                 <TableCell>{getRelativeTime(doc.uploadedAt)}</TableCell>
+                                <TableCell>
+                                    {doc.lastApproved ? (
+                                        <div className="text-xs">
+                                            <p className="font-medium">{getRelativeTime(doc.lastApproved)}</p>
+                                            <p className="text-gray-500">oleh {doc.lastApprovedBy}</p>
+                                        </div>
+                                    ) : '-'}
+                                </TableCell>
                                 <TableCell>
                                     {doc.jenis === 'catatan' ? (
                                         <Button variant="outline" size="sm" onClick={() => setNoteViewModal({ isOpen: true, title: doc.nama, content: doc.link })} className="flex items-center gap-1">

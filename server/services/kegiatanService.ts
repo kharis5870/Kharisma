@@ -231,9 +231,9 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         }
 
         if (dokumen && dokumen.length > 0) {
-            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib, status) VALUES ?';
+            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib, status, lastApproved, lastApprovedBy) VALUES ?';
             const docValues = dokumen.map((doc: any) => [
-                id, doc.nama, doc.link, doc.jenis, doc.tipe, doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(), doc.isWajib || false, doc.status || 'Pending'
+                id, doc.nama, doc.link, doc.jenis, doc.tipe, doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(), doc.isWajib || false, doc.status || 'Pending', doc.lastApproved ? new Date(doc.lastApproved) : null, doc.lastApprovedBy
             ]);
             await connection.query(docQuery, [docValues]);
         }
@@ -333,9 +333,15 @@ export const deleteKegiatan = async (id: number): Promise<boolean> => {
     }
 };
 
-export const updateDocumentStatus = async (dokumenId: number, status: Dokumen['status']): Promise<Dokumen> => {
-    const query = 'UPDATE dokumen SET status = ? WHERE id = ?';
-    await db.execute(query, [status, dokumenId]);
+export const updateDocumentStatus = async (dokumenId: number, status: Dokumen['status'], username: string): Promise<Dokumen> => {
+    if (status === 'Approved') {
+        const query = 'UPDATE dokumen SET status = ?, lastApproved = CURRENT_TIMESTAMP, lastApprovedBy = ? WHERE id = ?';
+        await db.execute(query, [status, username, dokumenId]);
+    } else {
+        const query = 'UPDATE dokumen SET status = ? WHERE id = ?';
+        await db.execute(query, [status, dokumenId]);
+    }
+
     const [rows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE id = ?', [dokumenId]);
     if (rows.length === 0) {
         throw new Error("Dokumen tidak ditemukan setelah update");
@@ -343,8 +349,8 @@ export const updateDocumentStatus = async (dokumenId: number, status: Dokumen['s
     return rows[0] as Dokumen;
 };
 
-export const approveDocumentsByTipe = async (kegiatanId: number, tipe: Dokumen['tipe']): Promise<OkPacket> => {
-    const query = 'UPDATE dokumen SET status = ? WHERE kegiatanId = ? AND tipe = ?';
-    const [result] = await db.execute<OkPacket>(query, ['Approved', kegiatanId, tipe]);
+export const approveDocumentsByTipe = async (kegiatanId: number, tipe: Dokumen['tipe'], username: string): Promise<OkPacket> => {
+    const query = 'UPDATE dokumen SET status = ?, lastApproved = CURRENT_TIMESTAMP, lastApprovedBy = ? WHERE kegiatanId = ? AND tipe = ? AND status != ?';
+    const [result] = await db.execute<OkPacket>(query, ['Approved', username, kegiatanId, tipe, 'Approved']);
     return result;
 };
