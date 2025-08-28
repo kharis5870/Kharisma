@@ -283,7 +283,8 @@ export default function ManajemenAdmin() {
   
   const userStats = useMemo(() => ({ totalUsers: userList.length, adminUsers: userList.filter(u => u.role === 'admin').length, supervisorUsers: userList.filter(u => u.role === 'supervisor').length, regularUsers: userList.filter(u => u.role === 'user').length }), [userList]);
   const ketuaTimStats = useMemo(() => ({ totalKetuaTim: ketuaTimList.length }), [ketuaTimList]);
-  const pplStats = useMemo(() => ({ totalPPL: pplAdminList.length, totalKegiatan: pplAdminList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0), avgKegiatan: pplAdminList.length > 0 ? Math.round(pplAdminList.reduce((sum, ppl) => sum + ppl.totalKegiatan, 0) / pplAdminList.length) : 0 }), [pplAdminList]);
+  const pplStats = useMemo(() => ({ totalPPL: pplAdminList.length }), [pplAdminList]);
+
 
   // PERBAIKAN: Logika paginasi untuk setiap tab
   const paginatedUsers = useMemo(() => {
@@ -450,10 +451,8 @@ export default function ManajemenAdmin() {
           </TabsContent>
           
            <TabsContent value="ppl" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-6">
                 <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total PPL</p><p className="text-2xl font-bold text-gray-900">{pplStats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
-                <Card className="border-l-4 border-l-orange-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total Kegiatan</p><p className="text-2xl font-bold text-gray-900">{pplStats.totalKegiatan}</p></div><Activity className="w-8 h-8 text-orange-500" /></div></CardContent></Card>
-                <Card className="border-l-4 border-l-purple-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Rata-rata Kegiatan</p><p className="text-2xl font-bold text-gray-900">{pplStats.avgKegiatan}</p></div><Activity className="w-8 h-8 text-purple-500" /></div></CardContent></Card>
             </div>
             <Card>
                 <CardHeader>

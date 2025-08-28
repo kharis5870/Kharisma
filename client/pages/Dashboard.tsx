@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare } from "lucide-react";
+import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare, Layers, ClipboardCheck } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen } from "@shared/api";
 import { cn } from "@/lib/utils";
@@ -145,6 +145,8 @@ export default function Dashboard() {
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [progressView, setProgressView] = useState<'pendataan' | 'pengolahan'>('pendataan');
+  const [progressType, setProgressType] = useState<'submit' | 'approved'>('approved');
   const [pplSearchView, setPplSearchView] = useState("");
   const [pplSearchUpdate, setPplSearchUpdate] = useState("");
 
@@ -403,23 +405,51 @@ export default function Dashboard() {
                             <Input id="search" type="text" placeholder="Cari nama kegiatan..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
                         </div>
                     </div>
-                    <div className="sm:w-64">
-                        <Label htmlFor="status-filter" className="text-sm font-medium text-gray-700 mb-2 block">Filter Status</Label>
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger>
-                                <Filter className="w-4 h-4 mr-2" />
-                                <SelectValue placeholder="Semua Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Semua Status</SelectItem>
-                                <SelectItem value="Persiapan">Persiapan</SelectItem>
-                                <SelectItem value="Pengumpulan Data">Pengumpulan Data</SelectItem>
-                                <SelectItem value="Pengolahan & Analisis">Pengolahan & Analisis</SelectItem>
-                                <SelectItem value="Diseminasi & Evaluasi">Diseminasi & Evaluasi</SelectItem>
-                                <SelectItem value="Selesai">Selesai</SelectItem>
-                                <SelectItem value="warning">Ada Warning</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    <div className="flex items-end gap-2">
+                        <div className="sm:w-48">
+                            <Label htmlFor="progress-type" className="text-sm font-medium text-gray-700 mb-2 block">Tipe Progress</Label>
+                            <Select value={progressType} onValueChange={(v) => setProgressType(v as any)}>
+                                <SelectTrigger>
+                                    <ClipboardCheck className="w-4 h-4 mr-2" />
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="submit">Submit</SelectItem>
+                                    <SelectItem value="approved">Approved</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="sm:w-48">
+                            <Label htmlFor="progress-view" className="text-sm font-medium text-gray-700 mb-2 block">Tahap Progress</Label>
+                            <Select value={progressView} onValueChange={(v) => setProgressView(v as any)}>
+                                <SelectTrigger>
+                                    <Layers className="w-4 h-4 mr-2" />
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="pendataan">Pendataan</SelectItem>
+                                    <SelectItem value="pengolahan">Pengolahan</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="sm:w-64">
+                            <Label htmlFor="status-filter" className="text-sm font-medium text-gray-700 mb-2 block">Filter Status</Label>
+                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <SelectTrigger>
+                                    <Filter className="w-4 h-4 mr-2" />
+                                    <SelectValue placeholder="Semua Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Semua Status</SelectItem>
+                                    <SelectItem value="Persiapan">Persiapan</SelectItem>
+                                    <SelectItem value="Pengumpulan Data">Pengumpulan Data</SelectItem>
+                                    <SelectItem value="Pengolahan & Analisis">Pengolahan & Analisis</SelectItem>
+                                    <SelectItem value="Diseminasi & Evaluasi">Diseminasi & Evaluasi</SelectItem>
+                                    <SelectItem value="Selesai">Selesai</SelectItem>
+                                    <SelectItem value="warning">Ada Warning</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </div>
 
@@ -433,6 +463,11 @@ export default function Dashboard() {
                 ) : (
                     filteredActivities.map((activity) => {
                     const { status, color, warnings } = activity.dynamicStatus;
+                    const progressValue = progressView === 'pendataan' 
+                        ? (progressType === 'submit' ? activity.progressPendataanSubmit : activity.progressPendataanApproved)
+                        : (progressType === 'submit' ? activity.progressPengolahanSubmit : activity.progressPengolahanApproved);
+                    const progressLabel = `Progress ${progressView === 'pendataan' ? 'Pendataan' : 'Pengolahan'} (${progressType === 'submit' ? 'Submit' : 'Approved'})`;
+
 
                     const getStageDates = () => {
                         const formatDate = (dateString?: string) => dateString ? format(new Date(dateString), 'dd MMM yyyy', { locale: localeID }) : '-';
@@ -474,8 +509,8 @@ export default function Dashboard() {
                             <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.namaKetua}</p></div><Badge className={cn("ml-2 whitespace-nowrap", warnings.length > 0 ? 'bg-red-100 text-red-700' : color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
                             <CardContent className="space-y-4 flex-grow flex flex-col justify-between">
                                 <div>
-                                    <div className="flex justify-between items-center mb-2"><span className="text-sm font-medium">Progress Pendataan/Pengolahan</span><span className="text-sm font-bold text-bps-blue-600">{activity.progressKeseluruhan || 0}%</span></div>
-                                    <Progress value={activity.progressKeseluruhan || 0} className="h-2" />
+                                    <div className="flex justify-between items-center mb-2"><span className="text-sm font-medium">{progressLabel}</span><span className="text-sm font-bold text-bps-blue-600">{progressValue || 0}%</span></div>
+                                    <Progress value={progressValue || 0} className="h-2" />
                                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
                                         {getStageDates()}
                                     </div>

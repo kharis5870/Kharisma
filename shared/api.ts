@@ -49,6 +49,10 @@ export interface Kegiatan {
   adaListing: boolean;
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';
   progressKeseluruhan: number;
+  progressPendataanApproved: number;
+  progressPengolahanApproved: number;
+  progressPendataanSubmit: number;
+  progressPengolahanSubmit: number;
   lastUpdated: string;
   lastUpdatedBy?: string; 
   lastEdited?: string;

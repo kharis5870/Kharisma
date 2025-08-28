@@ -6,6 +6,25 @@ import { Kegiatan, Dokumen, PPL } from '@shared/api';
 
 interface KegiatanPacket extends Kegiatan, RowDataPacket {}
 
+const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | 'Submit'): number => {
+    const pplTahap = ppl.filter(p => p.tahap === tahap);
+    if (pplTahap.length === 0) return 0;
+
+    const totalBebanKerja = pplTahap.reduce((acc, p) => acc + (parseInt(p.bebanKerja) || 0), 0);
+    if (totalBebanKerja === 0) return 0;
+
+    const totalProgress = pplTahap.reduce((acc, p) => {
+        const approved = p.progressApproved || 0;
+        if (type === 'Approved') {
+            return acc + approved;
+        }
+        // Untuk 'Submit', kita hitung 'submit', 'diperiksa', dan 'approved'
+        return acc + (p.progressSubmit || 0) + (p.progressDiperiksa || 0) + approved;
+    }, 0);
+    
+    return Math.round((totalProgress / totalBebanKerja) * 100);
+};
+
 const getKegiatanWithRelations = async (whereClause: string, params: any[]): Promise<Kegiatan[]> => {
     const query = `
         SELECT
@@ -28,6 +47,11 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
 
         kegiatan.dokumen = dokumenRows as Dokumen[];
         kegiatan.ppl = pplRows as PPL[];
+        // Menghitung progress dan menambahkannya ke objek kegiatan
+        kegiatan.progressPendataanApproved = calculateProgress(kegiatan.ppl, 'pengumpulan-data', 'Approved');
+        kegiatan.progressPengolahanApproved = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Approved');
+        kegiatan.progressPendataanSubmit = calculateProgress(kegiatan.ppl, 'pengumpulan-data', 'Submit');
+        kegiatan.progressPengolahanSubmit = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Submit');
     }
     return kegiatanRows;
 };
@@ -62,8 +86,10 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
              tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
              tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
              tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
-             status, progressKeseluruhan, lastUpdatedBy, lastEditedBy)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?, ?)
+             status, progressKeseluruhan, lastUpdatedBy, lastEditedBy, 
+             progressPendataanApproved, progressPengolahanApproved, 
+             progressPendataanSubmit, progressPengolahanSubmit)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?, ?, 0, 0, 0, 0)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
             namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false,
@@ -212,14 +238,20 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             await connection.query(docQuery, [docValues]);
         }
 
-        const [allPplForKegiatan] = await connection.query<RowDataPacket[]>('SELECT bebanKerja, progressApproved FROM ppl WHERE kegiatanId = ?', [id]);
+        const [allPplForKegiatan] = await connection.query<RowDataPacket[]>('SELECT tahap, bebanKerja, progressApproved, progressSubmit, progressDiperiksa FROM ppl WHERE kegiatanId = ?', [id]);
+        
+        const progressPendataanApproved = calculateProgress(allPplForKegiatan as PPL[], 'pengumpulan-data', 'Approved');
+        const progressPengolahanApproved = calculateProgress(allPplForKegiatan as PPL[], 'pengolahan-analisis', 'Approved');
+        const progressPendataanSubmit = calculateProgress(allPplForKegiatan as PPL[], 'pengumpulan-data', 'Submit');
+        const progressPengolahanSubmit = calculateProgress(allPplForKegiatan as PPL[], 'pengolahan-analisis', 'Submit');
+        
         const totalBebanKerja = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja) || 0), 0);
         const totalApproved = allPplForKegiatan.reduce((acc, p) => acc + (p.progressApproved || 0), 0);
         const progressKeseluruhan = totalBebanKerja > 0 ? Math.round((totalApproved / totalBebanKerja) * 100) : 0;
 
         await connection.execute(
-            'UPDATE kegiatan SET progressKeseluruhan = ? WHERE id = ?',
-            [progressKeseluruhan, id]
+            'UPDATE kegiatan SET progressKeseluruhan = ?, progressPendataanApproved = ?, progressPengolahanApproved = ?, progressPendataanSubmit = ?, progressPengolahanSubmit = ? WHERE id = ?',
+            [progressKeseluruhan, progressPendataanApproved, progressPengolahanApproved, progressPendataanSubmit, progressPengolahanSubmit, id]
         );
 
         await connection.commit();
@@ -261,14 +293,20 @@ export const updatePplProgress = async (pplId: number, progressData: { open: num
 
     const kegiatanId = currentPpl.kegiatanId;
 
-    const [allPplForKegiatan] = await db.query<RowDataPacket[]>('SELECT bebanKerja, progressApproved FROM ppl WHERE kegiatanId = ?', [kegiatanId]);
+    const [allPplForKegiatan] = await db.query<RowDataPacket[]>('SELECT tahap, bebanKerja, progressApproved, progressSubmit, progressDiperiksa FROM ppl WHERE kegiatanId = ?', [kegiatanId]);
+    
+    const progressPendataanApproved = calculateProgress(allPplForKegiatan as PPL[], 'pengumpulan-data', 'Approved');
+    const progressPengolahanApproved = calculateProgress(allPplForKegiatan as PPL[], 'pengolahan-analisis', 'Approved');
+    const progressPendataanSubmit = calculateProgress(allPplForKegiatan as PPL[], 'pengumpulan-data', 'Submit');
+    const progressPengolahanSubmit = calculateProgress(allPplForKegiatan as PPL[], 'pengolahan-analisis', 'Submit');
+
     const totalBebanKerjaKegiatan = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja, 10) || 0), 0);
     const totalApproved = allPplForKegiatan.reduce((acc, p) => acc + (p.progressApproved || 0), 0);
     const progressKeseluruhan = totalBebanKerjaKegiatan > 0 ? Math.round((totalApproved / totalBebanKerjaKegiatan) * 100) : 0;
 
     await db.execute(
-        'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, progressKeseluruhan = ?, lastUpdatedBy = ? WHERE id = ?',
-        [progressKeseluruhan, username, kegiatanId]
+        'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, progressKeseluruhan = ?, progressPendataanApproved = ?, progressPengolahanApproved = ?, progressPendataanSubmit = ?, progressPengolahanSubmit = ?, lastUpdatedBy = ? WHERE id = ?',
+        [progressKeseluruhan, progressPendataanApproved, progressPengolahanApproved, progressPendataanSubmit, progressPengolahanSubmit, username, kegiatanId]
     );
 
     const [updatedPpl] = await db.query<RowDataPacket[]>('SELECT * FROM ppl WHERE id = ?', [pplId]);
