@@ -45,7 +45,7 @@ const Sidebar: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/login', { state: { fromLogout: true } });
   };
 
   // 1. Definisikan SEMUA kemungkinan item menu di sini

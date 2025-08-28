@@ -1,22 +1,33 @@
 // client/pages/Login.tsx
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext"; // <-- Impor useAuth
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, LogIn, Eye, EyeOff } from "lucide-react";
+import SuccessModal from "@/components/SuccessModal";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth(); // <-- Gunakan login dari context
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showLogoutSuccess, setShowLogoutSuccess] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.fromLogout) {
+      setShowLogoutSuccess(true);
+      // Hapus state agar tidak muncul lagi saat refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +58,15 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-bps-blue-50 to-bps-green-50 flex items-center justify-center p-4">
+      <SuccessModal
+        isOpen={showLogoutSuccess}
+        onClose={() => setShowLogoutSuccess(false)}
+        title="Logout Berhasil!"
+        description="Anda telah berhasil keluar dari sistem."
+        actionLabel="Tutup"
+        onAction={() => setShowLogoutSuccess(false)}
+        autoCloseDelay={3000}
+      />
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="bg-gradient-to-r from-bps-blue-600 to-bps-blue-700 text-white p-6 rounded-t-2xl">
