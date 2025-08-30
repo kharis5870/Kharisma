@@ -14,21 +14,27 @@ export interface Dokumen {
   lastApprovedBy?: string;
 }
 
+export type ProgressType = 'open' | 'submit' | 'diperiksa' | 'approved' | 'belum_entry' | 'sudah_entry' | 'validasi' | 'clean';
+
+export interface HonorariumDetail {
+    jenis_pekerjaan: 'listing' | 'pencacahan' | 'pengolahan';
+    bebanKerja?: string;
+    satuanBebanKerja?: string;
+    hargaSatuan?: string;
+    besaranHonor?: string;
+}
+
 export interface PPL {
   id?: number;
   kegiatanId?: number;
   ppl_master_id: string;
   namaPPL?: string;
   namaPML: string;
-  bebanKerja: string;
-  satuanBebanKerja: string;
-  hargaSatuan: string; // <-- Tambahan baru
-  besaranHonor: string;
-  tahap: 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi'; // <-- Tambahan baru
-  progressOpen?: number;
-  progressSubmit?: number;
-  progressDiperiksa?: number;
-  progressApproved?: number;
+  bebanKerja: string; 
+  besaranHonor: string; 
+  tahap: 'pengumpulan-data' | 'pengolahan-analisis';
+  progress?: Partial<Record<ProgressType, number>>;
+  honorarium?: HonorariumDetail[];
 }
 
 export interface PPLMaster {
@@ -49,6 +55,8 @@ export interface Kegiatan {
   namaKetua?: string;
   deskripsiKegiatan: string;
   adaListing: boolean;
+  isFasih: boolean; 
+  bulanPembayaranHonor?: number;
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';
   progressKeseluruhan: number;
   progressPendataanApproved: number;
@@ -80,9 +88,6 @@ export interface PPLHonorData {
   honorPerBulan: number[];
 }
 
-
-// --- Tipe Data Baru untuk Halaman Admin ---
-
 export interface UserData {
     id: string;
     username: string;
@@ -104,5 +109,5 @@ export interface PPLAdminData {
     totalKegiatan: number;
     alamat: string;
     noTelepon: string;
-    kegiatanNames: string[]; // <-- Tambahkan properti ini
+    kegiatanNames: string[];
 }

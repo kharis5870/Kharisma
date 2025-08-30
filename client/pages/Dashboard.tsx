@@ -17,9 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, Edit, RefreshCw, Trash2, FileCheck, Users, Activity, FileText, AlertTriangle, Search, Filter, BarChart, BookOpen, Send, CheckSquare, Layers, ClipboardCheck } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Kegiatan, PPL, Dokumen } from "@shared/api";
+import { Kegiatan, PPL, Dokumen, ProgressType } from "@shared/api";
 import { cn } from "@/lib/utils";
-import { format, isPast, parseISO } from "date-fns";
+import { format, isPast, parseISO, differenceInDays } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -29,13 +29,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-type EditableProgressKey = 'progressSubmit' | 'progressDiperiksa' | 'progressApproved';
+type EditableProgressKey = 'submit' | 'diperiksa' | 'approved' | 'sudah_entry' | 'validasi' | 'clean';
 // --- Tipe Data Frontend ---
 type PPLWithProgress = PPL & {
-  progressOpen: number;
-  progressSubmit: number;
-  progressDiperiksa: number;
-  progressApproved: number;
+  progress: Partial<Record<ProgressType, number>>;
 };
 
 type KegiatanWithDynamicStatus = Kegiatan & {
@@ -109,6 +106,10 @@ const calculateActivityStatus = (kegiatan: Kegiatan): KegiatanWithDynamicStatus[
         status = 'Persiapan';
     }
 
+    if ((status === 'Pengumpulan Data' || status === 'Pengolahan & Analisis') && differenceInDays(now, parseISO(kegiatan.lastUpdated)) > 2) {
+        warnings.push(`Tidak ada pembaruan progress selama lebih dari 2 hari pada tahap ${status}.`);
+    }
+
     switch (status) {
         case 'Pengumpulan Data': color = 'bg-yellow-100 text-yellow-700'; break;
         case 'Pengolahan & Analisis': color = 'bg-green-100 text-green-700'; break;
@@ -123,7 +124,8 @@ const calculateActivityStatus = (kegiatan: Kegiatan): KegiatanWithDynamicStatus[
 const getProgressBarValue = (ppl: PPLWithProgress) => {
     const totalBeban = parseInt(ppl.bebanKerja as any) || 0;
     if (totalBeban === 0) return 0;
-    return ((ppl.progressApproved || 0) / totalBeban) * 100;
+    const approvedValue = ppl.tahap === 'pengolahan-analisis' ? (ppl.progress.clean ?? 0) : (ppl.progress.approved ?? 0);
+    return ((approvedValue) / totalBeban) * 100;
 };
 
 const getRelativeTime = (dateString: string) => {
@@ -165,10 +167,16 @@ export default function Dashboard() {
         ...activity,
         ppl: (activity.ppl || []).map(p => ({
             ...p,
-            progressOpen: p.progressOpen ?? 0,
-            progressSubmit: p.progressSubmit ?? 0,
-            progressDiperiksa: p.progressDiperiksa ?? 0,
-            progressApproved: p.progressApproved ?? 0,
+            progress: {
+                open: p.progress?.open ?? 0,
+                submit: p.progress?.submit ?? 0,
+                diperiksa: p.progress?.diperiksa ?? 0,
+                approved: p.progress?.approved ?? 0,
+                belum_entry: p.progress?.belum_entry ?? 0,
+                sudah_entry: p.progress?.sudah_entry ?? 0,
+                validasi: p.progress?.validasi ?? 0,
+                clean: p.progress?.clean ?? 0,
+            }
         })),
         dynamicStatus: calculateActivityStatus(activity),
     }));
@@ -228,69 +236,48 @@ export default function Dashboard() {
   const handleOpenUpdateModal = (activity: KegiatanWithDynamicStatus) => { setLocalPplProgress(JSON.parse(JSON.stringify(activity.ppl || []))); setUpdateModalActivity(activity); };
 
   const handleUpdatePPL = (pplId: number, field: EditableProgressKey, value: string) => {
-    setLocalPplProgress(prev =>
-        prev.map(p => {
-            if (p.id !== pplId) return p;
+    setLocalPplProgress(prev =>
+        prev.map(p => {
+            if (p.id !== pplId) return p;
 
-            const originalPpl = { ...p };
-            const updatedPpl = { ...p };
-
-            const newValue = parseInt(value, 10);
-            if (isNaN(newValue) || newValue < 0) {
-                return originalPpl;
-            }
-
-            const oldValue = originalPpl[field];
-            const delta = newValue - oldValue;
-
-            if (delta === 0) return originalPpl;
-
-            let sourceField: 'progressOpen' | 'progressSubmit' | 'progressDiperiksa' | null = null;
-            
-            if (field === 'progressSubmit')    sourceField = 'progressOpen';
-            else if (field === 'progressDiperiksa') sourceField = 'progressSubmit';
-            else if (field === 'progressApproved')  sourceField = 'progressDiperiksa';
-            
-            updatedPpl[field] = newValue;
-
-            if (delta > 0) {
-                // --- Logika MENAMBAH progress ---
-                if (!sourceField || updatedPpl[sourceField] < delta) {
-                    setAlertModal({ isOpen: true, title: "Aksi Gagal", message: `Progress di tahap sebelumnya tidak mencukupi untuk dipindahkan.` });
-                    return originalPpl;
-                }
-                updatedPpl[sourceField] -= delta;
-            } else {
-                // --- Logika MENGURANGI progress ---
-                if (sourceField) {
-                    updatedPpl[sourceField] += Math.abs(delta);
-                }
-            }
-
-            // Validasi akhir untuk memastikan tidak ada nilai negatif
-            const totalProgress = updatedPpl.progressSubmit + updatedPpl.progressDiperiksa + updatedPpl.progressApproved;
+            const updatedPpl = { ...p, progress: { ...p.progress } };
+            const newValue = parseInt(value, 10);
+            if (isNaN(newValue) || newValue < 0) {
+                return p;
+            }
+            
+            updatedPpl.progress[field] = newValue;
+            
             const totalBeban = parseInt(updatedPpl.bebanKerja, 10) || 0;
-            if (totalProgress > totalBeban) {
-                setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Total progress tidak boleh melebihi total beban kerja." });
-                return originalPpl;
+            if (updatedPpl.tahap === 'pengumpulan-data') {
+                const totalUsed = (updatedPpl.progress.submit ?? 0) + (updatedPpl.progress.diperiksa ?? 0) + (updatedPpl.progress.approved ?? 0);
+                if (totalUsed > totalBeban) {
+                    setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Total progress tidak boleh melebihi total beban kerja." });
+                    return p;
+                }
+                updatedPpl.progress.open = totalBeban - totalUsed;
+            } else if (updatedPpl.tahap === 'pengolahan-analisis') {
+                const totalUsed = (updatedPpl.progress.sudah_entry ?? 0) + (updatedPpl.progress.validasi ?? 0) + (updatedPpl.progress.clean ?? 0);
+                if (totalUsed > totalBeban) {
+                    setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Total progress tidak boleh melebihi total beban kerja." });
+                    return p;
+                }
+                updatedPpl.progress.belum_entry = totalBeban - totalUsed;
             }
 
-            return updatedPpl;
-        })
-    );
-  };
+            return updatedPpl;
+        })
+    );
+  };
 
   const handleSaveProgress = () => {
     localPplProgress.forEach(ppl => {
       const originalPpl = updateModalActivity?.ppl.find(op => op.id === ppl.id);
-      if (JSON.stringify(ppl) !== JSON.stringify(originalPpl)) {
+      if (JSON.stringify(ppl.progress) !== JSON.stringify(originalPpl?.progress)) {
           progressMutation.mutate({
             pplId: ppl.id!,
             progressData: {
-              open: ppl.progressOpen,
-              submit: ppl.progressSubmit,
-              diperiksa: ppl.progressDiperiksa,
-              approved: ppl.progressApproved,
+              ...ppl.progress,
               username: user?.username
             }
           });
@@ -316,7 +303,7 @@ export default function Dashboard() {
                         <div>
                             <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
                             <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
-                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
+                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.progress.approved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
                             <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
                         </div>
                         <div className="text-right">
@@ -325,13 +312,13 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="grid grid-cols-4 gap-4">
-                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressOpen}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressOpen} {ppl.satuanBebanKerja}</div></div>
-                        <div className="text-center"><Label className="text-xs text-gray-600">Submit</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressSubmit}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressSubmit} {ppl.satuanBebanKerja}</div></div>
-                        <div className="text-center"><Label className="text-xs text-gray-600">Diperiksa</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressDiperiksa}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressDiperiksa} {ppl.satuanBebanKerja}</div></div>
-                        <div className="text-center"><Label className="text-xs text-gray-600">Approved</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progressApproved}</div><div className="text-xs text-gray-500 mt-1">{ppl.progressApproved} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progress.open}</div><div className="text-xs text-gray-500 mt-1">{ppl.progress.open} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Submit</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progress.submit}</div><div className="text-xs text-gray-500 mt-1">{ppl.progress.submit} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Diperiksa</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progress.diperiksa}</div><div className="text-xs text-gray-500 mt-1">{ppl.progress.diperiksa} {ppl.satuanBebanKerja}</div></div>
+                        <div className="text-center"><Label className="text-xs text-gray-600">Approved</Label><div className="mt-1 p-2 bg-white border border-gray-200 rounded text-center text-sm font-medium">{ppl.progress.approved}</div><div className="text-xs text-gray-500 mt-1">{ppl.progress.approved} {ppl.satuanBebanKerja}</div></div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-bps-green-600 h-2 rounded-full transition-all duration-300" style={{ width: `${getProgressBarValue(ppl)}%` }}></div></div>
-                    <div className="text-xs text-gray-500 text-center">Total Beban Kerja: {ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
+                    <div className="text-xs text-gray-500 text-center">Total Beban Kerja: {ppl.progress.approved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
                 </div>
             </Card>
         ))}
@@ -352,7 +339,7 @@ export default function Dashboard() {
                         <div>
                             <h5 className="font-medium text-gray-900">{ppl.namaPPL}</h5>
                             <p className="text-sm text-gray-600">PML: {ppl.namaPML}</p>
-                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
+                            <p className="text-sm text-gray-600">Total Beban Kerja: {ppl.progress.approved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</p>
                             <p className="text-sm text-gray-600">Honor: Rp {parseInt(ppl.besaranHonor).toLocaleString('id-ID')}</p>
                         </div>
                         <div className="text-right">
@@ -361,21 +348,21 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="grid grid-cols-4 gap-4">
-                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><Input type="number" value={ppl.progressOpen} disabled className="mt-1 text-center"/></div>
-                        {['submit', 'diperiksa', 'approved'].map(field => (
+                        <div className="text-center"><Label className="text-xs text-gray-600">Open</Label><Input type="number" value={ppl.progress.open} disabled className="mt-1 text-center"/></div>
+                        {(['submit', 'diperiksa', 'approved'] as const).map(field => (
                             <div key={field} className="text-center">
                                 <Label className="text-xs text-gray-600 capitalize">{field}</Label>
                                 <Input 
-    type="number" min="0" 
-    value={(ppl as any)[`progress${field.charAt(0).toUpperCase() + field.slice(1)}`]} 
-    onChange={e => handleUpdatePPL(ppl.id!, `progress${field.charAt(0).toUpperCase() + field.slice(1)}` as EditableProgressKey, e.target.value)} 
-    className="mt-1 text-center" 
-/>
+                                    type="number" min="0" 
+                                    value={ppl.progress[field]} 
+                                    onChange={e => handleUpdatePPL(ppl.id!, field, e.target.value)} 
+                                    className="mt-1 text-center" 
+                                />
                             </div>
                         ))}
                     </div>
                     <Progress value={getProgressBarValue(ppl)} className="h-2" />
-                    <div className="text-xs text-gray-500 text-center">Total Beban Kerja: {ppl.progressApproved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
+                    <div className="text-xs text-gray-500 text-center">Total Beban Kerja: {ppl.progress.approved} / {ppl.bebanKerja} {ppl.satuanBebanKerja}</div>
                 </div>
             </Card>
         ))}
@@ -509,10 +496,8 @@ export default function Dashboard() {
                             </>
                         );
                     };
-                    const isDeleteDisabled = user?.role !== 'admin';
 
                     return (
-                      <TooltipProvider>
                         <Card key={activity.id} className="hover:shadow-lg transition-shadow flex flex-col">
                             <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.namaKetua}</p></div><Badge className={cn("ml-2 whitespace-nowrap", warnings.length > 0 ? 'bg-red-100 text-red-700' : color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
                             <CardContent className="space-y-4 flex-grow flex flex-col justify-between">
@@ -540,31 +525,12 @@ export default function Dashboard() {
                                     <Button variant="outline" size="sm" asChild><Link to={`/edit-activity/${activity.id}`}><Edit className="w-4 h-4 mr-1" />Edit</Link></Button>
                                     <Button variant="outline" size="sm" onClick={() => { handleOpenUpdateModal(activity); setPplSearchUpdate(""); }}><RefreshCw className="w-4 h-4 mr-1" />Update</Button>
                                     <Button variant="outline" size="sm" asChild><Link to={`/view-documents/${activity.id}`}><FileText className="w-4 h-4 mr-1" />View Docs</Link></Button>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="col-span-2">
-                                          <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => setActivityToDelete(activity)}
-                                            disabled={isDeleteDisabled}
-                                            className="w-full"
-                                          >
-                                            <Trash2 className="w-4 h-4 mr-1" />
-                                            Hapus
-                                          </Button>
-                                        </div>
-                                      </TooltipTrigger>
-                                      {isDeleteDisabled && (
-                                        <TooltipContent>
-                                          <p>Hanya admin yang dapat menghapus kegiatan.</p>
-                                        </TooltipContent>
-                                      )}
-                                    </Tooltip>
+                                    {user?.role === 'admin' && (
+                                        <Button variant="destructive" size="sm" onClick={() => setActivityToDelete(activity)} className="col-span-2"><Trash2 className="w-4 h-4 mr-1" />Hapus</Button>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
-                      </TooltipProvider>
                     )})
                 )}
                 </div>

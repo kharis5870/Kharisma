@@ -19,6 +19,7 @@ import { AlertTriangle, Edit, Save, X, DollarSign, TrendingUp, Users, Search, Ch
 import { useQuery } from "@tanstack/react-query";
 import { PPLHonorData } from "@shared/api";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const months = [ "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des" ];
 const currentYear = new Date().getFullYear();
@@ -67,6 +68,7 @@ const ActivityDetailModal = ({ isOpen, onClose, pplData, selectedMonth, selected
 };
 
 export default function ManajemenHonor() {
+  const { user } = useAuth();
   const [globalSettings, setGlobalSettings] = useState({ 
       batasHonorBulananGlobal: 3000000, 
       selectedMonth: getCurrentMonth(),
@@ -193,7 +195,23 @@ export default function ManajemenHonor() {
                     <SelectContent>{years.map((year) => (<SelectItem key={year} value={String(year)}>{year}</SelectItem>))}</SelectContent>
                 </Select>
             </div>
-            <div className="flex items-center gap-2"><Label className="text-sm font-medium">Batas Honor:</Label>{isEditingGlobalLimit ? (<div className="flex items-center gap-2"><Input type="number" value={tempGlobalLimit} onChange={e => setTempGlobalLimit(Number(e.target.value))} className="w-36 h-8" placeholder="Honor limit"/><Button size="sm" onClick={() => { setGlobalSettings(p => ({...p, batasHonorBulananGlobal: tempGlobalLimit})); setIsEditingGlobalLimit(false); }} className="h-8 w-8 p-0"><Save className="w-3 h-3" /></Button><Button size="sm" variant="outline" onClick={() => setIsEditingGlobalLimit(false)} className="h-8 w-8 p-0"><X className="w-3 h-3" /></Button></div>) : (<div className="flex items-center gap-2"><Badge variant="outline" className="bg-bps-blue-50 text-bps-blue-700 font-semibold">Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</Badge><Button size="sm" variant="outline" onClick={() => { setTempGlobalLimit(globalSettings.batasHonorBulananGlobal); setIsEditingGlobalLimit(true); }} className="h-6 w-6 p-0"><Edit className="w-3 h-3" /></Button></div>)}</div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium">Batas Honor:</Label>
+              {isEditingGlobalLimit ? (
+                <div className="flex items-center gap-2">
+                  <Input type="number" value={tempGlobalLimit} onChange={e => setTempGlobalLimit(Number(e.target.value))} className="w-36 h-8" placeholder="Honor limit"/>
+                  <Button size="sm" onClick={() => { setGlobalSettings(p => ({...p, batasHonorBulananGlobal: tempGlobalLimit})); setIsEditingGlobalLimit(false); }} className="h-8 w-8 p-0"><Save className="w-3 h-3" /></Button>
+                  <Button size="sm" variant="outline" onClick={() => setIsEditingGlobalLimit(false)} className="h-8 w-8 p-0"><X className="w-3 h-3" /></Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-bps-blue-50 text-bps-blue-700 font-semibold">Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</Badge>
+                  {user?.role === 'admin' && (
+                    <Button size="sm" variant="outline" onClick={() => { setTempGlobalLimit(globalSettings.batasHonorBulananGlobal); setIsEditingGlobalLimit(true); }} className="h-6 w-6 p-0"><Edit className="w-3 h-3" /></Button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

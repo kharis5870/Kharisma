@@ -2,9 +2,24 @@
 
 import { RowDataPacket, OkPacket } from 'mysql2';
 import db from '../db';
-import { Kegiatan, Dokumen, PPL } from '@shared/api';
+import { Kegiatan, Dokumen, PPL, ProgressType, HonorariumDetail } from '@shared/api';
 
 interface KegiatanPacket extends Kegiatan, RowDataPacket {}
+interface PPLPacket extends PPL, RowDataPacket {}
+interface ProgressPacket extends RowDataPacket {
+    ppl_id: number;
+    progress_type: ProgressType;
+    value: number;
+}
+interface HonorariumPacket extends RowDataPacket {
+    ppl_id: number;
+    jenis_pekerjaan: 'listing' | 'pencacahan' | 'pengolahan';
+    bebanKerja: number;
+    satuanBebanKerja: string;
+    hargaSatuan: number;
+    besaranHonor: number;
+}
+
 
 const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | 'Submit'): number => {
     const pplTahap = ppl.filter(p => p.tahap === tahap);
@@ -14,12 +29,22 @@ const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | '
     if (totalBebanKerja === 0) return 0;
 
     const totalProgress = pplTahap.reduce((acc, p) => {
-        const approved = p.progressApproved || 0;
-        if (type === 'Approved') {
-            return acc + approved;
+        const progress = p.progress || {};
+        if (tahap === 'pengumpulan-data') {
+            const approved = progress.approved || 0;
+            if (type === 'Approved') {
+                return acc + approved;
+            }
+            return acc + (progress.submit || 0) + (progress.diperiksa || 0) + approved;
         }
-        // Untuk 'Submit', kita hitung 'submit', 'diperiksa', dan 'approved'
-        return acc + (p.progressSubmit || 0) + (p.progressDiperiksa || 0) + approved;
+        if (tahap === 'pengolahan-analisis') {
+            const clean = progress.clean || 0;
+            if (type === 'Approved') {
+                return acc + clean;
+            }
+             return acc + (progress.sudah_entry || 0) + (progress.validasi || 0) + clean;
+        }
+        return acc;
     }, 0);
     
     return Math.round((totalProgress / totalBebanKerja) * 100);
@@ -36,18 +61,54 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
     `;
     const [kegiatanRows] = await db.query<KegiatanPacket[]>(query, params);
 
-    for (const kegiatan of kegiatanRows) {
-        const [dokumenRows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE kegiatanId = ?', [kegiatan.id]);
-        const [pplRows] = await db.query<RowDataPacket[]>(`
-            SELECT p.*, pm.namaPPL
-            FROM ppl p
-            JOIN ppl_master pm ON p.ppl_master_id = pm.id
-            WHERE p.kegiatanId = ?
-        `, [kegiatan.id]);
+    if (kegiatanRows.length === 0) return [];
 
-        kegiatan.dokumen = dokumenRows as Dokumen[];
-        kegiatan.ppl = pplRows as PPL[];
-        // Menghitung progress dan menambahkannya ke objek kegiatan
+    const kegiatanIds = kegiatanRows.map(k => k.id);
+    const placeholders = kegiatanIds.map(() => '?').join(',');
+
+    const [dokumenRows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE kegiatanId IN (' + placeholders + ')', kegiatanIds);
+    const [pplRows] = await db.query<PPLPacket[]>('SELECT p.*, pm.namaPPL FROM ppl p JOIN ppl_master pm ON p.ppl_master_id = pm.id WHERE p.kegiatanId IN (' + placeholders + ')', kegiatanIds);
+    
+    if (pplRows.length > 0) {
+        const pplIds = pplRows.map(p => p.id).filter(id => id !== undefined) as number[];
+        if (pplIds.length > 0) {
+            const pplPlaceholders = pplIds.map(() => '?').join(',');
+            const [progressRows] = await db.query<ProgressPacket[]>('SELECT * FROM ppl_progress WHERE ppl_id IN (' + pplPlaceholders + ')', pplIds);
+            const [honorRows] = await db.query<HonorariumPacket[]>('SELECT * FROM ppl_honorarium WHERE ppl_id IN (' + pplPlaceholders + ')', pplIds);
+
+            const progressMap = new Map<number, Partial<Record<ProgressType, number>>>();
+            progressRows.forEach(row => {
+                if (!progressMap.has(row.ppl_id)) {
+                    progressMap.set(row.ppl_id, {});
+                }
+                progressMap.get(row.ppl_id)![row.progress_type] = row.value;
+            });
+
+            const honorMap = new Map<number, HonorariumDetail[]>();
+            honorRows.forEach(row => {
+                if (!honorMap.has(row.ppl_id)) {
+                    honorMap.set(row.ppl_id, []);
+                }
+                honorMap.get(row.ppl_id)!.push({
+                    jenis_pekerjaan: row.jenis_pekerjaan,
+                    bebanKerja: String(row.bebanKerja),
+                    satuanBebanKerja: row.satuanBebanKerja,
+                    hargaSatuan: String(row.hargaSatuan),
+                    besaranHonor: String(row.besaranHonor)
+                });
+            });
+
+            pplRows.forEach(ppl => {
+                ppl.progress = progressMap.get(ppl.id!) || {};
+                ppl.honorarium = honorMap.get(ppl.id!) || [];
+            });
+        }
+    }
+
+    for (const kegiatan of kegiatanRows) {
+        kegiatan.dokumen = dokumenRows.filter(d => d.kegiatanId === kegiatan.id) as Dokumen[];
+        kegiatan.ppl = pplRows.filter(p => p.kegiatanId === kegiatan.id) as PPL[];
+        
         kegiatan.progressPendataanApproved = calculateProgress(kegiatan.ppl, 'pengumpulan-data', 'Approved');
         kegiatan.progressPengolahanApproved = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Approved');
         kegiatan.progressPendataanSubmit = calculateProgress(kegiatan.ppl, 'pengumpulan-data', 'Submit');
@@ -71,7 +132,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         await connection.beginTransaction();
 
         const {
-            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing,
+            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih, bulanPembayaranHonor,
             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
@@ -81,7 +142,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
 
         const kegiatanQuery = `
             INSERT INTO kegiatan
-            (namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing,
+            (namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih, bulanPembayaranHonor,
              tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
              tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
              tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
@@ -89,10 +150,10 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
              status, progressKeseluruhan, lastUpdatedBy, lastEditedBy, 
              progressPendataanApproved, progressPengolahanApproved, 
              progressPendataanSubmit, progressPengolahanSubmit)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?, ?, 0, 0, 0, 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?, ?, 0, 0, 0, 0)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
-            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false,
+            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false, bulanPembayaranHonor || null,
             tanggalMulaiPersiapan || null, tanggalSelesaiPersiapan || null,
             tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
             tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
@@ -102,40 +163,32 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         const kegiatanId = kegiatanResult.insertId;
 
         if (pplAllocations && pplAllocations.length > 0) {
-            const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, satuanBebanKerja, hargaSatuan, besaranHonor, tahap, progressOpen) VALUES ?';
-            const pplValues = pplAllocations.map((ppl: PPL) => {
-                const bebanKerja = parseInt(ppl.bebanKerja) || 0;
-                return [
-                    kegiatanId,
-                    ppl.ppl_master_id,
-                    ppl.namaPML,
-                    bebanKerja,
-                    ppl.satuanBebanKerja,
-                    parseInt(ppl.hargaSatuan) || 0,
-                    parseInt(ppl.besaranHonor) || 0,
-                    ppl.tahap,
-                    bebanKerja,
-                ];
-            });
-            await connection.query(pplQuery, [pplValues]);
+            for (const ppl of pplAllocations) {
+                const totalHonor = ppl.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.besaranHonor || '0')), 0) || 0;
+                const totalBeban = ppl.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.bebanKerja || '0')), 0) || 0;
 
-            const persiapanPpls = pplAllocations.filter((p: PPL) => p.tahap === 'persiapan');
-            if (persiapanPpls.length > 0) {
-                const pengumpulanDataPpls = persiapanPpls.map((ppl: PPL) => [
-                    kegiatanId,
-                    ppl.ppl_master_id,
-                    '', 
-                    0, 
-                    '', 
-                    0, 
-                    0, 
-                    'pengumpulan-data',
-                    0, 
+                const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, besaranHonor, tahap) VALUES (?, ?, ?, ?, ?, ?)';
+                const [pplResult] = await connection.execute<OkPacket>(pplQuery, [
+                   kegiatanId, ppl.ppl_master_id, ppl.namaPML, totalBeban, totalHonor, ppl.tahap
                 ]);
-                await connection.query(pplQuery, [pengumpulanDataPpls]);
+                const pplId = pplResult.insertId;
+
+                if (ppl.honorarium && ppl.honorarium.length > 0) {
+                    const honorQuery = 'INSERT INTO ppl_honorarium (ppl_id, jenis_pekerjaan, bebanKerja, satuanBebanKerja, hargaSatuan, besaranHonor) VALUES ?';
+                    const honorValues = ppl.honorarium.map((h: HonorariumDetail) => [
+                        pplId, h.jenis_pekerjaan, parseInt(h.bebanKerja || '0'), h.satuanBebanKerja, parseInt(h.hargaSatuan || '0'), parseInt(h.besaranHonor || '0')
+                    ]);
+                    await connection.query(honorQuery, [honorValues]);
+                }
+
+                const progressType = ppl.tahap === 'pengumpulan-data' ? 'open' : 'belum_entry';
+                if (totalBeban > 0) {
+                   const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES (?, ?, ?)';
+                   await connection.execute(progressQuery, [pplId, progressType, totalBeban]);
+                }
             }
         }
-
+        
         if (documents && documents.length > 0) {
             const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib) VALUES ?';
             const docValues = documents.map((doc: Dokumen) => [
@@ -164,7 +217,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         await connection.beginTransaction();
 
         const {
-            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing,
+            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih, bulanPembayaranHonor,
             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
@@ -174,7 +227,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
 
         const kegiatanQuery = `
             UPDATE kegiatan SET
-            namaKegiatan = ?, ketua_tim_id = ?, deskripsiKegiatan = ?, adaListing = ?,
+            namaKegiatan = ?, ketua_tim_id = ?, deskripsiKegiatan = ?, adaListing = ?, isFasih = ?, bulanPembayaranHonor = ?,
             tanggalMulaiPersiapan = ?, tanggalSelesaiPersiapan = ?,
             tanggalMulaiPengumpulanData = ?, tanggalSelesaiPengumpulanData = ?,
             tanggalMulaiPengolahanAnalisis = ?, tanggalSelesaiPengolahanAnalisis = ?,
@@ -184,7 +237,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             WHERE id = ?
         `;
         await connection.execute(kegiatanQuery, [
-            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false,
+            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false, bulanPembayaranHonor || null,
             tanggalMulaiPersiapan || null, tanggalSelesaiPersiapan || null,
             tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
             tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
@@ -193,41 +246,37 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             id
         ]);
         
-        const [existingPpls] = await connection.query<RowDataPacket[]>('SELECT * FROM ppl WHERE kegiatanId = ?', [id]);
-        const existingPplsMap = new Map(existingPpls.map(p => [p.id, p]));
-
-        await connection.execute('DELETE FROM ppl WHERE kegiatanId = ?', [id]);
+        await connection.execute('DELETE FROM ppl WHERE kegiatanId = ?', [id]); // This will cascade delete progress and honorarium
         await connection.execute('DELETE FROM dokumen WHERE kegiatanId = ?', [id]);
 
         if (ppl && ppl.length > 0) {
-            const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, satuanBebanKerja, hargaSatuan, besaranHonor, tahap, progressOpen, progressSubmit, progressDiperiksa, progressApproved) VALUES ?';
-            const pplValues = ppl.map((p: PPL & {clientId?: string}) => {
-                const existingPpl = existingPplsMap.get(p.id);
-                const oldBebanKerja = existingPpl ? parseInt(existingPpl.bebanKerja) || 0 : 0;
-                const newBebanKerja = parseInt(p.bebanKerja) || 0;
-                const bebanKerjaDiff = newBebanKerja - oldBebanKerja;
-                
-                let progressOpen = p.progressOpen ?? 0;
-                if(existingPpl) {
-                    progressOpen = (parseInt(existingPpl.progressOpen) || 0) + bebanKerjaDiff;
-                } else {
-                    progressOpen = newBebanKerja;
+            for (const p of ppl) {
+                const totalHonor = p.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.besaranHonor || '0')), 0) || 0;
+                const totalBeban = p.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.bebanKerja || '0')), 0) || 0;
+
+                const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, besaranHonor, tahap) VALUES (?, ?, ?, ?, ?, ?)';
+                const [pplResult] = await connection.execute<OkPacket>(pplQuery, [
+                   id, p.ppl_master_id, p.namaPML, totalBeban, totalHonor, p.tahap
+                ]);
+                const pplId = pplResult.insertId;
+
+                if (p.honorarium && p.honorarium.length > 0) {
+                    const honorQuery = 'INSERT INTO ppl_honorarium (ppl_id, jenis_pekerjaan, bebanKerja, satuanBebanKerja, hargaSatuan, besaranHonor) VALUES ?';
+                    const honorValues = p.honorarium.map((h: HonorariumDetail) => [
+                        pplId, h.jenis_pekerjaan, parseInt(h.bebanKerja || '0'), h.satuanBebanKerja, parseInt(h.hargaSatuan || '0'), parseInt(h.besaranHonor || '0')
+                    ]);
+                    await connection.query(honorQuery, [honorValues]);
                 }
 
-                 return [
-                    id, p.ppl_master_id, p.namaPML,
-                    newBebanKerja,
-                    p.satuanBebanKerja,
-                    parseInt(p.hargaSatuan) || 0,
-                    parseInt(p.besaranHonor) || 0,
-                    p.tahap,
-                    progressOpen < 0 ? 0 : progressOpen,
-                    p.progressSubmit ?? 0,
-                    p.progressDiperiksa ?? 0,
-                    p.progressApproved ?? 0
-                ];
-            });
-            await connection.query(pplQuery, [pplValues]);
+                if (p.progress) {
+                    const progressEntries = Object.entries(p.progress);
+                    if (progressEntries.length > 0) {
+                        const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES ?';
+                        const progressValues = progressEntries.map(([type, value]) => [pplId, type, value]);
+                        await connection.query(progressQuery, [progressValues]);
+                    }
+                }
+            }
         }
 
         if (dokumen && dokumen.length > 0) {
@@ -237,23 +286,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             ]);
             await connection.query(docQuery, [docValues]);
         }
-
-        const [allPplForKegiatan] = await connection.query<RowDataPacket[]>('SELECT tahap, bebanKerja, progressApproved, progressSubmit, progressDiperiksa FROM ppl WHERE kegiatanId = ?', [id]);
         
-        const progressPendataanApproved = calculateProgress(allPplForKegiatan as PPL[], 'pengumpulan-data', 'Approved');
-        const progressPengolahanApproved = calculateProgress(allPplForKegiatan as PPL[], 'pengolahan-analisis', 'Approved');
-        const progressPendataanSubmit = calculateProgress(allPplForKegiatan as PPL[], 'pengumpulan-data', 'Submit');
-        const progressPengolahanSubmit = calculateProgress(allPplForKegiatan as PPL[], 'pengolahan-analisis', 'Submit');
-        
-        const totalBebanKerja = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja) || 0), 0);
-        const totalApproved = allPplForKegiatan.reduce((acc, p) => acc + (p.progressApproved || 0), 0);
-        const progressKeseluruhan = totalBebanKerja > 0 ? Math.round((totalApproved / totalBebanKerja) * 100) : 0;
-
-        await connection.execute(
-            'UPDATE kegiatan SET progressKeseluruhan = ?, progressPendataanApproved = ?, progressPengolahanApproved = ?, progressPendataanSubmit = ?, progressPengolahanSubmit = ? WHERE id = ?',
-            [progressKeseluruhan, progressPendataanApproved, progressPengolahanApproved, progressPendataanSubmit, progressPengolahanSubmit, id]
-        );
-
         await connection.commit();
 
         const updatedKegiatan = await getKegiatanById(id);
@@ -269,68 +302,89 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
     }
 }
 
-export const updatePplProgress = async (pplId: number, progressData: { open: number; submit: number; diperiksa: number; approved: number; username: string; }) => {
-    const { open, submit, diperiksa, approved, username } = progressData;
-
-    const [pplRows] = await db.query<RowDataPacket[]>('SELECT * FROM ppl WHERE id = ?', [pplId]);
-    if (pplRows.length === 0) {
-        throw new Error("PPL not found");
-    }
-    const currentPpl = pplRows[0];
-    const totalBebanKerja = parseInt(currentPpl.bebanKerja, 10) || 0;
-    const totalProgress = open + submit + diperiksa + approved;
-
-    if (totalProgress > totalBebanKerja) {
-        throw new Error("Total progress tidak bisa melebihi total beban kerja");
-    }
-
-    const query = `
-        UPDATE ppl
-        SET progressOpen = ?, progressSubmit = ?, progressDiperiksa = ?, progressApproved = ?
-        WHERE id = ?
-    `;
-    await db.execute(query, [open, submit, diperiksa, approved, pplId]);
-
-    const kegiatanId = currentPpl.kegiatanId;
-
-    const [allPplForKegiatan] = await db.query<RowDataPacket[]>('SELECT tahap, bebanKerja, progressApproved, progressSubmit, progressDiperiksa FROM ppl WHERE kegiatanId = ?', [kegiatanId]);
-    
-    const progressPendataanApproved = calculateProgress(allPplForKegiatan as PPL[], 'pengumpulan-data', 'Approved');
-    const progressPengolahanApproved = calculateProgress(allPplForKegiatan as PPL[], 'pengolahan-analisis', 'Approved');
-    const progressPendataanSubmit = calculateProgress(allPplForKegiatan as PPL[], 'pengumpulan-data', 'Submit');
-    const progressPengolahanSubmit = calculateProgress(allPplForKegiatan as PPL[], 'pengolahan-analisis', 'Submit');
-
-    const totalBebanKerjaKegiatan = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja, 10) || 0), 0);
-    const totalApproved = allPplForKegiatan.reduce((acc, p) => acc + (p.progressApproved || 0), 0);
-    const progressKeseluruhan = totalBebanKerjaKegiatan > 0 ? Math.round((totalApproved / totalBebanKerjaKegiatan) * 100) : 0;
-
-    await db.execute(
-        'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, progressKeseluruhan = ?, progressPendataanApproved = ?, progressPengolahanApproved = ?, progressPendataanSubmit = ?, progressPengolahanSubmit = ?, lastUpdatedBy = ? WHERE id = ?',
-        [progressKeseluruhan, progressPendataanApproved, progressPengolahanApproved, progressPendataanSubmit, progressPengolahanSubmit, username, kegiatanId]
-    );
-
-    const [updatedPpl] = await db.query<RowDataPacket[]>('SELECT * FROM ppl WHERE id = ?', [pplId]);
-    return updatedPpl[0];
-};
-
-export const deleteKegiatan = async (id: number): Promise<boolean> => {
+export const updatePplProgress = async (pplId: number, progressData: Partial<Record<ProgressType, number>>, username: string) => {
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
-        await connection.execute('DELETE FROM ppl WHERE kegiatanId = ?', [id]);
-        await connection.execute('DELETE FROM dokumen WHERE kegiatanId = ?', [id]);
 
-        const [result] = await connection.execute<OkPacket>('DELETE FROM kegiatan WHERE id = ?', [id]);
+        const [pplRows] = await connection.query<RowDataPacket[]>('SELECT * FROM ppl WHERE id = ?', [pplId]);
+        if (pplRows.length === 0) throw new Error("PPL not found");
+        const currentPpl = pplRows[0];
+        const totalBebanKerja = parseInt(currentPpl.bebanKerja, 10) || 0;
+
+        const totalProgress = Object.values(progressData).reduce((sum, val) => sum + (val || 0), 0);
+        if (totalProgress > totalBebanKerja) {
+            throw new Error("Total progress tidak bisa melebihi total beban kerja");
+        }
+
+        await connection.execute('DELETE FROM ppl_progress WHERE ppl_id = ?', [pplId]);
+        const progressEntries = Object.entries(progressData);
+        if (progressEntries.length > 0) {
+            const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES ?';
+            const progressValues = progressEntries.map(([type, value]) => [pplId, type, value]);
+            await connection.query(progressQuery, [progressValues]);
+        }
+
+        const kegiatanId = currentPpl.kegiatanId;
+        // Recalculate main activity progress
+        const [allPplForKegiatan] = await connection.query<PPLPacket[]>('SELECT * FROM ppl WHERE kegiatanId = ?', [kegiatanId]);
+        if (allPplForKegiatan.length > 0) {
+            const pplIds = allPplForKegiatan.map(p => p.id).filter(id => id !== undefined) as number[];
+            const pplPlaceholders = pplIds.map(() => '?').join(',');
+            const [progressRows] = await db.query<ProgressPacket[]>('SELECT * FROM ppl_progress WHERE ppl_id IN (' + pplPlaceholders + ')', pplIds);
+
+            const progressMap = new Map<number, Partial<Record<ProgressType, number>>>();
+            progressRows.forEach(row => {
+                if (!progressMap.has(row.ppl_id)) {
+                    progressMap.set(row.ppl_id, {});
+                }
+                progressMap.get(row.ppl_id)![row.progress_type] = row.value;
+            });
+            allPplForKegiatan.forEach(p => {
+                p.progress = progressMap.get(p.id!) || {};
+            });
+        }
+
+        const progressPendataanApproved = calculateProgress(allPplForKegiatan, 'pengumpulan-data', 'Approved');
+        const progressPengolahanApproved = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Approved');
+        const progressPendataanSubmit = calculateProgress(allPplForKegiatan, 'pengumpulan-data', 'Submit');
+        const progressPengolahanSubmit = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Submit');
+
+        const totalBebanKerjaKegiatan = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja, 10) || 0), 0);
+        const totalApproved = allPplForKegiatan.reduce((acc, p) => {
+            const approved = p.progress?.approved || p.progress?.clean || 0;
+            return acc + approved;
+        }, 0);
+        const progressKeseluruhan = totalBebanKerjaKegiatan > 0 ? Math.round((totalApproved / totalBebanKerjaKegiatan) * 100) : 0;
+
+        await connection.execute(
+            'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, progressKeseluruhan = ?, progressPendataanApproved = ?, progressPengolahanApproved = ?, progressPendataanSubmit = ?, progressPengolahanSubmit = ?, lastUpdatedBy = ? WHERE id = ?',
+            [progressKeseluruhan, progressPendataanApproved, progressPengolahanApproved, progressPendataanSubmit, progressPengolahanSubmit, username, kegiatanId]
+        );
 
         await connection.commit();
-        return result.affectedRows > 0;
+
+        const [updatedPplRows] = await db.query<RowDataPacket[]>('SELECT * FROM ppl WHERE id = ?', [pplId]);
+        const updatedPpl = updatedPplRows[0] as PPL;
+        const [newProgressRows] = await db.query<ProgressPacket[]>('SELECT * FROM ppl_progress WHERE ppl_id = ?', [pplId]);
+        updatedPpl.progress = {};
+        newProgressRows.forEach(row => {
+            updatedPpl.progress![row.progress_type] = row.value;
+        });
+        return updatedPpl;
+
     } catch (error) {
         await connection.rollback();
-        console.error("Error deleting kegiatan:", error);
+        console.error("TRANSACTION ROLLED BACK:", error);
         throw error;
     } finally {
         connection.release();
     }
+};
+
+export const deleteKegiatan = async (id: number): Promise<boolean> => {
+    const [result] = await db.execute<OkPacket>('DELETE FROM kegiatan WHERE id = ?', [id]);
+    return result.affectedRows > 0;
 };
 
 export const updateDocumentStatus = async (dokumenId: number, status: Dokumen['status'], username: string): Promise<Dokumen> => {
