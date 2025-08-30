@@ -1,10 +1,17 @@
+// vite.config.ts
+
 import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { createServer } from "./server";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ command }) => ({
+  // Baris ini sekarang cerdas:
+  // Jika command adalah 'build', base-nya '/kharisma/'.
+  // Jika command adalah 'serve' (untuk pnpm dev), base-nya '/'.
+  base: command === 'build' ? "/kharisma/" : "/",
+
   server: {
     host: "::",
     port: 8080,
@@ -28,11 +35,9 @@ export default defineConfig(({ mode }) => ({
 function expressPlugin(): Plugin {
   return {
     name: "express-plugin",
-    apply: "serve", // Only apply during development (serve mode)
+    apply: "serve",
     configureServer(server) {
       const app = createServer();
-
-      // Add Express app as middleware to Vite dev server
       server.middlewares.use(app);
     },
   };

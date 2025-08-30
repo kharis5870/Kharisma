@@ -1,7 +1,7 @@
 // client/pages/InputKegiatan.tsx
 
-import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarIcon, Plus, Trash2, Link2, X, Lock, Check, ChevronsUpDown, Users, XCircle } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore, { PPLItem, DocumentItem } from "@/stores/useInputKegiatanStore"; 
@@ -359,25 +359,29 @@ export default function InputKegiatan() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Panggil fungsi validasi lengkap di sini. Jika gagal, modal akan muncul dan proses berhenti.
     if (!validateForm()) {
         return;
     }
     
     setLastActivityName(store.namaKegiatan);
+
+    const formatDateForSubmission = (date: Date | string | undefined) => {
+        if (!date) return undefined;
+        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        return isValid(dateObj) ? dateObj.toISOString() : undefined;
+    };
+    
     const dataToSubmit = {
       ...store,
-      ppl: store.pplAllocations,
-      dokumen: store.documents,
-      honorarium: store.honorarium,
-      tanggalMulaiPersiapan: store.tanggalMulaiPersiapan?.toISOString(),
-      tanggalSelesaiPersiapan: store.tanggalSelesaiPersiapan?.toISOString(),
-      tanggalMulaiPengumpulanData: store.tanggalMulaiPengumpulanData?.toISOString(),
-      tanggalSelesaiPengumpulanData: store.tanggalSelesaiPengumpulanData?.toISOString(),
-      tanggalMulaiPengolahanAnalisis: store.tanggalMulaiPengolahanAnalisis?.toISOString(),
-      tanggalSelesaiPengolahanAnalisis: store.tanggalSelesaiPengolahanAnalisis?.toISOString(),
-      tanggalMulaiDiseminasiEvaluasi: store.tanggalMulaiDiseminasiEvaluasi?.toISOString(),
-      tanggalSelesaiDiseminasiEvaluasi: store.tanggalSelesaiDiseminasiEvaluasi?.toISOString()
+      username: user?.username,
+      tanggalMulaiPersiapan: formatDateForSubmission(store.tanggalMulaiPersiapan),
+      tanggalSelesaiPersiapan: formatDateForSubmission(store.tanggalSelesaiPersiapan),
+      tanggalMulaiPengumpulanData: formatDateForSubmission(store.tanggalMulaiPengumpulanData),
+      tanggalSelesaiPengumpulanData: formatDateForSubmission(store.tanggalSelesaiPengumpulanData),
+      tanggalMulaiPengolahanAnalisis: formatDateForSubmission(store.tanggalMulaiPengolahanAnalisis),
+      tanggalSelesaiPengolahanAnalisis: formatDateForSubmission(store.tanggalSelesaiPengolahanAnalisis),
+      tanggalMulaiDiseminasiEvaluasi: formatDateForSubmission(store.tanggalMulaiDiseminasiEvaluasi),
+      tanggalSelesaiDiseminasiEvaluasi: formatDateForSubmission(store.tanggalSelesaiDiseminasiEvaluasi),
     };
     mutation.mutate(dataToSubmit);
   };

@@ -70,7 +70,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="bg-gradient-to-r from-bps-blue-600 to-bps-blue-700 text-white p-6 rounded-t-2xl">
-            <h1 className="text-3xl font-bold tracking-wide mb-2">Kharisma</h1>
+            <h1 className="text-3xl font-bold tracking-wide mb-2">Kharisma.</h1>
             <p className="text-bps-blue-100 text-xs mb-3">
               Knowledge Hub for Activity Reporting and Integrated Statistical Monitoring Application
             </p>

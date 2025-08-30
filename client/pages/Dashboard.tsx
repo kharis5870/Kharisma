@@ -22,6 +22,12 @@ import { cn } from "@/lib/utils";
 import { format, isPast, parseISO } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type EditableProgressKey = 'progressSubmit' | 'progressDiperiksa' | 'progressApproved';
 // --- Tipe Data Frontend ---
@@ -503,8 +509,10 @@ export default function Dashboard() {
                             </>
                         );
                     };
+                    const isDeleteDisabled = user?.role !== 'admin';
 
                     return (
+                      <TooltipProvider>
                         <Card key={activity.id} className="hover:shadow-lg transition-shadow flex flex-col">
                             <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-gray-600 mt-1">Ketua: {activity.namaKetua}</p></div><Badge className={cn("ml-2 whitespace-nowrap", warnings.length > 0 ? 'bg-red-100 text-red-700' : color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
                             <CardContent className="space-y-4 flex-grow flex flex-col justify-between">
@@ -532,10 +540,31 @@ export default function Dashboard() {
                                     <Button variant="outline" size="sm" asChild><Link to={`/edit-activity/${activity.id}`}><Edit className="w-4 h-4 mr-1" />Edit</Link></Button>
                                     <Button variant="outline" size="sm" onClick={() => { handleOpenUpdateModal(activity); setPplSearchUpdate(""); }}><RefreshCw className="w-4 h-4 mr-1" />Update</Button>
                                     <Button variant="outline" size="sm" asChild><Link to={`/view-documents/${activity.id}`}><FileText className="w-4 h-4 mr-1" />View Docs</Link></Button>
-                                    <Button variant="destructive" size="sm" onClick={() => setActivityToDelete(activity)} className="col-span-2"><Trash2 className="w-4 h-4 mr-1" />Hapus</Button>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="col-span-2">
+                                          <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => setActivityToDelete(activity)}
+                                            disabled={isDeleteDisabled}
+                                            className="w-full"
+                                          >
+                                            <Trash2 className="w-4 h-4 mr-1" />
+                                            Hapus
+                                          </Button>
+                                        </div>
+                                      </TooltipTrigger>
+                                      {isDeleteDisabled && (
+                                        <TooltipContent>
+                                          <p>Hanya admin yang dapat menghapus kegiatan.</p>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
                                 </div>
                             </CardContent>
                         </Card>
+                      </TooltipProvider>
                     )})
                 )}
                 </div>

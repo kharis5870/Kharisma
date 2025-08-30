@@ -77,7 +77,8 @@ export default function ManajemenAdmin() {
     username: "",
     password: "",
     namaLengkap: "",
-    role: "user" as const
+    role: "user" as const,
+    isPML: false
   });
   const [editUserData, setEditUserData] = useState<UserData | null>(null);
   const [deleteUserId, setDeleteUserId] = useState("");
@@ -138,7 +139,7 @@ export default function ManajemenAdmin() {
   
   const handleAddUser = () => {
     setFormError(null);
-    const { id, username, password, namaLengkap, role } = newUserData;
+    const { id, username, password, namaLengkap, role, isPML } = newUserData;
     if (!isValidUserId(id)) { setFormError("ID User harus diisi!"); return; }
     if (!isValidUsername(username)) { setFormError("Username harus minimal 3 karakter!"); return; }
     if (!password || !isValidPassword(password)) { setFormError("Password harus minimal 6 karakter!"); return; }
@@ -146,8 +147,8 @@ export default function ManajemenAdmin() {
     if (isDuplicateUserId(id)) { setFormError("ID User sudah ada!"); return; }
     if (isDuplicateUsername(username)) { setFormError("Username sudah ada!"); return; }
     
-    addUser({ id: id.trim(), username: username.trim(), password, namaLengkap: namaLengkap.trim(), role });
-    setNewUserData({ id: "", username: "", password: "", namaLengkap: "", role: "user" });
+    addUser({ id: id.trim(), username: username.trim(), password, namaLengkap: namaLengkap.trim(), role, isPML });
+    setNewUserData({ id: "", username: "", password: "", namaLengkap: "", role: "user", isPML: false });
     setShowAddUserModal(false);
     setSuccessMessage(`User "${username}" berhasil ditambahkan!`);
     setShowSuccessModal(true);
