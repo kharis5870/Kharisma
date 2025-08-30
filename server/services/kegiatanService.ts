@@ -129,6 +129,7 @@ export const getKegiatanById = async (id: number): Promise<Kegiatan | null> => {
 };
 
 export const createKegiatan = async (data: any): Promise<Kegiatan> => {
+    console.log("Menerima data untuk kegiatan baru:", JSON.stringify(data, null, 2));
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
@@ -141,6 +142,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
             pplAllocations, documents, username
         } = data;
+        
 
         const kegiatanQuery = `
             INSERT INTO kegiatan
@@ -166,6 +168,10 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
 
         if (pplAllocations && pplAllocations.length > 0) {
             for (const ppl of pplAllocations) {
+                if (!ppl.ppl_master_id) {
+                   console.warn("Melewatkan PPL tanpa ppl_master_id:", ppl);
+                   continue; // Lewati iterasi ini jika tidak ada PPL Master ID
+               }
                 const totalHonor = ppl.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.besaranHonor || '0')), 0) || 0;
                 const totalBeban = ppl.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.bebanKerja || '0')), 0) || 0;
 

@@ -70,3 +70,32 @@ export const getHonorDetail = async (pplMasterId: string, tahun: number): Promis
 
     return honorPerBulan;
 };
+
+export const getTotalHonorPPLByMonth = async (pplMasterId: string, bulan: number, tahun: number): Promise<number> => {
+   // Query ini sudah diperbaiki untuk menangani tanggal yang NULL dengan lebih aman
+   const query = `
+       SELECT SUM(p.besaranHonor) as totalHonor
+       FROM kegiatan k
+       JOIN ppl p ON k.id = p.kegiatanId
+       WHERE
+           p.ppl_master_id = ? AND 
+           (
+               k.bulanPembayaranHonor = ? OR
+               (
+                   k.bulanPembayaranHonor IS NULL AND 
+                   MONTH(k.tanggalSelesaiPengumpulanData) = ? AND 
+                   YEAR(k.tanggalSelesaiPengumpulanData) = ?
+               )
+           )
+   `;
+
+   const bulanPembayaran = `${String(bulan).padStart(2, '0')}-${tahun}`;
+   const sqlMonth = bulan;
+
+   const [rows] = await db.query<RowDataPacket[]>(query, [pplMasterId, bulanPembayaran, sqlMonth, tahun]);
+
+   if (rows.length > 0 && rows[0].totalHonor) {
+       return parseInt(rows[0].totalHonor, 10);
+   }
+   return 0;
+ };

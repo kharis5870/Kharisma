@@ -63,8 +63,15 @@ router.put('/:id', async (req, res) => {
 router.put('/ppl/:pplId/progress', async (req, res) => {
     try {
         const { pplId } = req.params;
-        const progressData = req.body;
-        const updatedPpl = await updatePplProgress(parseInt(pplId), progressData);
+        // Ambil username dari body request
+       const { progressData, username } = req.body;
+
+       if (!username) {
+           return res.status(400).json({ message: 'Username diperlukan untuk update progress' });
+       }
+
+       // Teruskan username sebagai argumen ketiga
+       const updatedPpl = await updatePplProgress(parseInt(pplId), progressData, username);
         res.json(updatedPpl);
     } catch (error) {
         console.error("Error updating PPL progress:", error);

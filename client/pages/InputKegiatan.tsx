@@ -1,6 +1,6 @@
 // client/pages/InputKegiatan.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -24,6 +24,8 @@ import useInputKegiatanStore, { PPLItem, HonorariumDetail, HonorariumSettings } 
 import { PPLMaster, KetuaTim, Kegiatan, UserData } from "@shared/api";
 import { useAuth } from "@/contexts/AuthContext";
 import AlertModal from "@/components/AlertModal";
+import { eachMonthOfInterval, getMonth, getYear, format as formatDateFns } from 'date-fns';
+import { id as localeID } from 'date-fns/locale';
 
 type DateFieldName =
   | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
@@ -46,8 +48,15 @@ const createActivity = async (data: any): Promise<Kegiatan> => {
         body: JSON.stringify(data),
     });
 
-    if (!res.ok) throw new Error('Gagal membuat kegiatan');
-    return res.json();
+    const contentType = res.headers.get("content-type");
+   if (res.ok && contentType && contentType.includes("application/json")) {
+       return res.json();
+   } else {
+       // Jika respons bukan JSON, tampilkan sebagai teks agar mudah di-debug
+       const textResponse = await res.text();
+       console.error("Server tidak mengembalikan JSON. Respons:", textResponse);
+       throw new Error(`Terjadi kesalahan di server (Status: ${res.status}). Respons bukan JSON.`);
+   }
 }
 
 const fetchPPLs = async (): Promise<PPLMaster[]> => {
@@ -393,6 +402,55 @@ const DokumenContent = ({ tipe, title }: { tipe: "persiapan" | "pengumpulan-data
     );
   };
 
+ const HonorPaymentMonthSelector = () => {
+     const store = useInputKegiatanStore();
+     const { tanggalMulaiPersiapan, tanggalSelesaiDiseminasiEvaluasi, bulanPembayaranHonor, updateFormField } = store;
+
+     const paymentMonthOptions = useMemo(() => {
+         if (!tanggalMulaiPersiapan || !tanggalSelesaiDiseminasiEvaluasi) {
+             return [];
+         }
+
+         const start = tanggalMulaiPersiapan;
+         const end = tanggalSelesaiDiseminasiEvaluasi;
+
+         // Jika bulan mulai dan selesai sama, tidak perlu opsi
+         if (getMonth(start) === getMonth(end) && getYear(start) === getYear(end)) {
+             return [];
+         }
+
+         const months = eachMonthOfInterval({ start, end });
+         return months.map(monthDate => ({
+             value: formatDateFns(monthDate, 'MM-yyyy'),
+             label: formatDateFns(monthDate, 'MMMM yyyy', { locale: localeID }),
+         }));
+     }, [tanggalMulaiPersiapan, tanggalSelesaiDiseminasiEvaluasi]);
+
+     // Tampilkan komponen hanya jika ada lebih dari satu opsi bulan
+     if (paymentMonthOptions.length === 0) {
+         return null;
+     }
+
+     return (
+         <div className="space-y-2 pt-4 border-t mt-4">
+             <Label htmlFor="bulanPembayaran">Bulan Pembayaran Honor *</Label>
+             <Select value={bulanPembayaranHonor} onValueChange={(value) => updateFormField('bulanPembayaranHonor', value)}>
+                 <SelectTrigger id="bulanPembayaran">
+                     <SelectValue placeholder="Pilih bulan pembayaran honor" />
+                 </SelectTrigger>
+                 <SelectContent>
+                     {paymentMonthOptions.map(option => (
+                         <SelectItem key={option.value} value={option.value}>
+                             {option.label}
+                         </SelectItem>
+                     ))}
+                     {/* Opsi "Bulan Lain" bisa ditambahkan di sini jika diperlukan */}
+                 </SelectContent>
+             </Select>
+             <p className="text-xs text-gray-500">Pilih bulan di mana honor untuk kegiatan ini akan dibayarkan.</p>
+         </div>
+     );
+ };
 
 export default function InputKegiatan() {
     const { user } = useAuth();
@@ -466,10 +524,62 @@ export default function InputKegiatan() {
       return !namaKegiatan || !ketua_tim_id || !tanggalMulaiPersiapan || !tanggalSelesaiPersiapan;
     };
   
-    const handleSubmit = (e: React.FormEvent) => {
+    const [showHonorWarningModal, setShowHonorWarningModal] = useState(false);
+    const [honorWarningDetails, setHonorWarningDetails] = useState<{ pplName: string; totalHonor: number; limit: number } | null>(null);
+
+    
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      setLastActivityName(store.namaKegiatan);
   
+      const HONOR_LIMIT = 3000000; // Batas honor per bulan
+       const { pplAllocations, bulanPembayaranHonor, tanggalMulaiPengumpulanData } = store;
+
+       // Tentukan bulan dan tahun untuk validasi
+       let validationMonth: number, validationYear: number;
+       if (bulanPembayaranHonor) {
+           const [month, year] = bulanPembayaranHonor.split('-');
+           validationMonth = parseInt(month);
+           validationYear = parseInt(year);
+       } else if (tanggalMulaiPengumpulanData) {
+           validationMonth = getMonth(tanggalMulaiPengumpulanData) + 1; // getMonth is 0-indexed
+           validationYear = getYear(tanggalMulaiPengumpulanData);
+       } else {
+           // Jika tidak ada tanggal sama sekali, lewati validasi
+           proceedToSubmit();
+           return;
+       }
+
+       for (const ppl of pplAllocations) {
+           if (!ppl.ppl_master_id) continue;
+
+           // Hitung total honor PPL untuk kegiatan ini
+           const currentActivityHonor = ppl.honorarium.reduce((sum, h) => sum + (parseInt(h.besaranHonor) || 0), 0);
+
+           // Ambil total honor PPL yang sudah ada dari backend
+           const res = await fetch(`/api/honor/ppl/validate?pplId=${ppl.ppl_master_id}&bulan=${validationMonth}&tahun=${validationYear}`);
+           const { totalHonor: existingHonor } = await res.json();
+
+           const projectedTotal = existingHonor + currentActivityHonor;
+
+           if (projectedTotal > HONOR_LIMIT) {
+               setHonorWarningDetails({
+                   pplName: ppl.namaPPL || 'PPL',
+                   totalHonor: projectedTotal,
+                   limit: HONOR_LIMIT,
+               });
+               setShowHonorWarningModal(true);
+               return; // Hentikan proses submit
+           }
+       }
+
+       // Jika semua validasi lolos, lanjutkan submit
+       proceedToSubmit();
+   };
+
+   // Fungsi terpisah untuk proses submit data
+   const proceedToSubmit = () => {
+       setLastActivityName(store.namaKegiatan);
+
       const formatDateForSubmission = (date: Date | undefined) => {
           if (!date) return undefined;
           return isValid(date) ? date.toISOString() : undefined;
@@ -489,7 +599,11 @@ export default function InputKegiatan() {
       };
       mutation.mutate(dataToSubmit);
     };
-  
+  const handleConfirmHonorWarning = () => {
+       setShowHonorWarningModal(false);
+       // Lanjutkan proses submit setelah pengguna mengkonfirmasi peringatan
+       proceedToSubmit();
+   };
     const handleSuccessAction = () => {
       navigate('/dashboard');
     };
@@ -544,6 +658,9 @@ export default function InputKegiatan() {
                                     </div>
                                 ))}
                             </CardContent>
+                            <CardContent>
+                                     <HonorPaymentMonthSelector />
+                                 </CardContent>
                         </Card>
                      </div>
                   </TabsContent>
@@ -584,6 +701,15 @@ export default function InputKegiatan() {
                   </Button>
               </div>
           </form>
+          <ConfirmationModal
+                   isOpen={showHonorWarningModal}
+                   onClose={() => setShowHonorWarningModal(false)}
+                   onConfirm={handleConfirmHonorWarning}
+                   title="Peringatan Batas Honor"
+                   description={`Total honor untuk ${honorWarningDetails?.pplName} di bulan terpilih akan menjadi ${formatHonor(honorWarningDetails?.totalHonor || 0)}, melebihi batas ${formatHonor(honorWarningDetails?.limit || 0)}. Lanjutkan?`}
+                   confirmLabel="Ya, Lanjutkan"
+                   variant="warning"
+               />
           <SuccessModal 
               isOpen={showSuccessModal} 
               onClose={() => setShowSuccessModal(false)} 
