@@ -21,7 +21,7 @@ interface HonorariumPacket extends RowDataPacket {
 }
 
 
-const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | 'Submit'): number => {
+const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | 'Submitted'): number => {
     const pplTahap = ppl.filter(p => p.tahap === tahap);
     if (pplTahap.length === 0) return 0;
 
@@ -31,11 +31,13 @@ const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | '
     const totalProgress = pplTahap.reduce((acc, p) => {
         const progress = p.progress || {};
         if (tahap === 'pengumpulan-data') {
-            const approved = progress.approved || 0;
             if (type === 'Approved') {
-                return acc + approved;
-            }
-            return acc + (progress.submit || 0) + (progress.diperiksa || 0) + approved;
+               return acc + (progress.approved || 0);
+           }
+           // Gabungan dari 'submit' dan 'diperiksa'
+           if (type === 'Submitted') {
+               return acc + (progress.submit || 0) + (progress.diperiksa || 0);
+           }
         }
         if (tahap === 'pengolahan-analisis') {
             const clean = progress.clean || 0;
@@ -111,8 +113,8 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
         
         kegiatan.progressPendataanApproved = calculateProgress(kegiatan.ppl, 'pengumpulan-data', 'Approved');
         kegiatan.progressPengolahanApproved = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Approved');
-        kegiatan.progressPendataanSubmit = calculateProgress(kegiatan.ppl, 'pengumpulan-data', 'Submit');
-        kegiatan.progressPengolahanSubmit = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Submit');
+        kegiatan.progressPendataanSubmit = calculateProgress(kegiatan.ppl, 'pengumpulan-data', 'Submitted');
+        kegiatan.progressPengolahanSubmit = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Submitted');
     }
     return kegiatanRows;
 };
@@ -347,8 +349,8 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
 
         const progressPendataanApproved = calculateProgress(allPplForKegiatan, 'pengumpulan-data', 'Approved');
         const progressPengolahanApproved = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Approved');
-        const progressPendataanSubmit = calculateProgress(allPplForKegiatan, 'pengumpulan-data', 'Submit');
-        const progressPengolahanSubmit = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Submit');
+        const progressPendataanSubmit = calculateProgress(allPplForKegiatan, 'pengumpulan-data', 'Submitted');
+        const progressPengolahanSubmit = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Submitted');
 
         const totalBebanKerjaKegiatan = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja, 10) || 0), 0);
         const totalApproved = allPplForKegiatan.reduce((acc, p) => {
