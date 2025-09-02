@@ -1,6 +1,6 @@
 // client/pages/EditActivity.tsx
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -440,7 +440,9 @@ export default function EditActivity() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
     const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: TahapPPL | null}>({isOpen: false, tahap: null});
-    
+    const submitButtonRef = useRef<HTMLButtonElement>(null); 
+
+
     const handleFormFieldChange = useCallback((field: keyof FormState, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     }, []);
@@ -654,7 +656,14 @@ export default function EditActivity() {
     }
 
     const handleSubmit = async () => {
-        if (!formData.id) return alert("Error: ID Kegiatan tidak ditemukan.");
+    // Secara paksa pindahkan fokus ke tombol submit.
+    // Ini akan memicu event onBlur pada input field yang sedang aktif.
+    submitButtonRef.current?.focus();
+
+    // Beri jeda sesaat untuk memastikan state dari onBlur sudah selesai diperbarui
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    if (!formData.id) return alert("Error: ID Kegiatan tidak ditemukan.");
 
     const dateError = validateDates();
     if (dateError) {
@@ -662,17 +671,14 @@ export default function EditActivity() {
       return;
     }
 
-    // Jika tidak ada PPL yang dialokasikan, langsung simpan.
     if (!formData.ppl || formData.ppl.length === 0) {
       proceedToSubmit();
       return;
     }
 
-    // Jika ADA PPL, maka validasi honor WAJIB dijalankan.
     const HONOR_LIMIT = 3000000;
     let validationMonth: number, validationYear: number;
 
-    // Otomatis tentukan bulan validasi
     const singleMonthActivity = formData.tanggalMulaiPersiapan ? formatDateFns(formData.tanggalMulaiPersiapan, 'MM-yyyy') : null;
     const selectedMonth = formData.bulanPembayaranHonor;
     const collectionDate = formData.tanggalMulaiPengumpulanData;
@@ -689,12 +695,10 @@ export default function EditActivity() {
       validationMonth = parseInt(month);
       validationYear = parseInt(year);
     } else {
-      // Jika tidak ada tanggal acuan sama sekali, hentikan proses dan minta user mengisi.
       setAlertModal({ isOpen: true, title: "Informasi Kurang", message: "Untuk validasi honor, Anda harus mengisi setidaknya 'Tanggal Mulai Persiapan' atau 'Tanggal Mulai Pengumpulan Data'." });
       return;
     }
 
-    // Lakukan iterasi dan validasi
     for (const ppl of formData.ppl ?? []) {
         if (!ppl.ppl_master_id) continue;
         const currentActivityHonor = ppl.honorarium.reduce((sum, h) => sum + (parseInt(h.besaranHonor || '0') || 0), 0);
@@ -718,13 +722,12 @@ export default function EditActivity() {
           limit: result.limit,
         });
         setShowHonorWarningModal(true);
-        return; // Hentikan proses jika ada yang melebihi batas
+        return;
       }
     }
 
-    // Jika semua PPL lolos validasi, lanjutkan menyimpan.
     proceedToSubmit();
-    };
+};
 
     const handleConfirmHonorWarning = () => {
         setShowHonorWarningModal(false);
@@ -988,7 +991,16 @@ export default function EditActivity() {
                     </Tabs>
                     
                     <div className="flex justify-center mt-8">
-                        <Button type="submit" disabled={mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" size="lg"><Save className="w-4 h-4 mr-2" />{mutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
+                        <Button
+                            ref={submitButtonRef}
+                            type="submit" 
+                            disabled={mutation.isPending} 
+                            className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" 
+                            size="lg"
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            {mutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}
+                        </Button>
                     </div>
                  </form>
                 <SuccessModal 

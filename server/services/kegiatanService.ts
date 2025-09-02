@@ -282,6 +282,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
 // END OF FIX: createKegiatan function
 // =================================================================
 
+
 // =================================================================
 // START OF FIX: updateKegiatan function
 // =================================================================
@@ -296,7 +297,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
             tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
-            ppl, documents, lastEditedBy, 
+            ppl, documents, lastEditedBy,
             honorariumSettings
         } = data;
 
@@ -332,8 +333,50 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         const honorSettingsValues = [    ['listing', listingSettings],    ['pencacahan', pencacahanSettings],    ['pengolahan', pengolahanSettings]  ].map(([jenis, settings]) => [id, jenis, settings.satuanBebanKerja, settings.hargaSatuan]);
         await connection.query(honorSettingsQuery, [honorSettingsValues]);
 
+        // ================== DOCUMENT LOGIC FIX START ==================
+        if (documents) {
+            // 1. Get IDs of documents submitted from the client
+            const submittedDocIds = documents.map((doc: any) => doc.id).filter(Boolean);
+
+            // 2. Delete non-mandatory documents that were removed by the user
+            if (submittedDocIds.length > 0) {
+                 const placeholders = submittedDocIds.map(() => '?').join(',');
+                 await connection.execute(
+                    `DELETE FROM dokumen WHERE kegiatanId = ? AND isWajib = false AND id NOT IN (${placeholders})`,
+                    [id, ...submittedDocIds]
+                );
+            } else {
+                // If no existing documents are submitted, delete all non-mandatory ones for this activity
+                await connection.execute(
+                    'DELETE FROM dokumen WHERE kegiatanId = ? AND isWajib = false',
+                    [id]
+                );
+            }
+
+            // 3. Iterate to INSERT new documents or UPDATE existing ones
+            for (const doc of documents) {
+                if (doc.id) { // If ID exists, it's an existing document
+                    const updateDocQuery = 'UPDATE dokumen SET nama = ?, link = ?, status = ? WHERE id = ?';
+                    await connection.execute(updateDocQuery, [doc.nama, doc.link, doc.status || 'Pending', doc.id]);
+                } else { // No ID means it's a new document
+                    const insertDocQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+                    await connection.execute(insertDocQuery, [
+                        id,
+                        doc.nama,
+                        doc.link,
+                        doc.jenis || 'link',
+                        doc.tipe,
+                        new Date(),
+                        doc.isWajib || false,
+                        doc.status || 'Pending'
+                    ]);
+                }
+            }
+        }
+        // ================== DOCUMENT LOGIC FIX END ==================
+
+        // The PPL logic below might have a similar issue, but we focus on the document problem first.
         await connection.execute('DELETE FROM ppl WHERE kegiatanId = ?', [id]);
-        await connection.execute('DELETE FROM dokumen WHERE kegiatanId = ?', [id]);
 
         if (ppl && ppl.length > 0) {
             for (const p of ppl) {
@@ -373,39 +416,20 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
                 }
 
                 if (p.progress && Object.keys(p.progress).length > 0) {
-      // Jika data progress sudah ada dari klien, simpan kembali
-      const progressEntries = Object.entries(p.progress);
-      if (progressEntries.length > 0) {
+                  const progressEntries = Object.entries(p.progress);
+                  if (progressEntries.length > 0) {
                         const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES ?';
                         const progressValues = progressEntries.map(([type, value]) => [pplId, type, value]);
                         await connection.query(progressQuery, [progressValues]);
                     }
-                    } else {
-      // Jika tidak ada data progress (artinya ini PPL baru), buat entri default
-      if (totalBeban > 0) {
-        const progressType = p.tahap === 'pengumpulan-data' ? 'open' : 'belum_entry';
-        const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES (?, ?, ?)';
-        await connection.execute(progressQuery, [pplId, progressType, totalBeban]);
-      }
+                } else {
+                  if (totalBeban > 0) {
+                    const progressType = p.tahap === 'pengumpulan-data' ? 'open' : 'belum_entry';
+                    const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES (?, ?, ?)';
+                    await connection.execute(progressQuery, [pplId, progressType, totalBeban]);
+                  }
                 }
             }
-        }
-
-        if (documents && documents.length > 0) {
-            const docQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib, status, lastApproved, lastApprovedBy) VALUES ?';
-            const docValues = documents.map((doc: any) => [
-                id,
-                doc.nama,
-                doc.link,
-                doc.jenis,
-                doc.tipe,
-                doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(),
-                doc.isWajib || false,
-                doc.status || 'Pending',
-                doc.lastApproved && doc.lastApproved !== null ? new Date(doc.lastApproved) : null, // Cek eksplisit untuk null/undefined
-                doc.lastApprovedBy
-            ]);
-            await connection.query(docQuery, [docValues]);
         }
         
         await connection.commit();
