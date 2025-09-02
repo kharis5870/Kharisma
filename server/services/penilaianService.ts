@@ -11,7 +11,7 @@ export const getPenilaianList = async () => {
     SELECT
       p.id AS id, -- ID unik dari tabel PPL, kita gunakan sebagai ID utama
       k.id AS kegiatanId,
-      k.nama AS namaKegiatan,
+      k.namaKegiatan AS namaKegiatan,
       p.id AS pplId,
       pmaster.nama AS namaPPL,
       u.id AS pmlId,
@@ -28,7 +28,7 @@ export const getPenilaianList = async () => {
     JOIN ppl_master pmaster ON p.ppl_master_id = pmaster.id
     LEFT JOIN users u ON p.pml_id = u.id -- Mengambil nama PML dari tabel PPL
     LEFT JOIN penilaian_mitra pn ON p.id = pn.pplId AND k.id = pn.kegiatanId
-    ORDER BY k.nama, pmaster.nama;
+    ORDER BY k.namaKegiatan, pmaster.nama;
   `;
 
   const [rows] = await pool.query(query);

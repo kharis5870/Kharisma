@@ -13,7 +13,7 @@ export const getPendingDocumentNotifications = async () => {
     SELECT 
       d.id,
       d.nama AS namaDokumen,
-      k.nama AS namaKegiatan,
+      k.namaKegiatan AS namaKegiatan,
       k.id AS kegiatanId,
       d.link AS linkFile,
       u.nama AS uploadedBy,
