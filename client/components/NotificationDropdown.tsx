@@ -19,14 +19,11 @@ import {
 import { DocumentNotification } from "@shared/api";
 import { apiClient } from "@/lib/apiClient";
 
-// DIPERBAIKI: Fungsi ini sekarang dengan benar mengembalikan Promise<DocumentNotification[]>
 const fetchNotifications = async (): Promise<DocumentNotification[]> => {
-  // Axios response object memiliki properti 'data'. Kita langsung return isinya.
-  const response = await apiClient.get<DocumentNotification[]>("/notifikasi");
-  return response.data;
+  const notifications = await apiClient.get<DocumentNotification[]>("/notifikasi");
+  return notifications; 
 };
 
-// ... (sisa kode komponen sama persis, tidak perlu diubah)
 const getRelativeTime = (dateString: string) => {
   const date = new Date(dateString);
   const now = new Date();

@@ -183,13 +183,13 @@ function EvaluationModal({ isOpen, onClose, penilaian, onSave, isSaving }: Evalu
 // MAIN PAGE COMPONENT (SESUAI PROTOTIPE)
 //================================================================================
 const fetchPenilaianData = async (): Promise<PenilaianMitraType[]> => {
-  const response = await apiClient.get<PenilaianMitraType[]>("/penilaian");
-  return response.data;
+  const penilaianData = await apiClient.get<PenilaianMitraType[]>("/penilaian");
+  return penilaianData;
 };
 
 const savePenilaian = async (penilaianData: PenilaianRequest) => {
-  const response = await apiClient.post('/penilaian', penilaianData);
-  return response.data;
+  const result = await apiClient.post('/penilaian', penilaianData);
+  return result;
 };
 
 export default function PenilaianMitraPage() {
