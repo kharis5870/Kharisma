@@ -2,16 +2,13 @@
 
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Users, FileText, Settings, LogOut, PlusCircle, Menu, ArrowLeft } from 'lucide-react';
+import { Home, Users, FileText, Settings, LogOut, PlusCircle, Menu, ArrowLeft, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
 import favicon from '/favicon.ico';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/stores/useSidebarStore';
-
-// Pindahkan definisi menuItems ke DALAM komponen Sidebar
-// const menuItems = [ ... ]; // Hapus ini dari sini
 
 const SidebarLink: React.FC<{isExpanded: boolean; href: string; icon: React.ElementType; label: string; active: boolean; theme: 'light' | 'dark'}> =
 ({ isExpanded, href, icon: Icon, label, active, theme }) => (
@@ -53,6 +50,7 @@ const Sidebar: React.FC = () => {
     { href: '/dashboard', label: 'Dashboard', icon: Home },
     { href: '/daftar-ppl', label: 'Daftar PPL', icon: Users },
     { href: '/manajemen-honor', label: 'Manajemen Honor', icon: FileText },
+    { href: '/penilaian-mitra', label: 'Penilaian Mitra', icon: Star },
     { href: '/manajemen-admin', label: 'Manajemen Admin', icon: Settings },
   ];
 

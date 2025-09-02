@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Calendar, Clock, Search, Bell, Settings } from "lucide-react";
+import NotificationDropdown from './NotificationDropdown';
 
 // Fungsi getTitleFromPath tetap sama
 const getTitleFromPath = (path: string): string => {
@@ -106,10 +107,7 @@ const Header: React.FC = () => {
           </div>
           
           {/* Tombol Notifikasi & Pengaturan */}
-          <Button variant="ghost" size="icon" className="relative rounded-full">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-          </Button>
+          <NotificationDropdown /> 
           
           <Button variant="ghost" size="icon" className="rounded-full">
             <Settings className="w-5 h-5" />

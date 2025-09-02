@@ -11,10 +11,11 @@ import Login from "./pages/Login";
 import InputKegiatan from "./pages/InputKegiatan";
 import Dashboard from "./pages/Dashboard";
 import ManajemenHonor from "./pages/ManajemenHonor";
-import ManajemenAdmin from "./pages/ManajemenAdmin"; // <-- Impor halaman baru
-import DaftarPPL from "./pages/DaftarPPL"; // <-- Impor halaman baru
+import ManajemenAdmin from "./pages/ManajemenAdmin"; 
+import DaftarPPL from "./pages/DaftarPPL"; 
 import EditActivity from "./pages/EditActivity";
 import ViewDocuments from "./pages/ViewDocuments";
+import PenilaianMitraPage from './pages/PenilaianMitra';
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
                 <Route path="/daftar-ppl" element={<ProtectedRoute><DaftarPPL /></ProtectedRoute>} />
                 <Route path="/edit-activity/:id" element={<ProtectedRoute><EditActivity /></ProtectedRoute>} />
                 <Route path="/view-documents/:id" element={<ProtectedRoute><ViewDocuments /></ProtectedRoute>} />
+                <Route path="/penilaian-mitra" element={<ProtectedRoute><PenilaianMitraPage /></ProtectedRoute>} />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>

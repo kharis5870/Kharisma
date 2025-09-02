@@ -123,3 +123,43 @@ export interface PPLAdminData {
     noTelepon: string;
     kegiatanNames: string[];
 }
+
+export interface DocumentNotification {
+  id: number;
+  namaDokumen: string;
+  namaKegiatan: string;
+  kegiatanId: number;
+  linkFile: string;
+  uploadedBy: string;
+  uploadedAt: string; // ISO date string
+  status: 'pending_approval';
+  type: 'document_uploaded';
+}
+
+export interface PenilaianMitra {
+  id: number;
+  kegiatanId: number;
+  namaKegiatan: string;
+  pplId: number;
+  namaPPL: string;
+  pmlId: number | null;
+  namaPML: string | null;
+  sikapPelikaku: number | null;
+  kualitasPekerjaan: number | null;
+  ketepatanWaktu: number | null;
+  rataRata: number | null;
+  sudahDinilai: boolean;
+  tanggalPenilaian?: string | null; // ISO date string
+  dinilaiOleh?: string | null;
+}
+
+export interface PenilaianRequest {
+  penilaianId?: number; // ID dari penilaian_mitra jika sudah ada (untuk update)
+  pplId: number;
+  kegiatanId: number;
+  pmlId: number | null;
+  dinilaiOleh_userId: number; // ID user yang sedang login
+  sikapPelikaku: number;
+  kualitasPekerjaan: number;
+  ketepatanWaktu: number;
+}
