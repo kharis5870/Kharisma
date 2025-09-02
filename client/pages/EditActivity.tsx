@@ -109,11 +109,9 @@ const fetchPMLs = async (): Promise<UserData[]> => {
 const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Promise<Kegiatan> => {
     const sanitizedData = {
         ...kegiatan,
-        dokumen: kegiatan.dokumen?.map(({ clientId, ...rest }) => rest),
+        dokumen: kegiatan.dokumen,
         ppl: kegiatan.ppl?.map(({ clientId, namaPPL, ...rest }) => rest),
     };
-    // Don't delete honorariumSettings from the payload, the backend now needs it
-    // delete (sanitizedData as any).honorariumSettings;
 
     const res = await fetch(`/api/kegiatan/${kegiatan.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sanitizedData) });
     if (!res.ok) {
