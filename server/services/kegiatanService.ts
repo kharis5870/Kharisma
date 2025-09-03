@@ -450,6 +450,84 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
 // END OF FIX: updateKegiatan function
 // =================================================================
 
+export const createSingleDocument = async (data: Partial<Dokumen>, username: string): Promise<Dokumen> => {
+    const { kegiatanId, nama, link, jenis, tipe, isWajib } = data;
+
+    if (!kegiatanId || !nama || !tipe) {
+        throw new Error("Kegiatan ID, Nama, dan Tipe dokumen diperlukan.");
+    }
+
+    const query = `
+        INSERT INTO dokumen 
+        (kegiatanId, nama, link, jenis, tipe, isWajib, status, uploadedAt, diunggahOleh_userId) 
+        VALUES (?, ?, ?, ?, ?, ?, 'Pending', ?, ?)
+    `;
+    const [result] = await db.execute<OkPacket>(query, [
+        kegiatanId,
+        nama,
+        link || null,
+        jenis || 'link',
+        tipe,
+        isWajib || false,
+        new Date(),
+        username // Menyimpan siapa yang menambah
+    ]);
+
+    const newDocId = result.insertId;
+    const [rows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE id = ?', [newDocId]);
+    if (rows.length === 0) {
+        throw new Error("Gagal mengambil dokumen yang baru dibuat.");
+    }
+    return rows[0] as Dokumen;
+};
+
+// --- TAMBAHKAN FUNGSI BARU INI ---
+export const updateSingleDocument = async (dokumenId: number, data: { link?: string, nama?: string }, username: string): Promise<Dokumen> => {
+    const { link, nama } = data;
+
+    // Cek dulu apakah ada yang perlu diupdate
+    if (link === undefined && nama === undefined) {
+        const [rows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE id = ?', [dokumenId]);
+        if (rows.length === 0) throw new Error("Dokumen tidak ditemukan.");
+        return rows[0] as Dokumen;
+    }
+
+    // Jika ada link atau nama baru, update dan set status kembali ke Pending
+    // agar bisa direview ulang oleh supervisor.
+    const query = `
+        UPDATE dokumen 
+        SET 
+            link = ?, 
+            nama = ?, 
+            status = 'Pending', 
+            updatedAt = CURRENT_TIMESTAMP 
+        WHERE id = ?
+    `;
+
+    const [oldDocRows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE id = ?', [dokumenId]);
+    if (oldDocRows.length === 0) throw new Error("Dokumen tidak ditemukan untuk diupdate.");
+
+    const oldDoc = oldDocRows[0];
+
+    await db.execute(query, [
+        link ?? oldDoc.link, // Gunakan link baru jika ada, jika tidak, pertahankan yang lama
+        nama ?? oldDoc.nama, // Gunakan nama baru jika ada, jika tidak, pertahankan yang lama
+        dokumenId
+    ]);
+
+    const [updatedDocRows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE id = ?', [dokumenId]);
+    if (updatedDocRows.length === 0) {
+        throw new Error("Gagal mengambil dokumen setelah update.");
+    }
+    return updatedDocRows[0] as Dokumen;
+};
+// --- AKHIR DARI FUNGSI BARU ---
+
+export const deleteSingleDocument = async (id: number): Promise<boolean> => {
+    const [result] = await db.execute<OkPacket>('DELETE FROM dokumen WHERE id = ? AND isWajib = false', [id]);
+    return result.affectedRows > 0;
+};
+
 export const updatePplProgress = async (pplId: number, progressData: Partial<Record<ProgressType, number>>, username: string) => {
     const connection = await db.getConnection();
     try {

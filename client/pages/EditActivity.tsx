@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Check, ChevronsUpDown, Users, XCircle } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge"; 
 import { format, parseISO, isValid, getMonth, getYear, eachMonthOfInterval, format as formatDateFns } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -378,40 +379,105 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
 const DokumenItem = React.memo(({ doc, updateDocument, removeDocument }: {
     doc: ClientDokumen;
     updateDocument: (clientId: string, field: 'nama' | 'link', value: string) => void;
-    removeDocument: (clientId: string) => void;
+    removeDocument: (clientId: string, docId?: number) => void;
 }) => {
-    const [nama, setNama] = useState(doc.nama);
-    const [link, setLink] = useState(doc.link);
-    const isApproved = doc.status === 'Approved';
+    const { id, isWajib, status, nama, link, kegiatanId, tipe, clientId } = doc;
+    const isNew = !id;
 
-    const handleNamaBlur = () => {
-        if (nama !== doc.nama) {
-            updateDocument(doc.clientId, 'nama', nama);
+    const [isEditing, setIsEditing] = useState(isNew);
+    const [localNama, setLocalNama] = useState(nama);
+    const [localLink, setLocalLink] = useState(link ?? '');
+
+    const queryClient = useQueryClient();
+    const isApproved = status === 'Approved';
+
+    const mutation = useMutation({
+        mutationFn: (documentData: Partial<Dokumen>) => {
+            const url = isNew ? '/api/kegiatan/dokumen' : `/api/kegiatan/dokumen/${id}`;
+            const method = isNew ? 'POST' : 'PUT';
+            return fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(documentData)
+            }).then(res => {
+                if (!res.ok) throw new Error(`Gagal ${isNew ? 'membuat' : 'memperbarui'} dokumen.`);
+                return res.json();
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['kegiatan', String(kegiatanId)] });
+        },
+        onError: (error: any) => {
+            alert(`Error: ${error.message}`);
+        }
+    });
+
+    const handleSave = () => {
+        const dataToSend: Partial<Dokumen> = {
+            nama: localNama,
+            link: localLink,
+            kegiatanId: kegiatanId,
+            tipe: tipe,
+            isWajib: isWajib
+        };
+        mutation.mutate(dataToSend);
+    };
+
+    const handleCancel = () => {
+        if (isNew) {
+            removeDocument(clientId);
+        } else {
+            setLocalNama(nama);
+            setLocalLink(link ?? '');
+            setIsEditing(false);
         }
     };
 
-    const handleLinkBlur = () => {
-        if (link !== doc.link) {
-            updateDocument(doc.clientId, 'link', link);
-        }
+    const handleLocalChange = (field: 'nama' | 'link', value: string) => {
+        if (field === 'nama') setLocalNama(value);
+        if (field === 'link') setLocalLink(value);
     };
-
-    useEffect(() => {
-        setNama(doc.nama);
-        setLink(doc.link ?? '');
-    }, [doc.nama, doc.link]);
 
     return (
-        <div className={cn("flex items-center gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50 border-green-200" : (doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50"))}>
+        <div className={cn("flex items-start gap-3 p-3 border rounded-lg transition-all",
+            isApproved ? "bg-green-50 border-green-200" :
+            isEditing ? "bg-yellow-50 border-yellow-300" :
+            (isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")
+        )}>
             <div className="flex-grow space-y-2">
-                {doc.isWajib ? <Label className="font-semibold">{doc.nama} *</Label> : <Input placeholder="Nama Dokumen Pendukung" value={nama} onChange={(e) => setNama(e.target.value)} onBlur={handleNamaBlur} disabled={isApproved} />}
-                <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-gray-400"/><Input placeholder="https://drive.google.com/..." value={link ?? ''} onChange={(e) => setLink(e.target.value)} onBlur={handleLinkBlur} disabled={isApproved} /></div>
+                {isWajib ?
+                    <Label className="font-semibold pt-2 block">{nama} *</Label> :
+                    <Input placeholder="Nama Dokumen Pendukung" value={localNama} onChange={(e) => handleLocalChange('nama', e.target.value)} disabled={!isEditing || mutation.isPending} />
+                }
+                <div className="flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-gray-400" />
+                    <Input placeholder="https://drive.google.com/..." value={localLink} onChange={(e) => handleLocalChange('link', e.target.value)} disabled={!isEditing || mutation.isPending || isApproved} />
+                </div>
             </div>
-            {!doc.isWajib && !isApproved ? (<Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.clientId)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>) : (<div className="self-center p-2" title={isApproved ? "Dokumen Disetujui" : "Dokumen Wajib"}><Lock className="w-4 h-4 text-gray-400"/></div>)}
+
+            <div className="flex flex-col items-center gap-1 min-w-[80px]">
+                {isApproved ? (
+                    <div className="p-2" title="Dokumen Disetujui"><Lock className="w-4 h-4 text-green-600"/></div>
+                ) : isEditing ? (
+                    <>
+                        <Button type="button" size="sm" onClick={handleSave} disabled={!localNama || mutation.isPending} className="bg-green-500 hover:bg-green-600">
+                            {mutation.isPending ? '...' : 'Simpan'}
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={handleCancel} disabled={mutation.isPending}>Batal</Button>
+                    </>
+                ) : (
+                    <Button type="button" size="sm" variant="outline" onClick={() => setIsEditing(true)}>Edit</Button>
+                )}
+
+                {!isWajib && !isApproved && !isEditing && (
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(clientId, id)} className="mt-1">
+                        <X className="w-4 h-4 text-gray-500"/>
+                    </Button>
+                )}
+            </div>
         </div>
     );
 });
-
 
 // --- Main Component ---
 export default function EditActivity() {
@@ -855,11 +921,25 @@ export default function EditActivity() {
         const updateDocument = (clientId: string, field: 'nama' | 'link', value: string) => {
             setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.map(d => (d.clientId === clientId ? { ...d, [field]: value } : d)) }));
         };
-        const removeDocument = (clientId: string) => {
+
+        const removeDocument = (clientId: string, docId?: number) => {
+            // Logika hapus (bisa ditambahkan konfirmasi di sini jika perlu)
             setFormData(prev => ({ ...prev, dokumen: prev.dokumen?.filter(d => d.clientId !== clientId) }));
+            // Note: Penghapusan permanen dari DB untuk dokumen yang sudah ada akan ditangani oleh tombol Simpan Perubahan utama.
         };
-         const addDocument = (tipe: Dokumen['tipe']) => {
-            const newDoc: ClientDokumen = { clientId: `new-doc-${Date.now()}`, tipe, nama: "", link: "", jenis: 'link', isWajib: false, status: 'Pending', uploadedAt: new Date().toISOString() };
+
+        const addDocument = (tipe: Dokumen['tipe']) => {
+            const newDoc: ClientDokumen = { 
+                clientId: `new-doc-${Date.now()}`, 
+                kegiatanId: Number(id), 
+                tipe, 
+                nama: "", 
+                link: "", 
+                jenis: 'link', 
+                isWajib: false, 
+                status: 'Pending', 
+                uploadedAt: new Date().toISOString() 
+            };
             setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
         };
 
@@ -875,7 +955,12 @@ export default function EditActivity() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {documents.map(doc => (
-                        <DokumenItem key={doc.clientId} doc={doc} updateDocument={updateDocument} removeDocument={removeDocument} />
+                        <DokumenItem 
+                            key={doc.clientId} 
+                            doc={doc} 
+                            updateDocument={updateDocument} 
+                            removeDocument={removeDocument} 
+                        />
                     ))}
                 </CardContent>
             </Card>

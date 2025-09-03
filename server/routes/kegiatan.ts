@@ -8,6 +8,9 @@ import {
   updatePplProgress,
   deleteKegiatan,
   updateDocumentStatus,
+  updateSingleDocument,
+  createSingleDocument,
+  deleteSingleDocument,
   approveDocumentsByTipe
 } from '../services/kegiatanService';
 
@@ -121,6 +124,33 @@ router.put('/:kegiatanId/tahapan/approve', async (req, res) => {
     }
 });
 
+router.post('/dokumen', async (req, res) => {
+    try {
+        // @ts-ignore
+        const username = req.user?.username || 'system_add';
+        const newDocument = await createSingleDocument(req.body, username);
+        res.status(201).json(newDocument);
+    } catch (error: any) {
+        console.error("Error creating single document:", error);
+        res.status(500).json({ message: error.message || 'Gagal membuat dokumen baru.' });
+    }
+});
+
+router.put('/dokumen/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { link, nama } = req.body;
+        // Asumsi Anda memiliki middleware untuk otentikasi yang menaruh data user di req.user
+        // @ts-ignore
+        const username = req.user?.username || 'system_update';
+        
+        const updatedDocument = await updateSingleDocument(Number(id), { link, nama }, username);
+        res.json(updatedDocument);
+    } catch (error: any) {
+        console.error("Error updating single document:", error);
+        res.status(500).json({ message: error.message || 'Gagal memperbarui dokumen.' });
+    }
+});
 
 // DELETE kegiatan
 router.delete('/:id', async (req, res) => {
@@ -134,6 +164,19 @@ router.delete('/:id', async (req, res) => {
     } catch (error) {
         console.error("Error deleting kegiatan:", error);
         res.status(500).json({ message: 'Gagal menghapus kegiatan' });
+    }
+});
+
+router.delete('/dokumen/:id', async (req, res) => {
+    try {
+        const success = await deleteSingleDocument(parseInt(req.params.id));
+        if (success) {
+            res.status(204).send();
+        } else {
+            res.status(404).json({ message: 'Dokumen tidak ditemukan.' });
+        }
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
     }
 });
 
