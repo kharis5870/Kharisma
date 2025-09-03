@@ -356,20 +356,29 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             // 3. Iterate to INSERT new documents or UPDATE existing ones
             for (const doc of documents) {
                 if (doc.id) { // If ID exists, it's an existing document
+                    const [existingDoc] = await connection.query<RowDataPacket[]>('SELECT link FROM dokumen WHERE id = ?', [doc.id]);
+                if (existingDoc.length > 0 && !existingDoc[0].link && doc.link) {
+                    // Jika link sebelumnya KOSONG dan link baru ADA, rekam siapa yang mengunggah
+                    const updateDocQuery = 'UPDATE dokumen SET nama = ?, link = ?, status = ?, diunggahOleh_userId = ? WHERE id = ?';
+                    await connection.execute(updateDocQuery, [doc.nama, doc.link, doc.status || 'Pending', lastEditedBy, doc.id]);
+                } else {
+                    // Jika tidak, jalankan update seperti biasa
                     const updateDocQuery = 'UPDATE dokumen SET nama = ?, link = ?, status = ? WHERE id = ?';
                     await connection.execute(updateDocQuery, [doc.nama, doc.link, doc.status || 'Pending', doc.id]);
+                }
                 } else { // No ID means it's a new document
-                    const insertDocQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-                    await connection.execute(insertDocQuery, [
-                        id,
-                        doc.nama,
-                        doc.link,
-                        doc.jenis || 'link',
-                        doc.tipe,
-                        new Date(),
-                        doc.isWajib || false,
-                        doc.status || 'Pending'
-                    ]);
+                const insertDocQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib, status, diunggahOleh_userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+                await connection.execute(insertDocQuery, [
+                    id,
+                    doc.nama,
+                    doc.link,
+                    doc.jenis || 'link',
+                    doc.tipe,
+                    new Date(),
+                    doc.isWajib || false,
+                    doc.status || 'Pending',
+                    lastEditedBy // Gunakan lastEditedBy sebagai pengunggah
+                ]);
                 }
             }
         }
@@ -485,33 +494,31 @@ export const createSingleDocument = async (data: Partial<Dokumen>, username: str
 export const updateSingleDocument = async (dokumenId: number, data: { link?: string, nama?: string }, username: string): Promise<Dokumen> => {
     const { link, nama } = data;
 
-    // Cek dulu apakah ada yang perlu diupdate
     if (link === undefined && nama === undefined) {
         const [rows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE id = ?', [dokumenId]);
         if (rows.length === 0) throw new Error("Dokumen tidak ditemukan.");
         return rows[0] as Dokumen;
     }
 
-    // Jika ada link atau nama baru, update dan set status kembali ke Pending
-    // agar bisa direview ulang oleh supervisor.
     const query = `
         UPDATE dokumen 
         SET 
             link = ?, 
             nama = ?, 
             status = 'Pending', 
-            updatedAt = CURRENT_TIMESTAMP 
+            updatedAt = CURRENT_TIMESTAMP,
+            lastEditedBy_userId = ? -- Tambahkan baris ini
         WHERE id = ?
     `;
 
     const [oldDocRows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE id = ?', [dokumenId]);
     if (oldDocRows.length === 0) throw new Error("Dokumen tidak ditemukan untuk diupdate.");
-
     const oldDoc = oldDocRows[0];
 
     await db.execute(query, [
-        link ?? oldDoc.link, // Gunakan link baru jika ada, jika tidak, pertahankan yang lama
-        nama ?? oldDoc.nama, // Gunakan nama baru jika ada, jika tidak, pertahankan yang lama
+        link ?? oldDoc.link,
+        nama ?? oldDoc.nama,
+        username, // Simpan username sebagai editor terakhir
         dokumenId
     ]);
 
@@ -519,6 +526,10 @@ export const updateSingleDocument = async (dokumenId: number, data: { link?: str
     if (updatedDocRows.length === 0) {
         throw new Error("Gagal mengambil dokumen setelah update.");
     }
+    
+    // Di sini Anda bisa memicu notifikasi
+    // await createNotification({ message: `${username} telah mengubah dokumen ${nama}` });
+
     return updatedDocRows[0] as Dokumen;
 };
 // --- AKHIR DARI FUNGSI BARU ---

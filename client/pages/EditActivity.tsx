@@ -380,7 +380,7 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
     doc: ClientDokumen;
     removeDocument: (clientId: string, docId?: number) => void;
     onDocumentSaved: (updatedDoc: Dokumen, oldClientId: string) => void;
-    isDeleting: boolean; // Properti baru untuk status hapus
+    isDeleting: boolean;
 }) => {
     const { id, isWajib, status, nama, link, kegiatanId, tipe, clientId } = doc;
     const isNew = !id; 
@@ -388,7 +388,7 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
     const [isEditing, setIsEditing] = useState(isNew);
     const [localNama, setLocalNama] = useState(nama);
     const [localLink, setLocalLink] = useState(link ?? '');
-    
+
     const isApproved = status === 'Approved';
 
     const mutation = useMutation({
@@ -400,7 +400,7 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(documentData)
             }).then(res => {
-                if (!res.ok) throw new Error(`Gagal ${isNew ? 'menyimpan' : 'memperbarui'} dokumen.`);
+                if (!res.ok) throw new Error(`Gagal menyimpan dokumen.`);
                 return res.json();
             });
         },
@@ -408,19 +408,11 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
             onDocumentSaved(savedData, clientId);
             setIsEditing(false);
         },
-        onError: (error: any) => {
-            alert(`Error: ${error.message}`);
-        }
+        onError: (error: any) => alert(`Error: ${error.message}`)
     });
 
     const handleSave = () => {
-        mutation.mutate({
-            nama: localNama,
-            link: localLink,
-            kegiatanId: kegiatanId,
-            tipe: tipe,
-            isWajib: isWajib
-        });
+        mutation.mutate({ nama: localNama, link: localLink, kegiatanId, tipe, isWajib });
     };
 
     const handleCancel = () => {
@@ -432,38 +424,23 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
             setIsEditing(false);
         }
     };
-    
+
     return (
-        <div className={cn("flex items-start gap-3 p-3 border rounded-lg transition-all",
-            isApproved ? "bg-green-50 border-green-200" :
-            isEditing ? "bg-yellow-50 border-yellow-300" :
-            (isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")
-        )}>
+        <div className={cn("flex items-start gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50" : isEditing ? "bg-yellow-50" : "bg-gray-50/50")}>
             <div className="flex-grow space-y-2">
                 {isWajib ? (
                     <Label className="font-semibold pt-2 block">{nama} *</Label>
                 ) : (
-                    <Input 
-                        placeholder="Nama Dokumen Pendukung" 
-                        value={localNama} 
-                        onChange={(e) => setLocalNama(e.target.value)} 
-                        disabled={!isEditing || mutation.isPending || isApproved} 
-                    />
+                    <Input placeholder="Nama Dokumen" value={localNama} onChange={(e) => setLocalNama(e.target.value)} disabled={!isEditing || mutation.isPending || isApproved} />
                 )}
                 <div className="flex items-center gap-2">
                     <Link2 className="w-4 h-4 text-gray-400" />
-                    <Input 
-                        placeholder="https://drive.google.com/..." 
-                        value={localLink} 
-                        onChange={(e) => setLocalLink(e.target.value)} 
-                        disabled={!isEditing || mutation.isPending || isApproved} 
-                    />
+                    <Input placeholder="https://..." value={localLink} onChange={(e) => setLocalLink(e.target.value)} disabled={!isEditing || mutation.isPending || isApproved} />
                 </div>
             </div>
-
             <div className="flex flex-col items-center gap-1 min-w-[80px]">
                 {isApproved ? (
-                    <div className="p-2" title="Dokumen Disetujui"><Lock className="w-4 h-4 text-green-600"/></div>
+                    <div className="p-2" title="Disetujui"><Lock className="w-4 h-4 text-green-600"/></div>
                 ) : isEditing ? (
                     <>
                         <Button type="button" size="sm" onClick={handleSave} disabled={!localNama.trim() || mutation.isPending} className="bg-green-500 hover:bg-green-600">
@@ -474,17 +451,8 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
                 ) : (
                     <Button type="button" size="sm" variant="outline" onClick={() => setIsEditing(true)}>Edit</Button>
                 )}
-
                 {!isWajib && !isApproved && !isEditing && (
-                    <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => removeDocument(clientId, id)} 
-                        className="mt-1" 
-                        // Gunakan properti isDeleting yang dikirim dari induk
-                        disabled={isDeleting} 
-                    >
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(clientId, id)} className="mt-1" disabled={isDeleting}>
                         <X className="w-4 h-4 text-gray-500"/>
                     </Button>
                 )}
@@ -930,93 +898,76 @@ export default function EditActivity() {
     };
     
     const DokumenContent = ({ tipe, title }: { tipe: Dokumen['tipe'], title: string }) => {
-        const documents = useMemo(() => formData.dokumen?.filter(d => d.tipe === tipe) || [], [formData.dokumen, tipe]);
+    const documents = useMemo(() => formData.dokumen?.filter(d => d.tipe === tipe) || [], [formData.dokumen, tipe]);
 
-        // Mutasi untuk menghapus dokumen dari server
-        const deleteMutation = useMutation({
-            mutationFn: (docId: number) => 
-                fetch(`/api/kegiatan/dokumen/${docId}`, { method: 'DELETE' }),
-            onSuccess: (response, docId) => {
-                if (!response.ok) {
-                    throw new Error('Gagal menghapus dokumen di server.');
-                }
-                // Hapus dari state HANYA setelah berhasil di server
-                setFormData(prev => ({
-                    ...prev,
-                    dokumen: prev.dokumen?.filter(d => d.id !== docId)
-                }));
-            },
-            onError: (error: any) => alert(`Error: ${error.message}`)
-        });
+    const deleteMutation = useMutation({
+        mutationFn: (docId: number) => 
+            fetch(`/api/kegiatan/dokumen/${docId}`, { method: 'DELETE' }),
+        onSuccess: (response, docId) => {
+            if (!response.ok) throw new Error('Gagal menghapus dokumen.');
+            setFormData(prev => ({
+                ...prev,
+                dokumen: prev.dokumen?.filter(d => d.id !== docId)
+            }));
+        },
+        onError: (error: any) => alert(`Error: ${error.message}`)
+    });
 
-        const removeDocument = (clientId: string, docId?: number) => {
-            if (docId) {
-                // Jika dokumen ada di DB, panggil API untuk hapus
-                deleteMutation.mutate(docId);
-            } else {
-                // Jika dokumen baru (belum ada di DB), cukup hapus dari state
-                setFormData(prev => ({
-                    ...prev,
-                    dokumen: prev.dokumen?.filter(d => d.clientId !== clientId)
-                }));
-            }
-        };
-
-        const handleDocumentSaved = (savedDoc: Dokumen, oldClientId: string) => {
-            setFormData(prev => {
-                const newDokumenList = prev.dokumen?.map(d => {
-                    // Kunci utamanya adalah selalu mencocokkan dengan clientId
-                    if (d.clientId === oldClientId) {
-                        // Ganti data lama dengan data baru dari server,
-                        // tapi pastikan clientId tetap sama agar React tidak bingung.
-                        return { ...savedDoc, clientId: oldClientId };
-                    }
-                    return d;
-                });
-                return { ...prev, dokumen: newDokumenList };
-            });
-        };
-
-        const addDocument = (tipe: Dokumen['tipe']) => {
-            const newDoc: ClientDokumen = { 
-                clientId: `new-doc-${Date.now()}`, 
-                kegiatanId: Number(id), 
-                tipe, 
-                nama: "", 
-                link: "", 
-                jenis: 'link', 
-                isWajib: false, 
-                status: 'Pending', 
-                uploadedAt: new Date().toISOString() 
-            };
-            setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
-        };
-
-        return (
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Dokumen {title}</CardTitle>
-                        <Button type="button" variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2">
-                            <Plus className="w-4 h-4" />Tambah Dokumen Pendukung
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {documents.map(doc => (
-                        <DokumenItem 
-                            key={doc.clientId} 
-                            doc={doc} 
-                            removeDocument={removeDocument}
-                            onDocumentSaved={handleDocumentSaved}
-                            // Teruskan status loading dari mutasi hapus ke anak
-                            isDeleting={deleteMutation.isPending}
-                        />
-                    ))}
-                </CardContent>
-            </Card>
-        );
+    const removeDocument = (clientId: string, docId?: number) => {
+        if (docId) {
+            deleteMutation.mutate(docId);
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                dokumen: prev.dokumen?.filter(d => d.clientId !== clientId)
+            }));
+        }
     };
+
+    const handleDocumentSaved = (savedDoc: Dokumen, oldClientId: string) => {
+        setFormData(prev => {
+            const newDokumenList = prev.dokumen?.map(d => 
+                d.clientId === oldClientId ? { ...savedDoc, clientId: oldClientId } : d
+            );
+            return { ...prev, dokumen: newDokumenList };
+        });
+    };
+
+    const addDocument = (tipe: Dokumen['tipe']) => {
+        const newDoc: ClientDokumen = { 
+            clientId: `new-doc-${Date.now()}`, 
+            kegiatanId: Number(id), 
+            tipe, 
+            nama: "", link: "", jenis: 'link', isWajib: false, 
+            status: 'Pending', uploadedAt: new Date().toISOString() 
+        };
+        setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <CardTitle>Dokumen {title}</CardTitle>
+                    <Button type="button" variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2">
+                        <Plus className="w-4 h-4" />Tambah Dokumen
+                    </Button>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {documents.map(doc => (
+                    <DokumenItem 
+                        key={doc.clientId} 
+                        doc={doc} 
+                        removeDocument={removeDocument}
+                        onDocumentSaved={handleDocumentSaved}
+                        isDeleting={deleteMutation.isPending}
+                    />
+                ))}
+            </CardContent>
+        </Card>
+    );
+};
 
     if (isLoading) {
         return (
