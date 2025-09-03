@@ -376,11 +376,12 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
     );
 });
 
-const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleting }: {
+const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleting, username }: {
     doc: ClientDokumen;
     removeDocument: (clientId: string, docId?: number) => void;
     onDocumentSaved: (updatedDoc: Dokumen, oldClientId: string) => void;
     isDeleting: boolean;
+    username?: string; // Terima username sebagai prop
 }) => {
     const { id, isWajib, status, nama, link, kegiatanId, tipe, clientId } = doc;
     const isNew = !id; 
@@ -392,13 +393,14 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
     const isApproved = status === 'Approved';
 
     const mutation = useMutation({
-        mutationFn: (documentData: Partial<Dokumen>) => {
+        // Modifikasi mutationFn untuk mengirim username
+        mutationFn: (payload: { documentData: Partial<Dokumen>; username?: string }) => {
             const url = isNew ? `/api/kegiatan/dokumen` : `/api/kegiatan/dokumen/${id}`;
             const method = isNew ? 'POST' : 'PUT';
             return fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(documentData)
+                body: JSON.stringify(payload) // Kirim payload yang berisi data dokumen dan username
             }).then(res => {
                 if (!res.ok) throw new Error(`Gagal menyimpan dokumen.`);
                 return res.json();
@@ -412,7 +414,12 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
     });
 
     const handleSave = () => {
-        mutation.mutate({ nama: localNama, link: localLink, kegiatanId, tipe, isWajib });
+        // Siapkan payload untuk dikirim
+        const payload = {
+            documentData: { nama: localNama, link: localLink, kegiatanId, tipe, isWajib },
+            username: username 
+        };
+        mutation.mutate(payload);
     };
 
     const handleCancel = () => {
@@ -428,9 +435,7 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
     return (
         <div className={cn("flex items-start gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50" : isEditing ? "bg-yellow-50" : "bg-gray-50/50")}>
             <div className="flex-grow space-y-2">
-                {isWajib ? (
-                    <Label className="font-semibold pt-2 block">{nama} *</Label>
-                ) : (
+                {isWajib ? ( <Label className="font-semibold pt-2 block">{nama} *</Label> ) : (
                     <Input placeholder="Nama Dokumen" value={localNama} onChange={(e) => setLocalNama(e.target.value)} disabled={!isEditing || mutation.isPending || isApproved} />
                 )}
                 <div className="flex items-center gap-2">
@@ -439,8 +444,7 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
                 </div>
             </div>
             <div className="flex flex-col items-center gap-1 min-w-[80px]">
-                {isApproved ? (
-                    <div className="p-2" title="Disetujui"><Lock className="w-4 h-4 text-green-600"/></div>
+                {isApproved ? ( <div className="p-2" title="Disetujui"><Lock className="w-4 h-4 text-green-600"/></div>
                 ) : isEditing ? (
                     <>
                         <Button type="button" size="sm" onClick={handleSave} disabled={!localNama.trim() || mutation.isPending} className="bg-green-500 hover:bg-green-600">
@@ -448,9 +452,7 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
                         </Button>
                         <Button type="button" size="sm" variant="ghost" onClick={handleCancel} disabled={mutation.isPending}>Batal</Button>
                     </>
-                ) : (
-                    <Button type="button" size="sm" variant="outline" onClick={() => setIsEditing(true)}>Edit</Button>
-                )}
+                ) : ( <Button type="button" size="sm" variant="outline" onClick={() => setIsEditing(true)}>Edit</Button> )}
                 {!isWajib && !isApproved && !isEditing && (
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(clientId, id)} className="mt-1" disabled={isDeleting}>
                         <X className="w-4 h-4 text-gray-500"/>
@@ -897,7 +899,7 @@ export default function EditActivity() {
         );
     };
     
-    const DokumenContent = ({ tipe, title }: { tipe: Dokumen['tipe'], title: string }) => {
+    const DokumenContent = ({ tipe, title, username }: { tipe: Dokumen['tipe'], title: string, username?: string }) => {
     const documents = useMemo(() => formData.dokumen?.filter(d => d.tipe === tipe) || [], [formData.dokumen, tipe]);
 
     const deleteMutation = useMutation({
@@ -962,6 +964,7 @@ export default function EditActivity() {
                         removeDocument={removeDocument}
                         onDocumentSaved={handleDocumentSaved}
                         isDeleting={deleteMutation.isPending}
+                        username={username}
                     />
                 ))}
             </CardContent>
@@ -1067,10 +1070,18 @@ export default function EditActivity() {
                                     <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>
                                     <TabsTrigger value="diseminasi-evaluasi">Diseminasi</TabsTrigger>
                                 </TabsList>
-                                <TabsContent value="persiapan" className="mt-4"><DokumenContent tipe="persiapan" title="Persiapan" /></TabsContent>
-                                <TabsContent value="pengumpulan-data" className="mt-4"><DokumenContent tipe="pengumpulan-data" title="Pengumpulan Data" /></TabsContent>
-                                <TabsContent value="pengolahan-analisis" className="mt-4"><DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" /></TabsContent>
-                                <TabsContent value="diseminasi-evaluasi" className="mt-4"><DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" /></TabsContent>
+                                    <TabsContent value="persiapan" className="mt-4">
+                                        <DokumenContent tipe="persiapan" title="Persiapan" username={user?.username} />
+                                    </TabsContent>
+                                    <TabsContent value="pengumpulan-data" className="mt-4">
+                                        <DokumenContent tipe="pengumpulan-data" title="Pengumpulan Data" username={user?.username} />
+                                    </TabsContent>
+                                    <TabsContent value="pengolahan-analisis" className="mt-4">
+                                        <DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" username={user?.username} />
+                                    </TabsContent>
+                                    <TabsContent value="diseminasi-evaluasi" className="mt-4">
+                                        <DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" username={user?.username} />
+                                    </TabsContent>
                             </Tabs>
                         </TabsContent>
                     </Tabs>

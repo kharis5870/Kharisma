@@ -126,9 +126,12 @@ router.put('/:kegiatanId/tahapan/approve', async (req, res) => {
 
 router.post('/dokumen', async (req, res) => {
     try {
-        // @ts-ignore
-        const username = req.user?.username || 'system_add';
-        const newDocument = await createSingleDocument(req.body, username);
+        // Ambil username dan data dokumen dari body
+        const { documentData, username } = req.body;
+        if (!username) {
+            return res.status(400).json({ message: 'Username diperlukan.' });
+        }
+        const newDocument = await createSingleDocument(documentData, username);
         res.status(201).json(newDocument);
     } catch (error: any) {
         console.error("Error creating single document:", error);
@@ -139,12 +142,12 @@ router.post('/dokumen', async (req, res) => {
 router.put('/dokumen/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { link, nama } = req.body;
-        // Asumsi Anda memiliki middleware untuk otentikasi yang menaruh data user di req.user
-        // @ts-ignore
-        const username = req.user?.username || 'system_update';
-        
-        const updatedDocument = await updateSingleDocument(Number(id), { link, nama }, username);
+        // Ambil username dan data dokumen dari body
+        const { documentData, username } = req.body;
+        if (!username) {
+            return res.status(400).json({ message: 'Username diperlukan.' });
+        }
+        const updatedDocument = await updateSingleDocument(Number(id), documentData, username);
         res.json(updatedDocument);
     } catch (error: any) {
         console.error("Error updating single document:", error);
