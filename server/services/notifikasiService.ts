@@ -21,7 +21,7 @@ export const getPendingDocumentNotifications = async () => {
       'document_uploaded' AS type
     FROM dokumen d
     JOIN kegiatan k ON d.kegiatanId = k.id
-    LEFT JOIN users u ON d.lastEditedBy_userId = u.id 
+    LEFT JOIN users u ON d.lastEditedBy_userId = u.username
     WHERE 
       d.status = 'Pending' 
       AND d.link IS NOT NULL
