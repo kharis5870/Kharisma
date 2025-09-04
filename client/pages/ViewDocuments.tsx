@@ -15,31 +15,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, Dokumen } from "@shared/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import { apiClient } from "@/lib/apiClient";
 
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
-    const res = await fetch(`/api/kegiatan/${id}`);
-    if (!res.ok) throw new Error("Kegiatan tidak ditemukan");
-    return res.json();
+    return apiClient.get<Kegiatan>(`/kegiatan/${id}`);
 };
 
 const updateDocumentStatus = async ({ dokumenId, status, username }: { dokumenId: number, status: Dokumen['status'], username: string }) => {
-    const res = await fetch(`/api/kegiatan/dokumen/${dokumenId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, username }),
-    });
-    if (!res.ok) throw new Error("Gagal memperbarui status dokumen");
-    return res.json();
+    return apiClient.put(`/kegiatan/dokumen/${dokumenId}/status`, { status, username });
 };
 
 const approveTahapan = async ({ kegiatanId, tipe, username }: { kegiatanId: number, tipe: Dokumen['tipe'], username: string }) => {
-    const res = await fetch(`/api/kegiatan/${kegiatanId}/tahapan/approve`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipe, username }),
-    });
-    if (!res.ok) throw new Error("Gagal menyetujui tahapan");
-    return res.json();
+    return apiClient.put(`/kegiatan/${kegiatanId}/tahapan/approve`, { tipe, username });
 };
 
 export default function ViewDocuments() {

@@ -1,38 +1,39 @@
 import { createContext, useContext, ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-query';
 import { UserData, KetuaTimData, PPLAdminData } from '@shared/api';
+import { apiClient } from '@/lib/apiClient';
 
 // --- API Functions ---
-const fetchUsers = async (): Promise<UserData[]> => (await fetch('/api/admin/users')).json();
-const fetchKetuaTim = async (): Promise<KetuaTimData[]> => (await fetch('/api/admin/ketua-tim')).json();
-const fetchPPLs = async (): Promise<PPLAdminData[]> => (await fetch('/api/admin/ppl')).json();
+const fetchUsers = (): Promise<UserData[]> => apiClient.get<UserData[]>('/admin/users');
+const fetchKetuaTim = (): Promise<KetuaTimData[]> => apiClient.get<KetuaTimData[]>('/admin/ketua-tim');
+const fetchPPLs = (): Promise<PPLAdminData[]> => apiClient.get<PPLAdminData[]>('/admin/ppl');
 
-const addUserAPI = async (data: UserData) => (await fetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
-const updateUserAPI = async ({ id, data }: { id: string, data: UserData }) => (await fetch(`/api/admin/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
-const deleteUserAPI = async (id: string) => (await fetch(`/api/admin/users/${id}`, { method: 'DELETE' }));
+const addUserAPI = (data: UserData): Promise<UserData> => apiClient.post<UserData>('/admin/users', data);
+const updateUserAPI = ({ id, data }: { id: string, data: UserData }): Promise<UserData> => apiClient.put<UserData>(`/admin/users/${id}`, data);
+const deleteUserAPI = (id: string): Promise<void> => apiClient.delete(`/admin/users/${id}`);
 
-const addKetuaTimAPI = async (data: KetuaTimData) => (await fetch('/api/admin/ketua-tim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
-const updateKetuaTimAPI = async ({ id, data }: { id: string, data: KetuaTimData }) => (await fetch(`/api/admin/ketua-tim/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
-const deleteKetuaTimAPI = async (id: string) => (await fetch(`/api/admin/ketua-tim/${id}`, { method: 'DELETE' }));
+const addKetuaTimAPI = (data: KetuaTimData): Promise<KetuaTimData> => apiClient.post<KetuaTimData>('/admin/ketua-tim', data);
+const updateKetuaTimAPI = ({ id, data }: { id: string, data: KetuaTimData }): Promise<KetuaTimData> => apiClient.put<KetuaTimData>(`/api/admin/ketua-tim/${id}`, data);
+const deleteKetuaTimAPI = (id: string): Promise<void> => apiClient.delete(`/api/admin/ketua-tim/${id}`);
 
-const addPPLAPI = async (data: PPLAdminData) => (await fetch('/api/admin/ppl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
-const updatePPLAPI = async ({ id, data }: { id: string, data: PPLAdminData }) => (await fetch(`/api/admin/ppl/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
-const deletePPLAPI = async (id: string) => (await fetch(`/api/admin/ppl/${id}`, { method: 'DELETE' }));
+const addPPLAPI = (data: PPLAdminData): Promise<PPLAdminData> => apiClient.post<PPLAdminData>('/admin/ppl', data);
+const updatePPLAPI = ({ id, data }: { id: string, data: PPLAdminData }): Promise<PPLAdminData> => apiClient.put<PPLAdminData>(`/admin/ppl/${id}`, data);
+const deletePPLAPI = (id: string): Promise<void> => apiClient.delete(`/admin/ppl/${id}`);
 
 // --- Context ---
 interface AdminContextType {
   userList: UserData[];
   addUser: UseMutationResult<UserData, Error, UserData>['mutate'];
   updateUser: (id: string, data: UserData) => void;
-  removeUser: UseMutationResult<Response, Error, string>['mutate'];
+  removeUser: UseMutationResult<void, Error, string>['mutate'];
   ketuaTimList: KetuaTimData[];
   addKetuaTim: UseMutationResult<KetuaTimData, Error, KetuaTimData>['mutate'];
   updateKetuaTim: (id: string, data: KetuaTimData) => void;
-  removeKetuaTim: UseMutationResult<Response, Error, string>['mutate'];
+  removeKetuaTim: UseMutationResult<void, Error, string>['mutate'];
   pplAdminList: PPLAdminData[];
   addPPLAdmin: UseMutationResult<PPLAdminData, Error, PPLAdminData>['mutate'];
   updatePPLAdmin: (id: string, data: PPLAdminData) => void;
-  removePPLAdmin: UseMutationResult<Response, Error, string>['mutate'];
+  removePPLAdmin: UseMutationResult<void, Error, string>['mutate'];
   isLoading: boolean;
 }
 

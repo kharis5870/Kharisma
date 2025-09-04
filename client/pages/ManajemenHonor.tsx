@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import AlertModal from "@/components/AlertModal";
 import SuccessModal from "@/components/SuccessModal";
+import { apiClient } from "@/lib/apiClient";
 
 const months = [ "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des" ];
 const currentYear = new Date().getFullYear();
@@ -30,27 +31,17 @@ const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 const getCurrentMonth = () => new Date().getMonth();
 
 const fetchHonorData = async (bulan: number, tahun: number): Promise<PPLHonorData[]> => {
-    const res = await fetch(`/api/honor?bulan=${bulan + 1}&tahun=${tahun}`);
-    if (!res.ok) throw new Error("Gagal memuat data honor");
-    return res.json();
+    return apiClient.get<PPLHonorData[]>(`/honor?bulan=${bulan + 1}&tahun=${tahun}`);
 }
 
 const fetchHonorLimit = async (): Promise<number> => {
-    const res = await fetch('/api/settings/HONOR_LIMIT');
-    if (!res.ok) throw new Error('Gagal mengambil batas honor');
-    const data = await res.json();
+    const data = await apiClient.get<{ value: string | number }>('/settings/HONOR_LIMIT');
     return Number(data.value);
 }
 
 const updateHonorLimit = async (newLimit: number): Promise<any> => {
-    const res = await fetch('/api/settings/HONOR_LIMIT', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: newLimit })
-    });
-    if (!res.ok) throw new Error('Gagal memperbarui batas honor');
-    return res.json();
- }
+    return apiClient.put('/settings/HONOR_LIMIT', { value: newLimit });
+}
 
 const ActivityDetailModal = ({ isOpen, onClose, pplData, selectedMonth, selectedYear }: { isOpen: boolean, onClose: () => void, pplData: PPLHonorData | null, selectedMonth: number, selectedYear: number }) => {
     if (!pplData) return null;

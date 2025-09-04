@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { format, isPast, parseISO, differenceInDays, formatDistanceToNow } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
 import { useAuth } from "@/contexts/AuthContext";
+import { apiClient } from "@/lib/apiClient";
 
 type EditableProgressKey = 'submit' | 'diperiksa' | 'approved' | 'sudah_entry' | 'validasi' | 'clean';
 type ProgressTypeFilter = 'submit' | 'approved' | 'sudah_entry' | 'clean';
@@ -43,27 +44,15 @@ type KegiatanWithDynamicStatus = Kegiatan & {
 
 // --- API Functions ---
 const fetchActivities = async (): Promise<Kegiatan[]> => {
-  const res = await fetch("/api/kegiatan");
-  if (!res.ok) throw new Error("Gagal memuat kegiatan");
-  return res.json();
+  return apiClient.get<Kegiatan[]>("/kegiatan");
 };
 
 const deleteActivity = async (id: number): Promise<void> => {
-    const res = await fetch(`/api/kegiatan/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error("Gagal menghapus kegiatan");
+    await apiClient.delete(`/kegiatan/${id}`);
 };
 
 const updatePplProgress = async ({ pplId, progressData }: { pplId: number; progressData: any }) => {
-    const res = await fetch(`/api/kegiatan/ppl/${pplId}/progress`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(progressData)
-    });
-    if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Gagal update progress");
-    }
-    return res.json();
+    return apiClient.put(`/kegiatan/ppl/${pplId}/progress`, progressData);
 };
 
 // --- Helper Functions ---
@@ -251,33 +240,84 @@ export default function Dashboard() {
 
             const updatedPpl = { ...p, progress: { ...p.progress } };
             const newValue = parseInt(value, 10);
-            if (isNaN(newValue) || newValue < 0) {
-                return p;
-            }
             
+            if (isNaN(newValue) || newValue < 0) return p; // Kembali ke state awal jika input tidak valid
+
+            const oldValue = updatedPpl.progress[field] ?? 0;
+            const delta = newValue - oldValue; // Menghitung selisih perubahan
+
+            if (delta === 0) return p; // Tidak ada perubahan
+
+            // Mendefinisikan urutan tahapan progress menggunakan tipe ProgressType yang lengkap
+            const pengumpulanStages: ProgressType[] = ['open', 'submit', 'diperiksa', 'approved'];
+            const pengolahanStages: ProgressType[] = ['belum_entry', 'sudah_entry', 'validasi', 'clean'];
+
+            const stages = updatedPpl.tahap === 'pengumpulan-data' ? pengumpulanStages : pengolahanStages;
+            const fieldIndex = stages.indexOf(field);
+
+            // Jika field tidak ditemukan dalam stages (seharusnya tidak terjadi), batalkan
+            if (fieldIndex === -1) return p;
+            
+            // Mencegah edit langsung pada tahap pertama (misal: 'open'), karena nilainya hasil kalkulasi.
+            if (fieldIndex === 0) {
+                setAlertModal({
+                    isOpen: true,
+                    title: "Info",
+                    message: `Progress '${stages[0]}' tidak dapat diubah secara manual.`
+                });
+                return p;
+            };
+
+            if (delta > 0) { // Jika MENAMBAH nilai progress (memindahkan ke tahap selanjutnya)
+                const prevStage = stages[fieldIndex - 1];
+                const prevStageValue = updatedPpl.progress[prevStage] ?? 0;
+
+                // Validasi: Pastikan tahap sebelumnya memiliki cukup progress untuk dipindahkan
+                if (prevStageValue < delta) {
+                    setAlertModal({
+                        isOpen: true,
+                        title: "Validasi Gagal",
+                        message: `Tidak bisa menambah '${field}' sebanyak ${delta}, karena progress di tahap '${prevStage}' hanya tersisa ${prevStageValue}.`
+                    });
+                    return p; // Batalkan perubahan
+                }
+                // Kurangi nilai dari tahap sebelumnya
+                (updatedPpl.progress as any)[prevStage] = prevStageValue - delta;
+            } else { // Jika MENGURANGI nilai progress (mengembalikan ke tahap sebelumnya)
+                const prevStage = stages[fieldIndex - 1];
+                const prevStageValue = updatedPpl.progress[prevStage] ?? 0;
+                // Tambahkan kembali nilai ke tahap sebelumnya
+                (updatedPpl.progress as any)[prevStage] = prevStageValue + Math.abs(delta);
+            }
+
+            // Terapkan perubahan yang diinput oleh user
             updatedPpl.progress[field] = newValue;
             
+            // Final check agar total tidak melebihi beban kerja
             const totalBeban = parseInt(updatedPpl.bebanKerja, 10) || 0;
-            if (updatedPpl.tahap === 'pengumpulan-data') {
-                const totalUsed = (updatedPpl.progress.submit ?? 0) + (updatedPpl.progress.diperiksa ?? 0) + (updatedPpl.progress.approved ?? 0);
-                if (totalUsed > totalBeban) {
-                    setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Total progress tidak boleh melebihi total beban kerja." });
+            // Hitung total dari semua stage yang relevan, bukan hanya yang diedit
+            const currentTotalProgress = stages.reduce((acc, stage) => acc + (updatedPpl.progress[stage] ?? 0), 0);
+            
+            // Jika total melebihi, bukan karena kalkulasi tapi karena input awal, maka sesuaikan stage pertama
+            if (currentTotalProgress > totalBeban) {
+                 const diff = currentTotalProgress - totalBeban;
+                 (updatedPpl.progress as any)[stages[0]] = (updatedPpl.progress[stages[0]] ?? 0) - diff;
+
+                 // Jika bahkan setelah penyesuaian masih negatif, berarti ada kesalahan. Batalkan.
+                 if ((updatedPpl.progress as any)[stages[0]] < 0) {
+                    setAlertModal({
+                        isOpen: true,
+                        title: "Validasi Gagal",
+                        message: `Total progress (${currentTotalProgress}) melebihi total beban kerja (${totalBeban}). Harap periksa kembali input Anda.`
+                    });
                     return p;
-                }
-                updatedPpl.progress.open = totalBeban - totalUsed;
-            } else if (updatedPpl.tahap === 'pengolahan-analisis') {
-                const totalUsed = (updatedPpl.progress.sudah_entry ?? 0) + (updatedPpl.progress.validasi ?? 0) + (updatedPpl.progress.clean ?? 0);
-                if (totalUsed > totalBeban) {
-                    setAlertModal({ isOpen: true, title: "Validasi Gagal", message: "Total progress tidak boleh melebihi total beban kerja." });
-                    return p;
-                }
-                updatedPpl.progress.belum_entry = totalBeban - totalUsed;
+                 }
             }
 
             return updatedPpl;
         })
     );
-  };
+};
 
   const handleSaveProgress = () => {
     localPplProgress.forEach(ppl => {
@@ -379,37 +419,70 @@ export default function Dashboard() {
   );
 
   const PPLUpdateCard = ({ ppl, handleUpdatePPL }: { ppl: PPLWithProgress, handleUpdatePPL: (pplId: number, field: EditableProgressKey, value: string) => void }) => {
-      const honorListing = ppl.honorarium?.find(h => h.jenis_pekerjaan === 'listing');
-      const honorPencacahan = ppl.honorarium?.find(h => h.jenis_pekerjaan === 'pencacahan');
-  
-      const [listingProgress, setListingProgress] = useState({ submit: ppl.progress.submit ?? 0, diperiksa: ppl.progress.diperiksa ?? 0, approved: ppl.progress.approved ?? 0 });
-      const [pencacahanProgress, setPencacahanProgress] = useState({ submit: ppl.progress.submit ?? 0, diperiksa: ppl.progress.diperiksa ?? 0, approved: ppl.progress.approved ?? 0 });
-  
-      const handleSeparateProgressChange = (
-          type: 'listing' | 'pencacahan',
-          field: 'submit' | 'diperiksa' | 'approved',
-          value: string
-      ) => {
-          const numericValue = parseInt(value) || 0;
-          let newListingProgress = { ...listingProgress };
-          let newPencacahanProgress = { ...pencacahanProgress };
-  
-          if (type === 'listing') {
-              newListingProgress[field] = numericValue;
-              setListingProgress(newListingProgress);
-          } else {
-              newPencacahanProgress[field] = numericValue;
-              setPencacahanProgress(newPencacahanProgress);
-          }
-  
-          const totalValue = newListingProgress[field] + newPencacahanProgress[field];
-          handleUpdatePPL(ppl.id!, field, String(totalValue));
-      };
-  
+    const isPengumpulanData = ppl.tahap === 'pengumpulan-data';
+    const honorListing = ppl.honorarium?.find(h => h.jenis_pekerjaan === 'listing');
+    const honorPencacahan = ppl.honorarium?.find(h => h.jenis_pekerjaan === 'pencacahan');
+
+    // Menggunakan key pada pemanggilan komponen akan memastikan state ini di-reset
+    // saat PPL yang berbeda dipilih, tanpa memerlukan useEffect yang rumit.
+    const [listingInput, setListingInput] = useState({
+        submit: ppl.progress.submit ?? 0,
+        diperiksa: ppl.progress.diperiksa ?? 0,
+        approved: ppl.progress.approved ?? 0,
+    });
+    const [pencacahanInput, setPencacahanInput] = useState({
+        submit: 0,
+        diperiksa: 0,
+        approved: 0,
+    });
+
+    // useEffect ini hanya dijalankan sekali saat komponen pertama kali dirender
+    // untuk PPL tertentu, bertugas memisahkan total progres awal.
+    useEffect(() => {
+        if (isPengumpulanData) {
+            // Asumsi: nilai awal yang ada di ppl.progress dialokasikan ke listing.
+            // Pengguna dapat menyesuaikannya setelahnya.
+            setListingInput({
+                submit: ppl.progress.submit ?? 0,
+                diperiksa: ppl.progress.diperiksa ?? 0,
+                approved: ppl.progress.approved ?? 0,
+            });
+            // Pastikan pencacahan dimulai dari 0.
+            setPencacahanInput({
+                submit: 0,
+                diperiksa: 0,
+                approved: 0,
+            });
+        }
+    }, [ppl.id, isPengumpulanData]); // Hanya bergantung pada ID PPL, bukan ppl.progress
+
+    const handleSeparateProgressChange = (
+        type: 'listing' | 'pencacahan',
+        field: 'submit' | 'diperiksa' | 'approved',
+        value: string
+    ) => {
+        const numericValue = parseInt(value, 10);
+        if (isNaN(numericValue) || numericValue < 0) return;
+
+        let newListingValue = listingInput[field];
+        let newPencacahanValue = pencacahanInput[field];
+
+        if (type === 'listing') {
+            newListingValue = numericValue;
+            setListingInput(prev => ({ ...prev, [field]: newListingValue }));
+        } else {
+            newPencacahanValue = numericValue;
+            setPencacahanInput(prev => ({ ...prev, [field]: newPencacahanValue }));
+        }
+
+        const totalValue = newListingValue + newPencacahanValue;
+        handleUpdatePPL(ppl.id!, field, String(totalValue));
+    };
+
     return (
         <Card key={ppl.id}>
             <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                         <Avatar className="w-10 h-10">
                             <AvatarImage src="" />
@@ -424,41 +497,39 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                         <div className="text-xl font-bold text-bps-blue-600">{getProgressBarValue(ppl).toFixed(0)}%</div>
-                        <div className="text-xs text-slate-500 -mt-1">Approved</div>
+                        <div className="text-xs text-slate-500 -mt-1">{ppl.tahap === 'pengolahan-analisis' ? 'Clean' : 'Approved'}</div>
                     </div>
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
-                {ppl.tahap === 'pengumpulan-data' && (
+                {isPengumpulanData ? (
                     <div className="space-y-4">
                         <div className="p-3 bg-blue-50 rounded-lg">
                             <Label className="text-sm font-medium text-blue-900 mb-2 block">Progress Listing (Target: {honorListing?.bebanKerja || 0})</Label>
                             <div className="grid grid-cols-4 gap-3">
-                                <div><Label className="text-xs text-slate-600">Open</Label><Input type="number" value={(parseInt(honorListing?.bebanKerja || '0')) - (listingProgress.submit + listingProgress.diperiksa + listingProgress.approved)} disabled className="mt-1 text-center bg-slate-100"/></div>
-                                {(['submit', 'diperiksa', 'approved'] as const).map(field => (<div key={`listing-${field}`}><Label className="text-xs text-slate-600 capitalize">{field}</Label><Input type="number" min="0" value={listingProgress[field]} onChange={e => handleSeparateProgressChange('listing', field, e.target.value)} className="mt-1 text-center" /></div>))}
+                                <div><Label className="text-xs text-slate-600">Open</Label><Input type="number" value={Math.max(0, (parseInt(honorListing?.bebanKerja || '0')) - (listingInput.submit + listingInput.diperiksa + listingInput.approved))} disabled className="mt-1 text-center bg-slate-100"/></div>
+                                {(['submit', 'diperiksa', 'approved'] as const).map(field => (<div key={`listing-${field}`}><Label className="text-xs text-slate-600 capitalize">{field}</Label><Input type="number" min="0" value={listingInput[field]} onChange={e => handleSeparateProgressChange('listing', field, e.target.value)} className="mt-1 text-center" /></div>))}
                             </div>
-                            <Progress value={((listingProgress.approved / (parseInt(honorListing?.bebanKerja || '1')) * 100))} className="h-2 mt-2" />
+                            <Progress value={((listingInput.approved / (parseInt(honorListing?.bebanKerja || '1')) * 100))} className="h-2 mt-2" />
                         </div>
                         <div className="p-3 bg-green-50 rounded-lg">
                             <Label className="text-sm font-medium text-green-900 mb-2 block">Progress Pencacahan (Target: {honorPencacahan?.bebanKerja || 0})</Label>
                             <div className="grid grid-cols-4 gap-3">
-                                <div><Label className="text-xs text-slate-600">Open</Label><Input type="number" value={(parseInt(honorPencacahan?.bebanKerja || '0')) - (pencacahanProgress.submit + pencacahanProgress.diperiksa + pencacahanProgress.approved)} disabled className="mt-1 text-center bg-slate-100"/></div>
-                                {(['submit', 'diperiksa', 'approved'] as const).map(field => (<div key={`pencacahan-${field}`}><Label className="text-xs text-slate-600 capitalize">{field}</Label><Input type="number" min="0" value={pencacahanProgress[field]} onChange={e => handleSeparateProgressChange('pencacahan', field, e.target.value)} className="mt-1 text-center" /></div>))}
+                                <div><Label className="text-xs text-slate-600">Open</Label><Input type="number" value={Math.max(0, (parseInt(honorPencacahan?.bebanKerja || '0')) - (pencacahanInput.submit + pencacahanInput.diperiksa + pencacahanInput.approved))} disabled className="mt-1 text-center bg-slate-100"/></div>
+                                {(['submit', 'diperiksa', 'approved'] as const).map(field => (<div key={`pencacahan-${field}`}><Label className="text-xs text-slate-600 capitalize">{field}</Label><Input type="number" min="0" value={pencacahanInput[field]} onChange={e => handleSeparateProgressChange('pencacahan', field, e.target.value)} className="mt-1 text-center" /></div>))}
                             </div>
-                            <Progress value={((pencacahanProgress.approved / (parseInt(honorPencacahan?.bebanKerja || '1')) * 100))} className="h-2 mt-2" />
+                            <Progress value={((pencacahanInput.approved / (parseInt(honorPencacahan?.bebanKerja || '1')) * 100))} className="h-2 mt-2" />
                         </div>
                     </div>
-                )}
-
-                {ppl.tahap === 'pengolahan-analisis' && (
+                ) : (
                     <div className="p-3 bg-purple-50 rounded-lg">
                         <Label className="text-sm font-medium text-purple-900 mb-2 block">Progress Pengolahan (Beban: {ppl.bebanKerja})</Label>
                         <div className="grid grid-cols-4 gap-3">
-                            <div><Label className="text-xs text-slate-600">Belum Entry</Label><Input type="number" value={ppl.progress.belum_entry} disabled className="mt-1 text-center bg-slate-100"/></div>
+                            <div><Label className="text-xs text-slate-600">Belum Entry</Label><Input type="number" value={ppl.progress.belum_entry ?? 0} disabled className="mt-1 text-center bg-slate-100"/></div>
                             {(['sudah_entry', 'validasi', 'clean'] as const).map(field => (
                                 <div key={field}>
                                     <Label className="text-xs text-slate-600 capitalize">{field === 'sudah_entry' ? 'Dientry' : field}</Label>
-                                    <Input type="number" min="0" value={ppl.progress[field]} onChange={e => handleUpdatePPL(ppl.id!, field, e.target.value)} className="mt-1 text-center" />
+                                    <Input type="number" min="0" value={ppl.progress[field] ?? 0} onChange={e => handleUpdatePPL(ppl.id!, field, e.target.value)} className="mt-1 text-center" />
                                 </div>
                             ))}
                         </div>
@@ -467,7 +538,8 @@ export default function Dashboard() {
                 )}
             </CardContent>
         </Card>
-    )}
+    );
+};
 
   if (isLoading) return <Layout><div className="text-center p-8">Memuat...</div></Layout>;
 

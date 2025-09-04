@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import AlertModal from "@/components/AlertModal";
 import { eachMonthOfInterval, getMonth, getYear, format as formatDateFns } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
+import { apiClient } from "@/lib/apiClient";
 
 type DateFieldName =
   | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
@@ -47,38 +48,20 @@ const parseHonor = (value: string | number): string => {
 
 
 const createActivity = async (data: any): Promise<Kegiatan> => {
-    const res = await fetch('/api/kegiatan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-    });
-
-    const contentType = res.headers.get("content-type");
-   if (res.ok && contentType && contentType.includes("application/json")) {
-       return res.json();
-   } else {
-       const textResponse = await res.text();
-       console.error("Server tidak mengembalikan JSON. Respons:", textResponse);
-       throw new Error(`Terjadi kesalahan di server (Status: ${res.status}). Respons bukan JSON.`);
-   }
+    // apiClient sudah menangani JSON parsing dan error, jadi lebih ringkas
+    return apiClient.post<Kegiatan>('/kegiatan', data);
 }
 
 const fetchPPLs = async (): Promise<PPLMaster[]> => {
-    const res = await fetch('/api/ppl');
-    if (!res.ok) throw new Error('Gagal memuat daftar PPL');
-    return res.json();
+    return apiClient.get<PPLMaster[]>('/ppl');
 };
 
 const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
-    const res = await fetch('/api/ketua-tim');
-    if (!res.ok) throw new Error('Gagal memuat daftar Ketua Tim');
-    return res.json();
+    return apiClient.get<KetuaTim[]>('/ketua-tim');
 };
 
 const fetchPMLs = async (): Promise<UserData[]> => {
-    const res = await fetch('/api/admin/pml');
-    if (!res.ok) throw new Error('Gagal memuat daftar PML');
-    return res.json();
+    return apiClient.get<UserData[]>('/admin/pml');
 };
 
 const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, store, existingPplIds }: any) => {
@@ -639,18 +622,13 @@ export default function InputKegiatan() {
     for (const ppl of pplAllocations ?? []) {
       if (!ppl.ppl_master_id) continue;
       const currentActivityHonor = ppl.honorarium.reduce((sum, h) => sum + (parseInt(h.besaranHonor) || 0), 0);
-      const validationResponse = await fetch('/api/honor/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pplMasterId: ppl.ppl_master_id,
-          bulan: validationMonth,
-          tahun: validationYear,
-          currentActivityHonor: currentActivityHonor,
-          kegiatanIdToExclude: null // Tidak ada ID untuk dikecualikan saat membuat baru
-        })
+      const result = await apiClient.post<{ isOverLimit: boolean; projectedTotal: number; limit: number }>('/honor/validate', {
+        pplMasterId: ppl.ppl_master_id,
+        bulan: validationMonth,
+        tahun: validationYear,
+        currentActivityHonor: currentActivityHonor,
+        kegiatanIdToExclude: null
       });
-      const result = await validationResponse.json();
       
       if (result.isOverLimit) {
         setHonorWarningDetails({

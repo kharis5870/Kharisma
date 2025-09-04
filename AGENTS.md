@@ -147,7 +147,7 @@ app.get("/api/my-endpoint", handleMyRoute);
 ```typescript
 import { MyRouteResponse } from "@shared/api"; // Optional: for type safety
 
-const response = await fetch("/api/my-endpoint");
+const response = await apiClient.get("/my-endpoint");
 const data: MyRouteResponse = await response.json();
 ```
 

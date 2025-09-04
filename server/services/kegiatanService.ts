@@ -270,10 +270,16 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         if (!newKegiatan) throw new Error("Gagal mengambil kegiatan yang baru dibuat");
         return newKegiatan;
 
-    } catch (error) {
-        await connection.rollback();
-        console.error("TRANSACTION ROLLED BACK:", error);
-        throw new Error('Terjadi kesalahan di server saat menyimpan data.');
+    } catch (error: any) {
+  await connection.rollback();
+
+  console.error("❌ TRANSACTION ROLLED BACK");
+  console.error("Code:", error.code);
+  console.error("Message:", error.sqlMessage || error.message);
+  console.error("Query:", error.sql);
+  console.error("Stack:", error.stack);
+
+  throw new Error('Terjadi kesalahan di server saat menyimpan data.');
     } finally {
         connection.release();
     }
@@ -447,10 +453,16 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         if (!updatedKegiatan) throw new Error("Gagal mengambil kegiatan setelah update");
         return updatedKegiatan;
 
-    } catch (error) {
-        await connection.rollback();
-        console.error("TRANSACTION ROLLED BACK:", error);
-        throw new Error('Terjadi kesalahan di server saat memperbarui data.');
+    } catch (error: any) {
+  await connection.rollback();
+
+  console.error("❌ TRANSACTION ROLLED BACK");
+  console.error("Code:", error.code);
+  console.error("Message:", error.sqlMessage || error.message);
+  console.error("Query:", error.sql);
+  console.error("Stack:", error.stack);
+
+  throw new Error('Terjadi kesalahan di server saat menyimpan data.');
     } finally {
         connection.release();
     }
@@ -544,62 +556,92 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
     try {
         await connection.beginTransaction();
 
-        const [pplRows] = await connection.query<RowDataPacket[]>('SELECT * FROM ppl WHERE id = ?', [pplId]);
-        if (pplRows.length === 0) throw new Error("PPL not found");
+        // 1. Ambil data PPL dari database untuk mendapatkan info penting
+        const [pplRows] = await connection.query<RowDataPacket[]>('SELECT kegiatanId, bebanKerja, tahap FROM ppl WHERE id = ?', [pplId]);
+        if (pplRows.length === 0) {
+            throw new Error("PPL tidak ditemukan");
+        }
         const currentPpl = pplRows[0];
         const totalBebanKerja = parseInt(currentPpl.bebanKerja, 10) || 0;
 
-        const totalProgress = Object.values(progressData).reduce((sum, val) => sum + (val || 0), 0);
-        if (totalProgress > totalBebanKerja) {
-            throw new Error("Total progress tidak bisa melebihi total beban kerja");
+        // 2. Tentukan urutan tahapan progress berdasarkan data dari DB
+        const stages = currentPpl.tahap === 'pengumpulan-data'
+            ? ['open', 'submit', 'diperiksa', 'approved']
+            : ['belum_entry', 'sudah_entry', 'validasi', 'clean'];
+        
+        const firstStage = stages[0];
+        const editableStages = stages.slice(1);
+
+        // 3. Hitung total dari field yang bisa diedit yang dikirim dari frontend
+        let editableProgressSum = 0;
+        for (const stage of editableStages) {
+            if (progressData[stage as ProgressType] !== undefined) {
+                editableProgressSum += Number(progressData[stage as ProgressType]);
+            }
+        }
+        
+        // 4. Hitung nilai untuk tahap pertama ('open' atau 'belum_entry') di server
+        const firstStageValue = totalBebanKerja - editableProgressSum;
+        
+        if (firstStageValue < 0) {
+            throw new Error(`Total progres (${editableProgressSum}) tidak bisa melebihi total beban kerja (${totalBebanKerja}).`);
         }
 
+        // 5. Gabungkan nilai yang dihitung dengan data yang masuk
+        const fullProgressData = { ...progressData };
+        (fullProgressData as any)[firstStage] = firstStageValue;
+
+        // 6. Hapus progress lama dan masukkan yang baru
         await connection.execute('DELETE FROM ppl_progress WHERE ppl_id = ?', [pplId]);
-        const progressEntries = Object.entries(progressData);
+        const progressEntries = Object.entries(fullProgressData).filter(([, value]) => value !== undefined && value !== null);
         if (progressEntries.length > 0) {
             const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES ?';
-            const progressValues = progressEntries.map(([type, value]) => [pplId, type, value]);
+            const progressValues = progressEntries.map(([type, value]) => [pplId, type, Number(value) || 0]);
             await connection.query(progressQuery, [progressValues]);
         }
 
+        // 7. Update progress keseluruhan kegiatan
         const kegiatanId = currentPpl.kegiatanId;
         const [allPplForKegiatan] = await connection.query<PPLPacket[]>('SELECT * FROM ppl WHERE kegiatanId = ?', [kegiatanId]);
         if (allPplForKegiatan.length > 0) {
             const pplIds = allPplForKegiatan.map(p => p.id).filter(id => id !== undefined) as number[];
-            const pplPlaceholders = pplIds.map(() => '?').join(',');
-            const [progressRows] = await db.query<ProgressPacket[]>('SELECT * FROM ppl_progress WHERE ppl_id IN (' + pplPlaceholders + ')', pplIds);
+            if (pplIds.length > 0) {
+                 const pplPlaceholders = pplIds.map(() => '?').join(',');
+                 const [progressRows] = await db.query<ProgressPacket[]>('SELECT * FROM ppl_progress WHERE ppl_id IN (' + pplPlaceholders + ')', pplIds);
 
-            const progressMap = new Map<number, Partial<Record<ProgressType, number>>>();
-            progressRows.forEach(row => {
-                if (!progressMap.has(row.ppl_id)) {
-                    progressMap.set(row.ppl_id, {});
-                }
-                progressMap.get(row.ppl_id)![row.progress_type] = row.value;
-            });
-            allPplForKegiatan.forEach(p => {
-                p.progress = progressMap.get(p.id!) || {};
-            });
+                 const progressMap = new Map<number, Partial<Record<ProgressType, number>>>();
+                 progressRows.forEach(row => {
+                     if (!progressMap.has(row.ppl_id)) {
+                         progressMap.set(row.ppl_id, {});
+                     }
+                     progressMap.get(row.ppl_id)![row.progress_type] = row.value;
+                 });
+                 allPplForKegiatan.forEach(p => {
+                     p.progress = progressMap.get(p.id!) || {};
+                 });
+            }
         }
-
+        
         const progressPendataanApproved = calculateProgress(allPplForKegiatan, 'pengumpulan-data', 'Approved');
         const progressPengolahanApproved = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Approved');
         const progressPendataanSubmit = calculateProgress(allPplForKegiatan, 'pengumpulan-data', 'Submitted');
         const progressPengolahanSubmit = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Submitted');
-
+        
         const totalBebanKerjaKegiatan = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja, 10) || 0), 0);
         const totalApproved = allPplForKegiatan.reduce((acc, p) => {
-            const approved = p.progress?.approved || p.progress?.clean || 0;
-            return acc + approved;
+            const approvedValue = (p.progress?.approved || 0) + (p.progress?.clean || 0);
+            return acc + approvedValue;
         }, 0);
+        
         const progressKeseluruhan = totalBebanKerjaKegiatan > 0 ? Math.round((totalApproved / totalBebanKerjaKegiatan) * 100) : 0;
-
+        
         await connection.execute(
-            'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, progressKeseluruhan = ?, progressPendataanApproved = ?, progressPengolahanApproved = ?, progressPendataanSubmit = ?, progressPengolahanSubmit = ?, lastUpdatedBy = ? WHERE id = ?',
-            [progressKeseluruhan, progressPendataanApproved, progressPengolahanApproved, progressPendataanSubmit, progressPengolahanSubmit, username, kegiatanId]
+            'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, lastUpdatedBy = ?, progressKeseluruhan = ?, progressPendataanApproved = ?, progressPengolahanApproved = ?, progressPendataanSubmit = ?, progressPengolahanSubmit = ? WHERE id = ?',
+            [username, progressKeseluruhan, progressPendataanApproved, progressPengolahanApproved, progressPendataanSubmit, progressPengolahanSubmit, kegiatanId]
         );
-
+        
         await connection.commit();
-
+        
         const [updatedPplRows] = await db.query<RowDataPacket[]>('SELECT * FROM ppl WHERE id = ?', [pplId]);
         const updatedPpl = updatedPplRows[0] as PPL;
         const [newProgressRows] = await db.query<ProgressPacket[]>('SELECT * FROM ppl_progress WHERE ppl_id = ?', [pplId]);
@@ -607,12 +649,19 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
         newProgressRows.forEach(row => {
             updatedPpl.progress![row.progress_type] = row.value;
         });
+
         return updatedPpl;
 
-    } catch (error) {
-        await connection.rollback();
-        console.error("TRANSACTION ROLLED BACK:", error);
-        throw error;
+    } catch (error: any) {
+  await connection.rollback();
+
+  console.error("❌ TRANSACTION ROLLED BACK");
+  console.error("Code:", error.code);
+  console.error("Message:", error.sqlMessage || error.message);
+  console.error("Query:", error.sql);
+  console.error("Stack:", error.stack);
+
+  throw new Error('Terjadi kesalahan di server saat menyimpan data.');
     } finally {
         connection.release();
     }

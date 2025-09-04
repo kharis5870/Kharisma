@@ -25,6 +25,7 @@ import { Kegiatan, PPL, Dokumen, PPLMaster, KetuaTim, UserData } from "@shared/a
 import { cn } from "@/lib/utils";
 import AlertModal from "@/components/AlertModal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiClient } from "@/lib/apiClient";
 
 // --- Type Definitions ---
 type Tahap = 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi';
@@ -84,27 +85,19 @@ const parseHonor = (value: string | number): string => {
 
 // --- API Fetching Functions ---
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
-    const res = await fetch(`/api/kegiatan/${id}`);
-    if (!res.ok) throw new Error("Kegiatan tidak ditemukan");
-    return res.json();
+    return apiClient.get<Kegiatan>(`/kegiatan/${id}`);
 }
 
 const fetchPPLs = async (): Promise<PPLMaster[]> => {
-    const res = await fetch('/api/ppl');
-    if (!res.ok) throw new Error('Gagal memuat daftar PPL');
-    return res.json();
+    return apiClient.get<PPLMaster[]>('/ppl');
 };
 
 const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
-    const res = await fetch('/api/ketua-tim');
-    if (!res.ok) throw new Error('Gagal memuat daftar Ketua Tim');
-    return res.json();
+    return apiClient.get<KetuaTim[]>('/ketua-tim');
 };
 
 const fetchPMLs = async (): Promise<UserData[]> => {
-    const res = await fetch('/api/admin/pml');
-    if (!res.ok) throw new Error('Gagal memuat daftar PML');
-    return res.json();
+    return apiClient.get<UserData[]>('/admin/pml');
 };
 
 const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Promise<Kegiatan> => {
@@ -113,13 +106,7 @@ const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Prom
         dokumen: kegiatan.dokumen,
         ppl: kegiatan.ppl?.map(({ clientId, namaPPL, ...rest }) => rest),
     };
-
-    const res = await fetch(`/api/kegiatan/${kegiatan.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sanitizedData) });
-    if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Gagal memperbarui kegiatan");
-    }
-    return res.json();
+    return apiClient.put<Kegiatan>(`/kegiatan/${kegiatan.id}`, sanitizedData);
 };
 
 
@@ -395,16 +382,11 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
     const mutation = useMutation({
         // Modifikasi mutationFn untuk mengirim username
         mutationFn: (payload: { documentData: Partial<Dokumen>; username?: string }) => {
-            const url = isNew ? `/api/kegiatan/dokumen` : `/api/kegiatan/dokumen/${id}`;
-            const method = isNew ? 'POST' : 'PUT';
-            return fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload) // Kirim payload yang berisi data dokumen dan username
-            }).then(res => {
-                if (!res.ok) throw new Error(`Gagal menyimpan dokumen.`);
-                return res.json();
-            });
+            if (isNew) {
+                return apiClient.post<Dokumen>('/kegiatan/dokumen', payload);
+            } else {
+                return apiClient.put<Dokumen>(`/kegiatan/dokumen/${id}`, payload);
+            }
         },
         onSuccess: (savedData: Dokumen) => {
             onDocumentSaved(savedData, clientId);
@@ -750,18 +732,13 @@ export default function EditActivity() {
     for (const ppl of formData.ppl ?? []) {
         if (!ppl.ppl_master_id) continue;
         const currentActivityHonor = ppl.honorarium.reduce((sum, h) => sum + (parseInt(h.besaranHonor || '0') || 0), 0);
-        const validationResponse = await fetch('/api/honor/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pplMasterId: ppl.ppl_master_id,
-          bulan: validationMonth,
-          tahun: validationYear,
-          currentActivityHonor: currentActivityHonor,
-          kegiatanIdToExclude: id
-        })
-      });
-      const result = await validationResponse.json();
+        const result = await apiClient.post<{ isOverLimit: boolean; projectedTotal: number; limit: number }>('/honor/validate', {
+            pplMasterId: ppl.ppl_master_id,
+            bulan: validationMonth,
+            tahun: validationYear,
+            currentActivityHonor: currentActivityHonor,
+            kegiatanIdToExclude: id
+            });
 
       if (result.isOverLimit) {
         setHonorWarningDetails({
@@ -903,10 +880,8 @@ export default function EditActivity() {
     const documents = useMemo(() => formData.dokumen?.filter(d => d.tipe === tipe) || [], [formData.dokumen, tipe]);
 
     const deleteMutation = useMutation({
-        mutationFn: (docId: number) => 
-            fetch(`/api/kegiatan/dokumen/${docId}`, { method: 'DELETE' }),
+        mutationFn: (docId: number) => apiClient.delete(`/kegiatan/dokumen/${docId}`),
         onSuccess: (response, docId) => {
-            if (!response.ok) throw new Error('Gagal menghapus dokumen.');
             setFormData(prev => ({
                 ...prev,
                 dokumen: prev.dokumen?.filter(d => d.id !== docId)

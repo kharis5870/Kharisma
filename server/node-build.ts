@@ -15,11 +15,10 @@ app.use(baseURI, express.static(distPath));
 
 // Tangani semua rute React Router di bawah /kharisma
 app.get(`${baseURI}/*`, (req, res, next) => {
-  // Jika ini panggilan API, biarkan handler API yang bekerja
-  if (req.path.startsWith(`${baseURI}/api`)) {
+  // Gunakan req.url, bukan req.path (Passenger suka "memotong" baseURI)
+  if (req.url.startsWith(`${baseURI}/api`)) {
     return next();
   }
-  // Untuk rute lain, kirim file index.html
   res.sendFile(path.join(distPath, "index.html"));
 });
 

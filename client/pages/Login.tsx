@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, LogIn, Eye, EyeOff } from "lucide-react";
 import SuccessModal from "@/components/SuccessModal";
+import { apiClient } from "@/lib/apiClient";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -35,22 +36,22 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+      // Definisikan tipe data yang diharapkan dari respons login
+      type LoginResponse = { success: boolean, user: any, message?: string };
 
-      const data = await response.json();
+      // Ganti fetch dengan apiClient.post
+      const data = await apiClient.post<LoginResponse>('/auth/login', { username, password });
 
-      if (response.ok && data.success) {
+      // apiClient sudah menangani !response.ok, jadi kita hanya perlu cek logika sukses
+      if (data.success) {
         login(data.user); // Simpan data user (termasuk role) ke context
         navigate("/dashboard");
       } else {
         setError(data.message || "Terjadi kesalahan. Silakan coba lagi.");
       }
-    } catch (err) {
-      setError("Tidak dapat terhubung ke server. Periksa koneksi Anda.");
+    } catch (err: any) {
+      // apiClient akan melempar error dengan properti message
+      setError(err.message || "Tidak dapat terhubung ke server. Periksa koneksi Anda.");
     } finally {
       setIsLoading(false);
     }

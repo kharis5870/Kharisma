@@ -39,11 +39,10 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { PPLAdminData, PPLMaster } from "@shared/api";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/lib/apiClient";
 
 const fetchPPLs = async (): Promise<PPLAdminData[]> => {
-    const res = await fetch('/api/admin/ppl');
-    if (!res.ok) throw new Error('Gagal memuat daftar PPL');
-    return res.json();
+    return apiClient.get<PPLAdminData[]>('/admin/ppl');
 };
 
 const ActivityDetailModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, onClose: () => void, pplData: PPLAdminData | null }) => {
