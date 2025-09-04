@@ -27,6 +27,24 @@ interface HonorariumPacket extends RowDataPacket {
 }
 // --- END OF TYPE DEFINITIONS ---
 
+const formatDateForDb = (dateInput: string | Date | null | undefined): string | null => {
+  if (!dateInput) {
+    return null;
+  }
+  try {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    console.error("Gagal memformat tanggal:", dateInput, error);
+    return null;
+  }
+};
 
 const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | 'Submitted'): number => {
     const pplTahap = ppl.filter(p => p.tahap === tahap);
@@ -197,10 +215,14 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
             namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false, bulanPembayaranHonor || null,
-            tanggalMulaiPersiapan || null, tanggalSelesaiPersiapan || null,
-            tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
-            tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
-            tanggalMulaiDiseminasiEvaluasi || null, tanggalSelesaiDiseminasiEvaluasi || null,
+            formatDateForDb(tanggalMulaiPersiapan),
+            formatDateForDb(tanggalSelesaiPersiapan),
+            formatDateForDb(tanggalMulaiPengumpulanData),
+            formatDateForDb(tanggalSelesaiPengumpulanData),
+            formatDateForDb(tanggalMulaiPengolahanAnalisis),
+            formatDateForDb(tanggalSelesaiPengolahanAnalisis),
+            formatDateForDb(tanggalMulaiDiseminasiEvaluasi),
+            formatDateForDb(tanggalSelesaiDiseminasiEvaluasi),
             username, username
         ]);
         const kegiatanId = kegiatanResult.insertId;
@@ -326,10 +348,14 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         `;
         await connection.execute(kegiatanQuery, [
             namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false, bulanPembayaranHonor || null,
-            tanggalMulaiPersiapan || null, tanggalSelesaiPersiapan || null,
-            tanggalMulaiPengumpulanData || null, tanggalSelesaiPengumpulanData || null,
-            tanggalMulaiPengolahanAnalisis || null, tanggalSelesaiPengolahanAnalisis || null,
-            tanggalMulaiDiseminasiEvaluasi || null, tanggalSelesaiDiseminasiEvaluasi || null,
+            formatDateForDb(tanggalMulaiPersiapan),
+            formatDateForDb(tanggalSelesaiPersiapan),
+            formatDateForDb(tanggalMulaiPengumpulanData),
+            formatDateForDb(tanggalSelesaiPengumpulanData),
+            formatDateForDb(tanggalMulaiPengolahanAnalisis),
+            formatDateForDb(tanggalSelesaiPengolahanAnalisis),
+            formatDateForDb(tanggalMulaiDiseminasiEvaluasi),
+            formatDateForDb(tanggalSelesaiDiseminasiEvaluasi),
             lastEditedBy,
             id
         ]);
