@@ -1,9 +1,9 @@
 // client/pages/ViewDocuments.tsx
 
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import Layout from "@/components/Layout";
-import { useAuth } from "@/contexts/AuthContext"; // <-- Impor useAuth
+import { useAuth } from "@/contexts/AuthContext"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,9 @@ const approveTahapan = async ({ kegiatanId, tipe, username }: { kegiatanId: numb
 
 export default function ViewDocuments() {
     const { id } = useParams<{ id: string }>();
-    const { user } = useAuth(); // <-- Dapatkan informasi user
+    const [searchParams] = useSearchParams();
+    const tahapFromNotif = searchParams.get('tahap');
+    const { user } = useAuth(); 
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState("persiapan");
     const [noteViewModal, setNoteViewModal] = useState<{ isOpen: boolean; title: string; content: string }>({ isOpen: false, title: '', content: '' });
@@ -218,7 +220,10 @@ export default function ViewDocuments() {
                     <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium">Ketua Tim</p><p className="text-lg font-medium">{activityData.namaKetua}</p></div><Users className="w-8 h-8 text-purple-500" /></div></CardContent></Card>
                     <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium">Status Kegiatan</p><Badge>{activityData.status}</Badge></div><Activity className="w-8 h-8 text-orange-500" /></div></CardContent></Card>
                 </div>
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                <Tabs 
+                    defaultValue={tahapFromNotif || 'persiapan'} 
+                    className="space-y-6"
+                    >
                     <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="persiapan">Persiapan <Badge variant="secondary" className="ml-2">{docsByTipe('persiapan').length}</Badge></TabsTrigger>
                         <TabsTrigger value="pengumpulan-data">Pengumpulan Data <Badge variant="secondary" className="ml-2">{docsByTipe('pengumpulan-data').length}</Badge></TabsTrigger>

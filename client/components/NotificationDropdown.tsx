@@ -14,7 +14,8 @@ import {
   ExternalLink,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  MapPin
 } from "lucide-react";
 import { DocumentNotification } from "@shared/api";
 import { apiClient } from "@/lib/apiClient";
@@ -41,6 +42,12 @@ const getRelativeTime = (dateString: string) => {
   return `${diffInDays} hari yang lalu`;
 };
 
+const formatTahap = (tahap: string) => {
+  if (!tahap) return '';
+  return tahap
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+};
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -64,7 +71,7 @@ export default function NotificationDropdown() {
   }, []);
 
   const handleNotificationClick = (notification: DocumentNotification) => {
-    navigate(`/input-kegiatan/${notification.kegiatanId}`);
+    navigate(`/view-documents/${notification.kegiatanId}?tahap=${notification.tahap}`);
     setIsOpen(false);
   };
 
@@ -129,6 +136,10 @@ export default function NotificationDropdown() {
                               </p>
                               <p className="text-xs text-slate-600 line-clamp-1">
                                 Kegiatan: {notification.namaKegiatan}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-1 flex items-center">
+                                  <MapPin className="w-3 h-3 mr-1.5" />
+                                  Tahap: {formatTahap(notification.tahap)}
                               </p>
                             </div>
                           </div>

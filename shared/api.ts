@@ -134,6 +134,7 @@ export interface DocumentNotification {
   uploadedAt: string; // ISO date string
   status: 'pending_approval';
   type: 'document_uploaded';
+  tahap: string;
 }
 
 export interface PenilaianMitra {
