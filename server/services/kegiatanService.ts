@@ -46,8 +46,15 @@ const formatDateForDb = (dateInput: string | Date | null | undefined): string | 
   }
 };
 
-const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | 'Submitted'): number => {
-    const pplTahap = ppl.filter(p => p.tahap === tahap);
+// =================================================================
+// START OF MODIFICATION: calculateProgress function
+// =================================================================
+const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'] | 'pendataan', type: 'Approved' | 'Submitted'): number => {
+    // Menangani kasus gabungan 'listing' dan 'pencacahan'
+    const pplTahap = tahap === 'pendataan'
+        ? ppl.filter(p => p.tahap === 'listing' || p.tahap === 'pencacahan')
+        : ppl.filter(p => p.tahap === tahap);
+
     if (pplTahap.length === 0) return 0;
 
     const totalBebanKerja = pplTahap.reduce((acc, p) => acc + (parseInt(p.bebanKerja) || 0), 0);
@@ -55,7 +62,8 @@ const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | '
 
     const totalProgress = pplTahap.reduce((acc, p) => {
         const progress = p.progress || {};
-        if (tahap === 'pengumpulan-data') {
+        // Logika untuk 'listing' dan 'pencacahan' digabung
+        if (p.tahap === 'listing' || p.tahap === 'pencacahan') {
             if (type === 'Approved') {
                 return acc + (progress.approved || 0);
             }
@@ -63,18 +71,21 @@ const calculateProgress = (ppl: PPL[], tahap: PPL['tahap'], type: 'Approved' | '
                 return acc + (progress.submit || 0) + (progress.diperiksa || 0);
             }
         }
-        if (tahap === 'pengolahan-analisis') {
+        if (p.tahap === 'pengolahan-analisis') {
             const clean = progress.clean || 0;
             if (type === 'Approved') {
                 return acc + clean;
             }
-             return acc + (progress.sudah_entry || 0) + (progress.validasi || 0);
+            return acc + (progress.sudah_entry || 0) + (progress.validasi || 0);
         }
         return acc;
     }, 0);
-    
+
     return Math.round((totalProgress / totalBebanKerja) * 100);
 };
+// =================================================================
+// END OF MODIFICATION: calculateProgress function
+// =================================================================
 
 interface HonorariumSettingPacket extends RowDataPacket {
     kegiatanId: number;
@@ -97,23 +108,23 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
     const kegiatanIds = kegiatanRows.map(k => k.id);
     const placeholders = kegiatanIds.map(() => '?').join(',');
 
- const [honorSettingsRows] = await db.query<HonorariumSettingPacket[]>('SELECT * FROM honorarium_kegiatan WHERE kegiatanId IN (' + placeholders + ')', kegiatanIds);
- const honorSettingsMap = new Map<number, any>();
- honorSettingsRows.forEach(row => {
-    if (!honorSettingsMap.has(row.kegiatanId)) {
-        honorSettingsMap.set(row.kegiatanId, {});
-    }
-    const currentSettings = honorSettingsMap.get(row.kegiatanId);
-    let key: string;
-    if (row.jenis_pekerjaan === 'listing') key = 'pengumpulan-data-listing';
-    else if (row.jenis_pekerjaan === 'pencacahan') key = 'pengumpulan-data-pencacahan';
-    else key = 'pengolahan-analisis';
+   const [honorSettingsRows] = await db.query<HonorariumSettingPacket[]>('SELECT * FROM honorarium_kegiatan WHERE kegiatanId IN (' + placeholders + ')', kegiatanIds);
+   const honorSettingsMap = new Map<number, any>();
+   honorSettingsRows.forEach(row => {
+     if (!honorSettingsMap.has(row.kegiatanId)) {
+         honorSettingsMap.set(row.kegiatanId, {});
+     }
+     const currentSettings = honorSettingsMap.get(row.kegiatanId);
+     let key: string;
+     if (row.jenis_pekerjaan === 'listing') key = 'pengumpulan-data-listing';
+     else if (row.jenis_pekerjaan === 'pencacahan') key = 'pengumpulan-data-pencacahan';
+     else key = 'pengolahan-analisis';
 
-    currentSettings[key] = {
-        satuanBebanKerja: row.satuan_beban_kerja,
-        hargaSatuan: row.harga_satuan
-    };
- });
+     currentSettings[key] = {
+         satuanBebanKerja: row.satuan_beban_kerja,
+         hargaSatuan: row.harga_satuan
+     };
+   });
 
     const [dokumenRows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE kegiatanId IN (' + placeholders + ')', kegiatanIds);
     const [pplRows] = await db.query<PPLPacket[]>('SELECT p.*, pm.namaPPL FROM ppl p LEFT JOIN ppl_master pm ON p.ppl_master_id = pm.id WHERE p.kegiatanId IN (' + placeholders + ')', kegiatanIds);
@@ -159,10 +170,16 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
         kegiatan.honorariumSettings = honorSettingsMap.get(kegiatan.id) || {};
         kegiatan.ppl = pplRows.filter(p => p.kegiatanId === kegiatan.id) as PPL[];
         
-        kegiatan.progressPendataanApproved = calculateProgress(kegiatan.ppl, 'pengumpulan-data', 'Approved');
+        // =================================================================
+        // START OF MODIFICATION: Progress calculation call
+        // =================================================================
+        kegiatan.progressPendataanApproved = calculateProgress(kegiatan.ppl, 'pendataan', 'Approved');
         kegiatan.progressPengolahanApproved = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Approved');
-        kegiatan.progressPendataanSubmit = calculateProgress(kegiatan.ppl, 'pengumpulan-data', 'Submitted');
+        kegiatan.progressPendataanSubmit = calculateProgress(kegiatan.ppl, 'pendataan', 'Submitted');
         kegiatan.progressPengolahanSubmit = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Submitted');
+        // =================================================================
+        // END OF MODIFICATION: Progress calculation call
+        // =================================================================
     }
     return kegiatanRows;
 };
@@ -177,7 +194,7 @@ export const getKegiatanById = async (id: number): Promise<Kegiatan | null> => {
 };
 
 // =================================================================
-// START OF FIX: createKegiatan function
+// START OF MODIFICATION: createKegiatan function
 // =================================================================
 export const createKegiatan = async (data: any): Promise<Kegiatan> => {
     const connection = await db.getConnection();
@@ -185,7 +202,9 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         await connection.beginTransaction();
 
         const {
-            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih, bulanPembayaranHonor,
+            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih,
+            // Ambil tiga bulan honor baru
+            bulanHonorListing, bulanHonorPencacahan, bulanHonorPengolahan,
             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
@@ -201,9 +220,11 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             'pengolahan-analisis': pengolahanSettings
         } = honorariumSettings;
 
+        // Perbarui query INSERT
         const kegiatanQuery = `
             INSERT INTO kegiatan
-            (namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih, bulanPembayaranHonor,
+            (namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih, 
+             bulanHonorListing, bulanHonorPencacahan, bulanHonorPengolahan,
              tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
              tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
              tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
@@ -211,10 +232,12 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
              status, progressKeseluruhan, lastUpdatedBy, lastEditedBy, 
              progressPendataanApproved, progressPengolahanApproved, 
              progressPendataanSubmit, progressPengolahanSubmit)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?, ?, 0, 0, 0, 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?, ?, 0, 0, 0, 0)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
-            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false, bulanPembayaranHonor || null,
+            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false,
+            // Masukkan tiga bulan honor baru
+            bulanHonorListing || null, bulanHonorPencacahan || null, bulanHonorPengolahan || null,
             formatDateForDb(tanggalMulaiPersiapan),
             formatDateForDb(tanggalSelesaiPersiapan),
             formatDateForDb(tanggalMulaiPengumpulanData),
@@ -227,11 +250,10 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         ]);
         const kegiatanId = kegiatanResult.insertId;
 
-        // Simpan honorarium settings ke tabel baru
+        // ... (sisa logika fungsi createKegiatan tidak berubah)
         const honorSettingsQuery = 'INSERT INTO honorarium_kegiatan (kegiatanId, jenis_pekerjaan, satuan_beban_kerja, harga_satuan) VALUES ?';
-        const honorSettingsValues = [    ['listing', listingSettings],    ['pencacahan', pencacahanSettings],    ['pengolahan', pengolahanSettings]  ].map(([jenis, settings]) => [kegiatanId, jenis, settings.satuanBebanKerja, settings.hargaSatuan]);
+        const honorSettingsValues = [   ['listing', listingSettings],   ['pencacahan', pencacahanSettings],   ['pengolahan', pengolahanSettings]  ].map(([jenis, settings]) => [kegiatanId, jenis, settings.satuanBebanKerja, settings.hargaSatuan]);
         await connection.query(honorSettingsQuery, [honorSettingsValues]);
-
         if (pplAllocations && pplAllocations.length > 0) {
             for (const ppl of pplAllocations) {
                 if (!ppl.ppl_master_id) {
@@ -271,7 +293,8 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
                     }
                 }
 
-                const progressType = ppl.tahap === 'pengumpulan-data' ? 'open' : 'belum_entry';
+                // Perbarui logika progress type berdasarkan tahap baru
+                const progressType = (ppl.tahap === 'listing' || ppl.tahap === 'pencacahan') ? 'open' : 'belum_entry';
                 if (totalBeban > 0) {
                     const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES (?, ?, ?)';
                     await connection.execute(progressQuery, [pplId, progressType, totalBeban]);
@@ -293,26 +316,24 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         return newKegiatan;
 
     } catch (error: any) {
-  await connection.rollback();
-
-  console.error("❌ TRANSACTION ROLLED BACK");
-  console.error("Code:", error.code);
-  console.error("Message:", error.sqlMessage || error.message);
-  console.error("Query:", error.sql);
-  console.error("Stack:", error.stack);
-
-  throw new Error('Terjadi kesalahan di server saat menyimpan data.');
+        await connection.rollback();
+        console.error("❌ TRANSACTION ROLLED BACK");
+        console.error("Code:", error.code);
+        console.error("Message:", error.sqlMessage || error.message);
+        console.error("Query:", error.sql);
+        console.error("Stack:", error.stack);
+        throw new Error('Terjadi kesalahan di server saat menyimpan data.');
     } finally {
         connection.release();
     }
 }
 // =================================================================
-// END OF FIX: createKegiatan function
+// END OF MODIFICATION: createKegiatan function
 // =================================================================
 
 
 // =================================================================
-// START OF FIX: updateKegiatan function
+// START OF MODIFICATION: updateKegiatan function
 // =================================================================
 export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> => {
     const connection = await db.getConnection();
@@ -320,7 +341,9 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         await connection.beginTransaction();
 
         const {
-            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih, bulanPembayaranHonor,
+            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih,
+            // Ambil tiga bulan honor baru
+            bulanHonorListing, bulanHonorPencacahan, bulanHonorPengolahan,
             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
@@ -335,9 +358,11 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             'pengolahan-analisis': pengolahanSettings
         } = honorariumSettings;
 
+        // Perbarui query UPDATE
         const kegiatanQuery = `
             UPDATE kegiatan SET
-            namaKegiatan = ?, ketua_tim_id = ?, deskripsiKegiatan = ?, adaListing = ?, isFasih = ?, bulanPembayaranHonor = ?,
+            namaKegiatan = ?, ketua_tim_id = ?, deskripsiKegiatan = ?, adaListing = ?, isFasih = ?,
+            bulanHonorListing = ?, bulanHonorPencacahan = ?, bulanHonorPengolahan = ?,
             tanggalMulaiPersiapan = ?, tanggalSelesaiPersiapan = ?,
             tanggalMulaiPengumpulanData = ?, tanggalSelesaiPengumpulanData = ?,
             tanggalMulaiPengolahanAnalisis = ?, tanggalSelesaiPengolahanAnalisis = ?,
@@ -347,7 +372,9 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             WHERE id = ?
         `;
         await connection.execute(kegiatanQuery, [
-            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false, bulanPembayaranHonor || null,
+            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false,
+            // Masukkan tiga bulan honor baru
+            bulanHonorListing || null, bulanHonorPencacahan || null, bulanHonorPengolahan || null,
             formatDateForDb(tanggalMulaiPersiapan),
             formatDateForDb(tanggalSelesaiPersiapan),
             formatDateForDb(tanggalMulaiPengumpulanData),
@@ -360,45 +387,37 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             id
         ]);
         
+        // ... (sisa logika fungsi updateKegiatan tidak berubah, tapi ada satu penyesuaian di progress)
         await connection.execute('DELETE FROM honorarium_kegiatan WHERE kegiatanId = ?', [id]);
         const honorSettingsQuery = 'INSERT INTO honorarium_kegiatan (kegiatanId, jenis_pekerjaan, satuan_beban_kerja, harga_satuan) VALUES ?';
-        const honorSettingsValues = [    ['listing', listingSettings],    ['pencacahan', pencacahanSettings],    ['pengolahan', pengolahanSettings]  ].map(([jenis, settings]) => [id, jenis, settings.satuanBebanKerja, settings.hargaSatuan]);
+        const honorSettingsValues = [   ['listing', listingSettings],   ['pencacahan', pencacahanSettings],   ['pengolahan', pengolahanSettings]  ].map(([jenis, settings]) => [id, jenis, settings.satuanBebanKerja, settings.hargaSatuan]);
         await connection.query(honorSettingsQuery, [honorSettingsValues]);
 
-        // ================== DOCUMENT LOGIC FIX START ==================
         if (documents) {
-            // 1. Get IDs of documents submitted from the client
             const submittedDocIds = documents.map((doc: any) => doc.id).filter(Boolean);
-
-            // 2. Delete non-mandatory documents that were removed by the user
             if (submittedDocIds.length > 0) {
                  const placeholders = submittedDocIds.map(() => '?').join(',');
                  await connection.execute(
-                    `DELETE FROM dokumen WHERE kegiatanId = ? AND isWajib = false AND id NOT IN (${placeholders})`,
-                    [id, ...submittedDocIds]
-                );
+                     `DELETE FROM dokumen WHERE kegiatanId = ? AND isWajib = false AND id NOT IN (${placeholders})`,
+                     [id, ...submittedDocIds]
+                 );
             } else {
-                // If no existing documents are submitted, delete all non-mandatory ones for this activity
-                await connection.execute(
-                    'DELETE FROM dokumen WHERE kegiatanId = ? AND isWajib = false',
-                    [id]
-                );
+                 await connection.execute(
+                     'DELETE FROM dokumen WHERE kegiatanId = ? AND isWajib = false',
+                     [id]
+                 );
             }
-
-            // 3. Iterate to INSERT new documents or UPDATE existing ones
             for (const doc of documents) {
-                if (doc.id) { // If ID exists, it's an existing document
+                if (doc.id) {
                     const [existingDoc] = await connection.query<RowDataPacket[]>('SELECT link FROM dokumen WHERE id = ?', [doc.id]);
                 if (existingDoc.length > 0 && !existingDoc[0].link && doc.link) {
-                    // Jika link sebelumnya KOSONG dan link baru ADA, rekam siapa yang mengunggah
                     const updateDocQuery = 'UPDATE dokumen SET nama = ?, link = ?, status = ?, diunggahOleh_userId = ? WHERE id = ?';
                     await connection.execute(updateDocQuery, [doc.nama, doc.link, doc.status || 'Pending', lastEditedBy, doc.id]);
                 } else {
-                    // Jika tidak, jalankan update seperti biasa
                     const updateDocQuery = 'UPDATE dokumen SET nama = ?, link = ?, status = ? WHERE id = ?';
                     await connection.execute(updateDocQuery, [doc.nama, doc.link, doc.status || 'Pending', doc.id]);
                 }
-                } else { // No ID means it's a new document
+                } else {
                 const insertDocQuery = 'INSERT INTO dokumen (kegiatanId, nama, link, jenis, tipe, uploadedAt, isWajib, status, diunggahOleh_userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
                 await connection.execute(insertDocQuery, [
                     id,
@@ -409,14 +428,11 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
                     new Date(),
                     doc.isWajib || false,
                     doc.status || 'Pending',
-                    lastEditedBy // Gunakan lastEditedBy sebagai pengunggah
+                    lastEditedBy
                 ]);
                 }
             }
         }
-        // ================== DOCUMENT LOGIC FIX END ==================
-
-        // The PPL logic below might have a similar issue, but we focus on the document problem first.
         await connection.execute('DELETE FROM ppl WHERE kegiatanId = ?', [id]);
 
         if (ppl && ppl.length > 0) {
@@ -465,9 +481,10 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
                     }
                 } else {
                   if (totalBeban > 0) {
-                    const progressType = p.tahap === 'pengumpulan-data' ? 'open' : 'belum_entry';
-                    const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES (?, ?, ?)';
-                    await connection.execute(progressQuery, [pplId, progressType, totalBeban]);
+                      // Perbarui logika progress type berdasarkan tahap baru
+                      const progressType = (p.tahap === 'listing' || p.tahap === 'pencacahan') ? 'open' : 'belum_entry';
+                      const progressQuery = 'INSERT INTO ppl_progress (ppl_id, progress_type, value) VALUES (?, ?, ?)';
+                      await connection.execute(progressQuery, [pplId, progressType, totalBeban]);
                   }
                 }
             }
@@ -480,22 +497,22 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         return updatedKegiatan;
 
     } catch (error: any) {
-  await connection.rollback();
-
-  console.error("❌ TRANSACTION ROLLED BACK");
-  console.error("Code:", error.code);
-  console.error("Message:", error.sqlMessage || error.message);
-  console.error("Query:", error.sql);
-  console.error("Stack:", error.stack);
-
-  throw new Error('Terjadi kesalahan di server saat menyimpan data.');
+        await connection.rollback();
+        console.error("❌ TRANSACTION ROLLED BACK");
+        console.error("Code:", error.code);
+        console.error("Message:", error.sqlMessage || error.message);
+        console.error("Query:", error.sql);
+        console.error("Stack:", error.stack);
+        throw new Error('Terjadi kesalahan di server saat menyimpan data.');
     } finally {
         connection.release();
     }
 }
 // =================================================================
-// END OF FIX: updateKegiatan function
+// END OF MODIFICATION: updateKegiatan function
 // =================================================================
+
+// ... (sisa file tidak berubah)
 
 export const createSingleDocument = async (data: Partial<Dokumen>, username: string): Promise<Dokumen> => {
     const { kegiatanId, nama, link, jenis, tipe, isWajib } = data;
@@ -528,7 +545,6 @@ export const createSingleDocument = async (data: Partial<Dokumen>, username: str
     return rows[0] as Dokumen;
 };
 
-// --- TAMBAHKAN FUNGSI BARU INI ---
 export const updateSingleDocument = async (dokumenId: number, data: { link?: string, nama?: string }, username: string): Promise<Dokumen> => {
     const { link, nama } = data;
 
@@ -545,7 +561,7 @@ export const updateSingleDocument = async (dokumenId: number, data: { link?: str
             nama = ?, 
             status = 'Pending', 
             updatedAt = CURRENT_TIMESTAMP,
-            lastEditedBy_userId = ? -- Tambahkan baris ini
+            lastEditedBy_userId = ?
         WHERE id = ?
     `;
 
@@ -556,7 +572,7 @@ export const updateSingleDocument = async (dokumenId: number, data: { link?: str
     await db.execute(query, [
         link ?? oldDoc.link,
         nama ?? oldDoc.nama,
-        username, // Simpan username sebagai editor terakhir
+        username,
         dokumenId
     ]);
 
@@ -565,24 +581,22 @@ export const updateSingleDocument = async (dokumenId: number, data: { link?: str
         throw new Error("Gagal mengambil dokumen setelah update.");
     }
     
-    // Di sini Anda bisa memicu notifikasi
-    // await createNotification({ message: `${username} telah mengubah dokumen ${nama}` });
-
     return updatedDocRows[0] as Dokumen;
 };
-// --- AKHIR DARI FUNGSI BARU ---
 
 export const deleteSingleDocument = async (id: number): Promise<boolean> => {
     const [result] = await db.execute<OkPacket>('DELETE FROM dokumen WHERE id = ? AND isWajib = false', [id]);
     return result.affectedRows > 0;
 };
 
+// =================================================================
+// START OF MODIFICATION: updatePplProgress function
+// =================================================================
 export const updatePplProgress = async (pplId: number, progressData: Partial<Record<ProgressType, number>>, username: string) => {
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
 
-        // 1. Ambil data PPL dari database untuk mendapatkan info penting
         const [pplRows] = await connection.query<RowDataPacket[]>('SELECT kegiatanId, bebanKerja, tahap FROM ppl WHERE id = ?', [pplId]);
         if (pplRows.length === 0) {
             throw new Error("PPL tidak ditemukan");
@@ -590,15 +604,14 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
         const currentPpl = pplRows[0];
         const totalBebanKerja = parseInt(currentPpl.bebanKerja, 10) || 0;
 
-        // 2. Tentukan urutan tahapan progress berdasarkan data dari DB
-        const stages = currentPpl.tahap === 'pengumpulan-data'
+        // Perbarui logika penentuan stages
+        const stages = (currentPpl.tahap === 'listing' || currentPpl.tahap === 'pencacahan')
             ? ['open', 'submit', 'diperiksa', 'approved']
             : ['belum_entry', 'sudah_entry', 'validasi', 'clean'];
         
         const firstStage = stages[0];
         const editableStages = stages.slice(1);
 
-        // 3. Hitung total dari field yang bisa diedit yang dikirim dari frontend
         let editableProgressSum = 0;
         for (const stage of editableStages) {
             if (progressData[stage as ProgressType] !== undefined) {
@@ -606,18 +619,15 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
             }
         }
         
-        // 4. Hitung nilai untuk tahap pertama ('open' atau 'belum_entry') di server
         const firstStageValue = totalBebanKerja - editableProgressSum;
         
         if (firstStageValue < 0) {
             throw new Error(`Total progres (${editableProgressSum}) tidak bisa melebihi total beban kerja (${totalBebanKerja}).`);
         }
 
-        // 5. Gabungkan nilai yang dihitung dengan data yang masuk
         const fullProgressData = { ...progressData };
         (fullProgressData as any)[firstStage] = firstStageValue;
 
-        // 6. Hapus progress lama dan masukkan yang baru
         await connection.execute('DELETE FROM ppl_progress WHERE ppl_id = ?', [pplId]);
         const progressEntries = Object.entries(fullProgressData).filter(([, value]) => value !== undefined && value !== null);
         if (progressEntries.length > 0) {
@@ -626,7 +636,6 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
             await connection.query(progressQuery, [progressValues]);
         }
 
-        // 7. Update progress keseluruhan kegiatan
         const kegiatanId = currentPpl.kegiatanId;
         const [allPplForKegiatan] = await connection.query<PPLPacket[]>('SELECT * FROM ppl WHERE kegiatanId = ?', [kegiatanId]);
         if (allPplForKegiatan.length > 0) {
@@ -637,20 +646,20 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
 
                  const progressMap = new Map<number, Partial<Record<ProgressType, number>>>();
                  progressRows.forEach(row => {
-                     if (!progressMap.has(row.ppl_id)) {
-                         progressMap.set(row.ppl_id, {});
-                     }
-                     progressMap.get(row.ppl_id)![row.progress_type] = row.value;
+                      if (!progressMap.has(row.ppl_id)) {
+                           progressMap.set(row.ppl_id, {});
+                      }
+                      progressMap.get(row.ppl_id)![row.progress_type] = row.value;
                  });
                  allPplForKegiatan.forEach(p => {
-                     p.progress = progressMap.get(p.id!) || {};
+                      p.progress = progressMap.get(p.id!) || {};
                  });
             }
         }
         
-        const progressPendataanApproved = calculateProgress(allPplForKegiatan, 'pengumpulan-data', 'Approved');
+        const progressPendataanApproved = calculateProgress(allPplForKegiatan, 'pendataan', 'Approved');
         const progressPengolahanApproved = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Approved');
-        const progressPendataanSubmit = calculateProgress(allPplForKegiatan, 'pengumpulan-data', 'Submitted');
+        const progressPendataanSubmit = calculateProgress(allPplForKegiatan, 'pendataan', 'Submitted');
         const progressPengolahanSubmit = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Submitted');
         
         const totalBebanKerjaKegiatan = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja, 10) || 0), 0);
@@ -679,19 +688,20 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
         return updatedPpl;
 
     } catch (error: any) {
-  await connection.rollback();
-
-  console.error("❌ TRANSACTION ROLLED BACK");
-  console.error("Code:", error.code);
-  console.error("Message:", error.sqlMessage || error.message);
-  console.error("Query:", error.sql);
-  console.error("Stack:", error.stack);
-
-  throw new Error('Terjadi kesalahan di server saat menyimpan data.');
+        await connection.rollback();
+        console.error("❌ TRANSACTION ROLLED BACK");
+        console.error("Code:", error.code);
+        console.error("Message:", error.sqlMessage || error.message);
+        console.error("Query:", error.sql);
+        console.error("Stack:", error.stack);
+        throw new Error('Terjadi kesalahan di server saat menyimpan data.');
     } finally {
         connection.release();
     }
 };
+// =================================================================
+// END OF MODIFICATION: updatePplProgress function
+// =================================================================
 
 export const deleteKegiatan = async (id: number): Promise<boolean> => {
     const [result] = await db.execute<OkPacket>('DELETE FROM kegiatan WHERE id = ?', [id]);

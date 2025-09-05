@@ -3,20 +3,17 @@
 import { create } from 'zustand';
 import { produce } from 'immer';
 import { persist } from 'zustand/middleware';
-import { Dokumen, PPLMaster } from "@shared/api"; // Import PPLMaster
-
-type TahapPPL = 'pengumpulan-data' | 'pengolahan-analisis';
-type TahapDokumen = 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi';
+import { Dokumen, PPLMaster, PPL } from "@shared/api";
 
 export interface HonorariumDetail {
-   jenis_pekerjaan: 'listing' | 'pencacahan' | 'pengolahan';
-   bebanKerja: string;
-   besaranHonor: string;
+    jenis_pekerjaan: 'listing' | 'pencacahan' | 'pengolahan';
+    bebanKerja: string;
+    besaranHonor: string;
 }
 
 export interface HonorariumSettings {
-   satuanBebanKerja: string;
-   hargaSatuan: string;
+    satuanBebanKerja: string;
+    hargaSatuan: string;
 }
 
 export interface PPLItem {
@@ -24,7 +21,7 @@ export interface PPLItem {
   ppl_master_id?: string;
   namaPPL?: string;
   namaPML: string;
-  tahap: TahapPPL;
+  tahap: PPL['tahap']; // Menggunakan tipe dari shared/api.ts
   honorarium: HonorariumDetail[];
 }
 
@@ -38,7 +35,9 @@ export type State = {
   deskripsiKegiatan: string;
   adaListing: boolean;
   isFasih: boolean;
-  bulanPembayaranHonor?: string;
+  bulanHonorListing?: string;
+  bulanHonorPencacahan?: string;
+  bulanHonorPengolahan?: string;
   pplAllocations: PPLItem[];
   documents: DocumentItem[];
   honorariumSettings: {
@@ -59,17 +58,17 @@ export type State = {
 export type Actions = {
   updateFormField: (field: keyof Omit<State, 'pplAllocations' | 'documents' | 'honorariumSettings'>, value: any) => void;
   updateHonorariumSetting: (tahap: keyof State['honorariumSettings'], field: keyof HonorariumSettings, value: string) => void;
-  addPPL: (tahap: TahapPPL) => void;
-  addBulkPPLs: (ppls: PPLMaster[], tahap: TahapPPL) => void; // Fungsi baru ditambahkan di sini
+  addPPL: (tahap: PPL['tahap']) => void;
+  addBulkPPLs: (ppls: PPLMaster[], tahap: PPL['tahap']) => void;
   removePPL: (id: string) => void;
   updatePPL: (id: string, field: keyof PPLItem, value: any) => void;
   updatePPLBebanKerja: (pplId: string, jenisPekerjaan: HonorariumDetail['jenis_pekerjaan'], bebanKerja: string) => void;
-  addDocumentLink: (tipe: TahapDokumen) => void;
+  addDocumentLink: (tipe: Dokumen['tipe']) => void;
   updateDocument: (id: string, field: 'nama' | 'link', value: string) => void;
   removeDocument: (id: string) => void;
   setPplAllocations: (allocations: PPLItem[]) => void;
   resetForm: () => void;
-  clearPPLsByTahap: (tahap: TahapPPL) => void;
+  clearPPLsByTahap: (tahap: PPL['tahap']) => void;
 };
 
 const mandatoryDocs: Omit<DocumentItem, 'id' | 'link' >[] = [
@@ -100,7 +99,9 @@ export const initialState: State = {
   deskripsiKegiatan: "",
   adaListing: false,
   isFasih: false,
-  bulanPembayaranHonor: undefined,
+  bulanHonorListing: undefined,
+  bulanHonorPencacahan: undefined,
+  bulanHonorPengolahan: undefined,
   pplAllocations: [],
   documents: mandatoryDocs.map((doc, i) => ({ ...doc, id: `wajib-initial-${i}`, link: '' })),
   honorariumSettings: {
@@ -120,7 +121,7 @@ export const initialState: State = {
 
 const useInputKegiatanStore = create<State & Actions>()(
   persist(
-    (set, get): State & Actions => ({
+    (set): State & Actions => ({
       ...initialState,
       updateFormField: (field, value) => set({ [field as any]: value }),
       
@@ -150,35 +151,30 @@ const useInputKegiatanStore = create<State & Actions>()(
             tahap: tahap,
             honorarium: []
         };
-        if (tahap === 'pengumpulan-data') {
-            newPpl.honorarium = [
-                { jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' },
-                { jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }
-            ];
+        if (tahap === 'listing') {
+            newPpl.honorarium = [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' }];
+        } else if (tahap === 'pencacahan') {
+            newPpl.honorarium = [{ jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }];
         } else if (tahap === 'pengolahan-analisis') {
-            newPpl.honorarium = [
-                { jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }
-            ];
+            newPpl.honorarium = [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }];
         }
         state.pplAllocations.push(newPpl);
       })),
       
-      // Implementasi fungsi yang hilang
       addBulkPPLs: (ppls, tahap) => set(produce((state: State) => {
         const newAllocations: PPLItem[] = ppls.map(ppl => {
             const newPpl: PPLItem = {
-                id: `ppl-${ppl.id}-${Date.now()}`,
+                id: `ppl-${ppl.id}-${tahap}-${Date.now()}`,
                 ppl_master_id: String(ppl.id),
                 namaPPL: ppl.namaPPL,
                 namaPML: '',
                 tahap: tahap,
                 honorarium: []
             };
-            if (tahap === 'pengumpulan-data') {
-                newPpl.honorarium = [
-                    { jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' },
-                    { jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }
-                ];
+            if (tahap === 'listing') {
+                newPpl.honorarium = [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' }];
+            } else if (tahap === 'pencacahan') {
+                newPpl.honorarium = [{ jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }];
             } else if (tahap === 'pengolahan-analisis') {
                 newPpl.honorarium = [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }];
             }
@@ -192,7 +188,7 @@ const useInputKegiatanStore = create<State & Actions>()(
       updatePPL: (id, field, value) => set(produce((state: State) => {
           const ppl = state.pplAllocations.find(p => p.id === id);
           if (ppl) {
-              (ppl as any)[field] = value;
+            (ppl as any)[field] = value;
           }
       })),
 

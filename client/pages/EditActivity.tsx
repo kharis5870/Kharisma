@@ -17,27 +17,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Check, ChevronsUpDown, Users, XCircle } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Badge } from "@/components/ui/badge"; 
-import { format, parseISO, isValid, getMonth, getYear, eachMonthOfInterval, format as formatDateFns } from "date-fns";
+import { format, parseISO, isValid, getYear, format as formatDateFns } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Kegiatan, PPL, Dokumen, PPLMaster, KetuaTim, UserData } from "@shared/api";
+import { Kegiatan, PPL, Dokumen, PPLMaster, KetuaTim, UserData, HonorariumDetail as ApiHonorariumDetail } from "@shared/api";
 import { cn } from "@/lib/utils";
 import AlertModal from "@/components/AlertModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/apiClient";
 
-// --- Type Definitions ---
-type Tahap = 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi';
-type TahapPPL = 'pengumpulan-data' | 'pengolahan-analisis';
+type TahapDokumen = 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi';
 
-export interface HonorariumDetail {
-    jenis_pekerjaan: 'listing' | 'pencacahan' | 'pengolahan';
-    bebanKerja: string;
-    satuanBebanKerja?: string | null;
-    hargaSatuan?: string | null;
-    besaranHonor: string;
-}
+export interface HonorariumDetail extends ApiHonorariumDetail {}
 
 type ClientPPL = Omit<PPL, 'honorarium'> & { clientId: string; honorarium: HonorariumDetail[] };
 type ClientDokumen = Dokumen & { clientId: string };
@@ -59,8 +50,10 @@ type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'lastUpdated
     tanggalSelesaiDiseminasiEvaluasi?: Date;
     ppl: ClientPPL[];
     dokumen: ClientDokumen[];
-    bulanPembayaranHonor?: string;
     honorariumSettings: HonorariumSettings;
+    bulanHonorListing?: string;
+    bulanHonorPencacahan?: string;
+    bulanHonorPengolahan?: string;
 };
 
 type DateFieldName =
@@ -69,7 +62,6 @@ type DateFieldName =
   | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
   | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
-// --- Helper Functions ---
 const formatHonor = (value: string | number): string => {
     if (value === '' || value === null || value === undefined) return '';
     const numString = String(value).replace(/[^0-9]/g, '');
@@ -83,7 +75,6 @@ const parseHonor = (value: string | number): string => {
     return String(value).replace(/\./g, '');
 };
 
-// --- API Fetching Functions ---
 const fetchActivityDetails = async (id: string): Promise<Kegiatan> => {
     return apiClient.get<Kegiatan>(`/kegiatan/${id}`);
 }
@@ -109,113 +100,28 @@ const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Prom
     return apiClient.put<Kegiatan>(`/kegiatan/${kegiatan.id}`, sanitizedData);
 };
 
-
 // --- Sub-Components ---
-
-const HonorPaymentMonthSelector = ({ formData, handleFormFieldChange }: { formData: Partial<FormState>, handleFormFieldChange: (field: keyof FormState, value: any) => void }) => {
-    const { tanggalMulaiPersiapan, tanggalSelesaiDiseminasiEvaluasi, bulanPembayaranHonor } = formData;
-    const [showOtherMonths, setShowOtherMonths] = useState(false);
-
-    useEffect(() => {
-        if (tanggalMulaiPersiapan && tanggalSelesaiDiseminasiEvaluasi) {
-            const start = tanggalMulaiPersiapan;
-            const end = tanggalSelesaiDiseminasiEvaluasi;
-            if (getMonth(start) === getMonth(end) && getYear(start) === getYear(end)) {
-                const autoSelectedMonth = formatDateFns(start, 'MM-yyyy');
-                if (bulanPembayaranHonor !== autoSelectedMonth) {
-                    handleFormFieldChange('bulanPembayaranHonor', autoSelectedMonth);
-                }
-            }
-        }
-    }, [tanggalMulaiPersiapan, tanggalSelesaiDiseminasiEvaluasi, bulanPembayaranHonor, handleFormFieldChange]);
-
-    const paymentMonthOptions = useMemo(() => {
-        if (!tanggalMulaiPersiapan || !tanggalSelesaiDiseminasiEvaluasi) return [];
-        const months = eachMonthOfInterval({ start: tanggalMulaiPersiapan, end: tanggalSelesaiDiseminasiEvaluasi });
-        return months.map(monthDate => ({
-            value: formatDateFns(monthDate, 'MM-yyyy'),
-            label: formatDateFns(monthDate, 'MMMM yyyy', { locale: localeID }),
-        }));
-    }, [tanggalMulaiPersiapan, tanggalSelesaiDiseminasiEvaluasi]);
-
-    const allYearMonths = useMemo(() => {
-        const currentYear = getYear(new Date());
-        return Array.from({ length: 12 }, (_, i) => {
-            const monthDate = new Date(currentYear, i, 1);
-            return {
-                value: formatDateFns(monthDate, 'MM-yyyy'),
-                label: formatDateFns(monthDate, 'MMMM yyyy', { locale: localeID }),
-            };
-        });
-    }, []);
-
-    if (!tanggalMulaiPersiapan || !tanggalSelesaiDiseminasiEvaluasi || (getMonth(tanggalMulaiPersiapan) === getMonth(tanggalSelesaiDiseminasiEvaluasi) && getYear(tanggalMulaiPersiapan) === getYear(tanggalSelesaiDiseminasiEvaluasi))) {
-        return null;
-    }
-
-    return (
-        <div className="space-y-2 pt-4 border-t mt-4">
-            <Label htmlFor="bulanPembayaran">Bulan Pembayaran Honor *</Label>
-            <Select
-                value={bulanPembayaranHonor}
-                onValueChange={(value) => {
-                    if (value === 'lainnya') {
-                        setShowOtherMonths(true);
-                        handleFormFieldChange('bulanPembayaranHonor', '');
-                    } else {
-                        handleFormFieldChange('bulanPembayaranHonor', value);
-                    }
-                }}
-            >
-                <SelectTrigger id="bulanPembayaran"><SelectValue placeholder="Pilih bulan pembayaran honor" /></SelectTrigger>
-                <SelectContent>
-                    {(showOtherMonths ? allYearMonths : paymentMonthOptions).map(option => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                    {!showOtherMonths && <SelectItem value="lainnya">Pilih Bulan Lainnya...</SelectItem>}
-                </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">Pilih bulan di mana honor untuk kegiatan ini akan dibayarkan.</p>
-        </div>
-    );
-};
-
-
-const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList, pmlList, honorariumSettings, existingPplIds }: {
-    ppl: ClientPPL;
-    index: number;
-    onRemove: (clientId: string) => void;
-    onUpdate: (clientId: string, field: keyof PPL | 'honorarium', value: any) => void;
-    pplList: PPLMaster[];
-    pmlList: UserData[];
-    honorariumSettings: FormState['honorariumSettings'];
-    existingPplIds: (string | number)[];
-}) => {
+const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList, pmlList, honorariumSettings, existingPplIds }: any) => {
     const [openPPL, setOpenPPL] = useState(false);
     const [openPML, setOpenPML] = useState(false);
-    const [localBebanKerja, setLocalBebanKerja] = useState<Record<string, string>>({});
+    
+    const honorDetail = ppl.honorarium[0];
+    const jenisPekerjaan = honorDetail.jenis_pekerjaan;
+    
+    const [localBebanKerja, setLocalBebanKerja] = useState(honorDetail.bebanKerja);
 
     useEffect(() => {
-        const initialBeban: Record<string, string> = {};
-        ppl.honorarium.forEach(h => {
-          initialBeban[h.jenis_pekerjaan] = h.bebanKerja || '';
-        });
-        setLocalBebanKerja(initialBeban);
-    }, [ppl.honorarium]);
+        setLocalBebanKerja(honorDetail.bebanKerja);
+    }, [honorDetail.bebanKerja]);
 
-    const handleBebanKerjaChange = (jenis: string, value: string) => {
-      setLocalBebanKerja(prev => ({ ...prev, [jenis]: value }));
-    };
-
-    const handleBebanKerjaBlur = (jenis: HonorariumDetail['jenis_pekerjaan']) => {
-        const newBebanKerja = localBebanKerja[jenis] || '0';
-        const honorDetail = ppl.honorarium.find(h => h.jenis_pekerjaan === jenis);
+    const handleBebanKerjaBlur = () => {
+        const newBebanKerja = localBebanKerja || '0';
         if (honorDetail && honorDetail.bebanKerja !== newBebanKerja) {
-            const updatedHonorarium = ppl.honorarium.map(h => {
-                if (h.jenis_pekerjaan === jenis) {
+            const updatedHonorarium = ppl.honorarium.map((h: any) => {
+                if (h.jenis_pekerjaan === jenisPekerjaan) {
                     let hargaSatuanKey: keyof typeof honorariumSettings;
-                    if (jenis === 'listing') hargaSatuanKey = 'pengumpulan-data-listing';
-                    else if (jenis === 'pencacahan') hargaSatuanKey = 'pengumpulan-data-pencacahan';
+                    if (jenisPekerjaan === 'listing') hargaSatuanKey = 'pengumpulan-data-listing';
+                    else if (jenisPekerjaan === 'pencacahan') hargaSatuanKey = 'pengumpulan-data-pencacahan';
                     else hargaSatuanKey = 'pengolahan-analisis';
                     const hargaSatuan = parseInt(parseHonor(honorariumSettings[hargaSatuanKey].hargaSatuan)) || 0;
                     return {
@@ -230,17 +136,22 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
         }
     };
     
-    const getHonorDetail = (jenis: HonorariumDetail['jenis_pekerjaan']) => {
-        return ppl.honorarium?.find(h => h.jenis_pekerjaan === jenis) || { jenis_pekerjaan: jenis, bebanKerja: '', besaranHonor: '0' };
-    };
-
-    const totalHonorPPL = ppl.honorarium?.reduce((sum, h) => sum + parseInt(h.besaranHonor || '0'), 0) || 0;
-    const selectedPML = pmlList.find(p => p.namaLengkap === ppl.namaPML);
-    const selectedPPL = pplList.find(p => String(p.id) === String(ppl.ppl_master_id));
+    const totalHonorPPL = ppl.honorarium?.reduce((sum: number, h: any) => sum + parseInt(h.besaranHonor || '0'), 0) || 0;
+    const selectedPML = pmlList.find((p: UserData) => p.namaLengkap === ppl.namaPML);
+    const selectedPPL = pplList.find((p: PPLMaster) => String(p.id) === String(ppl.ppl_master_id));
     
     const availablePplList = pplList.filter(
         (p: PPLMaster) => !existingPplIds.includes(String(p.id)) || p.id === selectedPPL?.id
     );
+
+    const getBebanKerjaLabel = () => {
+        switch(jenisPekerjaan) {
+            case 'listing': return 'Beban Kerja Listing';
+            case 'pencacahan': return 'Beban Kerja Pencacahan';
+            case 'pengolahan': return 'Beban Kerja Pengolahan';
+            default: return 'Beban Kerja';
+        }
+    };
     
     return (
         <div className="p-4 border rounded-lg space-y-4 bg-gray-50">
@@ -251,125 +162,89 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
                 </Button>
             </div>
             <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Pilih PPL *</Label>
-                        <Popover open={openPPL} onOpenChange={setOpenPPL}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" className="w-full justify-between">
-                                    {selectedPPL ? selectedPPL.namaPPL : "Pilih PPL..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Cari PPL..." />
-                                    <CommandList>
-                                        <CommandEmpty>PPL tidak ditemukan atau sudah dialokasikan.</CommandEmpty>
-                                        <CommandGroup>
-                                            {availablePplList.map(p => (
-                                                <CommandItem key={p.id} value={`${p.id} ${p.namaPPL}`} onSelect={() => {
-                                                    onUpdate(ppl.clientId, 'ppl_master_id', p.id);
-                                                    onUpdate(ppl.clientId, 'namaPPL', p.namaPPL);
-                                                    setOpenPPL(false);
-                                                }}>
-                                                    <Check className={cn("mr-2 h-4 w-4", String(ppl.ppl_master_id) === String(p.id) ? "opacity-100" : "opacity-0")} />
-                                                    <div>{p.namaPPL} <span className="text-xs text-gray-500">({p.id})</span></div>
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Nama PML *</Label>
-                        <Popover open={openPML} onOpenChange={setOpenPML}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" className="w-full justify-between">
-                                    {selectedPML ? selectedPML.namaLengkap : "Pilih PML..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Cari PML..." />
-                                    <CommandList>
-                                        <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
-                                        <CommandGroup>
-                                            {pmlList.map((pml: UserData) => (
-                                                <CommandItem
-                                                    key={pml.id}
-                                                    value={`${pml.id} ${pml.namaLengkap}`}
-                                                    onSelect={() => {
-                                                        onUpdate(ppl.clientId, 'namaPML', pml.namaLengkap);
-                                                        setOpenPML(false);
-                                                    }}>
-                                                    <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
-                                                    <div className="flex flex-col">
-                                                        <span>{pml.namaLengkap}</span>
-                                                        <span className="text-xs text-gray-500">ID: {pml.id}</span>
-                                                    </div>
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                         <Label>Pilih PPL *</Label>
+                         <Popover open={openPPL} onOpenChange={setOpenPPL}>
+                             <PopoverTrigger asChild>
+                                 <Button variant="outline" role="combobox" className="w-full justify-between">
+                                     {selectedPPL ? selectedPPL.namaPPL : "Pilih PPL..."}
+                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                 </Button>
+                             </PopoverTrigger>
+                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                 <Command>
+                                     <CommandInput placeholder="Cari PPL..." />
+                                     <CommandList>
+                                         <CommandEmpty>PPL tidak ditemukan atau sudah dialokasikan.</CommandEmpty>
+                                         <CommandGroup>
+                                             {availablePplList.map((p: PPLMaster) => (
+                                                 <CommandItem key={p.id} value={`${p.id} ${p.namaPPL}`} onSelect={() => {
+                                                     onUpdate(ppl.clientId, 'ppl_master_id', p.id);
+                                                     onUpdate(ppl.clientId, 'namaPPL', p.namaPPL);
+                                                     setOpenPPL(false);
+                                                 }}>
+                                                     <Check className={cn("mr-2 h-4 w-4", String(ppl.ppl_master_id) === String(p.id) ? "opacity-100" : "opacity-0")} />
+                                                     <div>{p.namaPPL} <span className="text-xs text-gray-500">({p.id})</span></div>
+                                                 </CommandItem>
+                                             ))}
+                                         </CommandGroup>
+                                     </CommandList>
+                                 </Command>
+                             </PopoverContent>
+                         </Popover>
+                     </div>
+                     <div className="space-y-2">
+                         <Label>Nama PML *</Label>
+                         <Popover open={openPML} onOpenChange={setOpenPML}>
+                             <PopoverTrigger asChild>
+                                 <Button variant="outline" role="combobox" className="w-full justify-between">
+                                     {selectedPML ? selectedPML.namaLengkap : "Pilih PML..."}
+                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                 </Button>
+                             </PopoverTrigger>
+                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                 <Command>
+                                     <CommandInput placeholder="Cari PML..." />
+                                     <CommandList>
+                                         <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
+                                         <CommandGroup>
+                                             {pmlList.map((pml: UserData) => (
+                                                 <CommandItem key={pml.id} value={`${pml.id} ${pml.namaLengkap}`} onSelect={() => {
+                                                     onUpdate(ppl.clientId, 'namaPML', pml.namaLengkap);
+                                                     setOpenPML(false);
+                                                 }}>
+                                                     <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
+                                                     <div className="flex flex-col">
+                                                         <span>{pml.namaLengkap}</span>
+                                                         <span className="text-xs text-gray-500">ID: {pml.id}</span>
+                                                     </div>
+                                                 </CommandItem>
+                                             ))}
+                                         </CommandGroup>
+                                     </CommandList>
+                                 </Command>
+                             </PopoverContent>
+                         </Popover>
+                     </div>
+                 </div>
 
-                {ppl.tahap === 'pengumpulan-data' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
-                        <div className="md:col-span-3 font-medium text-sm">Detail Beban Kerja</div>
-                        <div className="space-y-2">
-                            <Label>Beban Kerja Listing</Label>
-                            <Input type="number" placeholder="Jumlah..." value={localBebanKerja.listing || ''} onChange={(e) => handleBebanKerjaChange('listing', e.target.value)} onBlur={() => handleBebanKerjaBlur('listing')} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Honor Listing (Rp)</Label>
-                            <Input value={formatHonor(getHonorDetail('listing').besaranHonor || 0)} readOnly className="bg-gray-100"/>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Total Honor (Rp)</Label>
-                            <Input value={formatHonor(totalHonorPPL)} readOnly className="bg-gray-100 font-bold"/>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Beban Kerja Pencacahan</Label>
-                            <Input type="number" placeholder="Jumlah..." value={localBebanKerja.pencacahan || ''} onChange={(e) => handleBebanKerjaChange('pencacahan', e.target.value)} onBlur={() => handleBebanKerjaBlur('pencacahan')} />
-                        </div>
-                         <div className="space-y-2">
-                            <Label>Honor Pencacahan (Rp)</Label>
-                            <Input value={formatHonor(getHonorDetail('pencacahan').besaranHonor || 0)} readOnly className="bg-gray-100"/>
-                        </div>
-                    </div>
-                )}
-                {ppl.tahap === 'pengolahan-analisis' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-                        <div className="space-y-2">
-                            <Label>Beban Kerja Pengolahan</Label>
-                            <Input type="number" placeholder="Jumlah..." value={localBebanKerja.pengolahan || ''} onChange={(e) => handleBebanKerjaChange('pengolahan', e.target.value)} onBlur={() => handleBebanKerjaBlur('pengolahan')} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Total Honor (Rp)</Label>
-                            <Input value={formatHonor(totalHonorPPL)} readOnly className="bg-gray-100 font-bold"/>
-                        </div>
-                    </div>
-                )}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+                     <div className="space-y-2">
+                         <Label>{getBebanKerjaLabel()}</Label>
+                         <Input type="number" placeholder="Jumlah..." value={localBebanKerja} onChange={(e) => setLocalBebanKerja(e.target.value)} onBlur={handleBebanKerjaBlur} />
+                     </div>
+                     <div className="space-y-2">
+                         <Label>Total Honor (Rp)</Label>
+                         <Input value={formatHonor(totalHonorPPL)} readOnly className="bg-gray-100 font-bold"/>
+                     </div>
+                 </div>
             </div>
         </div>
     );
 });
 
-const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleting, username }: {
-    doc: ClientDokumen;
-    removeDocument: (clientId: string, docId?: number) => void;
-    onDocumentSaved: (updatedDoc: Dokumen, oldClientId: string) => void;
-    isDeleting: boolean;
-    username?: string; // Terima username sebagai prop
-}) => {
+const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleting, username }: any) => {
     const { id, isWajib, status, nama, link, kegiatanId, tipe, clientId } = doc;
     const isNew = !id; 
 
@@ -380,7 +255,6 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
     const isApproved = status === 'Approved';
 
     const mutation = useMutation({
-        // Modifikasi mutationFn untuk mengirim username
         mutationFn: (payload: { documentData: Partial<Dokumen>; username?: string }) => {
             if (isNew) {
                 return apiClient.post<Dokumen>('/kegiatan/dokumen', payload);
@@ -396,7 +270,6 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
     });
 
     const handleSave = () => {
-        // Siapkan payload untuk dikirim
         const payload = {
             documentData: { nama: localNama, link: localLink, kegiatanId, tipe, isWajib },
             username: username 
@@ -445,6 +318,7 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
     );
 });
 
+
 // --- Main Component ---
 export default function EditActivity() {
     const { id } = useParams<{ id: string }>();
@@ -454,8 +328,8 @@ export default function EditActivity() {
     const location = useLocation();
 
     const [mainTab, setMainTab] = useState("info-dasar");
-    const [pplStageTab, setPplStageTab] = useState<TahapPPL>("pengumpulan-data");
-    const [docStageTab, setDocStageTab] = useState<Tahap>("persiapan");
+    const [pplStageTab, setPplStageTab] = useState<PPL['tahap']>("listing");
+    const [docStageTab, setDocStageTab] = useState<TahapDokumen>("persiapan");
     const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
     const [addedPPLCount, setAddedPPLCount] = useState(0);
     const [formData, setFormData] = useState<Partial<FormState>>({ 
@@ -469,7 +343,7 @@ export default function EditActivity() {
     });
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
-    const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: TahapPPL | null}>({isOpen: false, tahap: null});
+    const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: PPL['tahap'] | null}>({isOpen: false, tahap: null});
     const submitButtonRef = useRef<HTMLButtonElement>(null); 
 
 
@@ -477,44 +351,25 @@ export default function EditActivity() {
         setFormData(prev => ({ ...prev, [field]: value }));
     }, []);
 
-    const addPPL = useCallback((tahap: TahapPPL, pplsToAdd: PPLMaster[] = []) => {
+    const addPPL = useCallback((tahap: PPL['tahap'], pplsToAdd: PPLMaster[] = []) => {
         setPplStageTab(tahap);
-
-        const newAllocations: ClientPPL[] = pplsToAdd.length > 0
-            ? pplsToAdd.map(ppl => {
-                const newPpl: ClientPPL = {
-                    clientId: `new-ppl-${Date.now()}-${ppl.id}`,
-                    ppl_master_id: ppl.id,
-                    namaPPL: ppl.namaPPL,
-                    namaPML: "",
-                    tahap: tahap,
-                    bebanKerja: '',
-                    besaranHonor: '0',
-                    honorarium: []
-                };
-                if (tahap === 'pengumpulan-data') {
-                    newPpl.honorarium = [
-                        { jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' },
-                        { jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }
-                    ];
-                } else if (tahap === 'pengolahan-analisis') {
-                    newPpl.honorarium = [
-                        { jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }
-                    ];
-                }
-                return newPpl;
-            })
-            : [{
-                clientId: `new-ppl-${Date.now()}`,
-                ppl_master_id: '',
+        const newAllocations: ClientPPL[] = (pplsToAdd.length > 0 ? pplsToAdd : [{ id: '', namaPPL: '' }]).map(ppl => {
+            const newPpl: ClientPPL = {
+                clientId: `new-ppl-${Date.now()}-${ppl.id || Math.random()}`,
+                ppl_master_id: ppl.id,
+                namaPPL: ppl.namaPPL,
                 namaPML: "",
                 tahap: tahap,
                 bebanKerja: '',
                 besaranHonor: '0',
-                honorarium: tahap === 'pengumpulan-data'
-                    ? [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' },{ jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }]
-                    : [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }]
-            } as ClientPPL];
+                honorarium: []
+            };
+            if (tahap === 'listing') newPpl.honorarium = [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' }];
+            if (tahap === 'pencacahan') newPpl.honorarium = [{ jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }];
+            if (tahap === 'pengolahan-analisis') newPpl.honorarium = [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }];
+            return newPpl;
+        });
+
         setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), ...newAllocations]}));
     }, []);
     
@@ -523,7 +378,8 @@ export default function EditActivity() {
 
         if (from === 'daftar-ppl' && newPpls && tahap && Array.isArray(newPpls) && newPpls.length > 0) {
             setFormData(currentFormData => {
-                const existingPplIds = currentFormData.ppl?.map(p => String(p.ppl_master_id)) || [];
+                const currentPplsInStage = currentFormData.ppl?.filter(p => p.tahap === tahap) || [];
+                const existingPplIds = currentPplsInStage.map(p => String(p.ppl_master_id));
                 const pplsToAdd = newPpls.filter((p: PPLMaster) => !existingPplIds.includes(String(p.id)));
 
                 if (pplsToAdd.length > 0) {
@@ -538,11 +394,9 @@ export default function EditActivity() {
                             besaranHonor: '0',
                             honorarium: []
                         };
-                        if (tahap === 'pengumpulan-data') {
-                            newPpl.honorarium = [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' }, { jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }];
-                        } else if (tahap === 'pengolahan-analisis') {
-                            newPpl.honorarium = [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }];
-                        }
+                        if (tahap === 'listing') newPpl.honorarium = [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' }];
+                        if (tahap === 'pencacahan') newPpl.honorarium = [{ jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }];
+                        if (tahap === 'pengolahan-analisis') newPpl.honorarium = [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }];
                         return newPpl;
                     });
 
@@ -563,8 +417,8 @@ export default function EditActivity() {
             setPplStageTab(tahap);
             window.history.replaceState({}, document.title);
         }
-    }, [location.state, addPPL, formData]);
-
+    }, [location.state, formData]);
+    
     const [showHonorWarningModal, setShowHonorWarningModal] = useState(false);
     const [honorWarningDetails, setHonorWarningDetails] = useState<{ pplName: string; totalHonor: number; limit: number } | null>(null);
 
@@ -588,11 +442,13 @@ export default function EditActivity() {
             
             setFormData({
                 ...initialData,
-                bulanPembayaranHonor: String(initialData.bulanPembayaranHonor || ''),
+                bulanHonorListing: initialData.bulanHonorListing || '',
+                bulanHonorPencacahan: initialData.bulanHonorPencacahan || '',
+                bulanHonorPengolahan: initialData.bulanHonorPengolahan || '',
                 honorariumSettings: initialData.honorariumSettings || {
-                'pengumpulan-data-listing': { satuanBebanKerja: '', hargaSatuan: '' },
-                'pengumpulan-data-pencacahan': { satuanBebanKerja: '', hargaSatuan: '' },
-                'pengolahan-analisis': { satuanBebanKerja: '', hargaSatuan: '' },
+                    'pengumpulan-data-listing': { satuanBebanKerja: '', hargaSatuan: '' },
+                    'pengumpulan-data-pencacahan': { satuanBebanKerja: '', hargaSatuan: '' },
+                    'pengolahan-analisis': { satuanBebanKerja: '', hargaSatuan: '' },
                 },
                 tanggalMulaiPersiapan: parseDate(initialData.tanggalMulaiPersiapan),
                 tanggalSelesaiPersiapan: parseDate(initialData.tanggalSelesaiPersiapan),
@@ -680,87 +536,43 @@ export default function EditActivity() {
             id: formData.id,
             lastEditedBy: user?.username,
             lastUpdatedBy: user?.username,
+            bulanPembayaranHonor: undefined, // Hapus field lama
         };
         
         mutation.mutate(dataToSubmit as Partial<FormState> & {id: number});
     }
 
     const handleSubmit = async () => {
-    // Secara paksa pindahkan fokus ke tombol submit.
-    // Ini akan memicu event onBlur pada input field yang sedang aktif.
-    submitButtonRef.current?.focus();
+     submitButtonRef.current?.focus();
+     await new Promise(resolve => setTimeout(resolve, 50));
 
-    // Beri jeda sesaat untuk memastikan state dari onBlur sudah selesai diperbarui
-    await new Promise(resolve => setTimeout(resolve, 50));
+     if (!formData.id) return alert("Error: ID Kegiatan tidak ditemukan.");
 
-    if (!formData.id) return alert("Error: ID Kegiatan tidak ditemukan.");
+     const dateError = validateDates();
+     if (dateError) {
+       setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
+       return;
+     }
 
-    const dateError = validateDates();
-    if (dateError) {
-      setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
-      return;
-    }
-
-    if (!formData.ppl || formData.ppl.length === 0) {
-      proceedToSubmit();
-      return;
-    }
-
-    const HONOR_LIMIT = 3000000;
-    let validationMonth: number, validationYear: number;
-
-    const singleMonthActivity = formData.tanggalMulaiPersiapan ? formatDateFns(formData.tanggalMulaiPersiapan, 'MM-yyyy') : null;
-    const selectedMonth = formData.bulanPembayaranHonor;
-    const collectionDate = formData.tanggalMulaiPengumpulanData;
-
-    if (selectedMonth) {
-      const [month, year] = selectedMonth.split('-');
-      validationMonth = parseInt(month);
-      validationYear = parseInt(year);
-    } else if (collectionDate) {
-      validationMonth = getMonth(collectionDate) + 1;
-      validationYear = getYear(collectionDate);
-    } else if (singleMonthActivity) {
-      const [month, year] = singleMonthActivity.split('-');
-      validationMonth = parseInt(month);
-      validationYear = parseInt(year);
-    } else {
-      setAlertModal({ isOpen: true, title: "Informasi Kurang", message: "Untuk validasi honor, Anda harus mengisi setidaknya 'Tanggal Mulai Persiapan' atau 'Tanggal Mulai Pengumpulan Data'." });
-      return;
-    }
-
-    for (const ppl of formData.ppl ?? []) {
-        if (!ppl.ppl_master_id) continue;
-        const currentActivityHonor = ppl.honorarium.reduce((sum, h) => sum + (parseInt(h.besaranHonor || '0') || 0), 0);
-        const result = await apiClient.post<{ isOverLimit: boolean; projectedTotal: number; limit: number }>('/honor/validate', {
-            pplMasterId: ppl.ppl_master_id,
-            bulan: validationMonth,
-            tahun: validationYear,
-            currentActivityHonor: currentActivityHonor,
-            kegiatanIdToExclude: id
-            });
-
-      if (result.isOverLimit) {
-        setHonorWarningDetails({
-          pplName: ppl.namaPPL || 'PPL',
-          totalHonor: result.projectedTotal,
-          limit: result.limit,
-        });
-        setShowHonorWarningModal(true);
-        return;
-      }
-    }
-
-    proceedToSubmit();
-};
-
-    const handleConfirmHonorWarning = () => {
-        setShowHonorWarningModal(false);
-        proceedToSubmit();
-    };
-
-    const AlokasiPPLContent = ({ tahap, title }: { tahap: TahapPPL, title: string }) => {
+     proceedToSubmit();
+   };
+   
+    const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: string }) => {
         const pplForStage = useMemo(() => formData.ppl?.filter(p => p.tahap === tahap) || [], [formData.ppl, tahap]);
+        
+        const bulanPembayaranHonor = useMemo(() => {
+            if (tahap === 'listing') return formData.bulanHonorListing;
+            if (tahap === 'pencacahan') return formData.bulanHonorPencacahan;
+            if (tahap === 'pengolahan-analisis') return formData.bulanHonorPengolahan;
+            return undefined;
+        }, [formData.bulanHonorListing, formData.bulanHonorPencacahan, formData.bulanHonorPengolahan, tahap]);
+
+        const handleBulanHonorChange = (value: string) => {
+            if (tahap === 'listing') handleFormFieldChange('bulanHonorListing', value);
+            if (tahap === 'pencacahan') handleFormFieldChange('bulanHonorPencacahan', value);
+            if (tahap === 'pengolahan-analisis') handleFormFieldChange('bulanHonorPengolahan', value);
+        };
+
         const [localHonorSettings, setLocalHonorSettings] = useState<HonorariumSettings>(
             formData.honorariumSettings || {
                 'pengumpulan-data-listing': { satuanBebanKerja: '', hargaSatuan: '' },
@@ -775,15 +587,20 @@ export default function EditActivity() {
             }
         }, [formData.honorariumSettings]);
 
-        const handleSettingChange = (key: keyof HonorariumSettings, field: 'satuanBebanKerja' | 'hargaSatuan', value: string) => {
-            setLocalHonorSettings(prev => {
-                const newSettings = { ...prev };
-                newSettings[key] = {
-                    ...newSettings[key],
-                    [field]: value
-                };
-                return newSettings;
-            });
+        const getHonorSettingsKey = (): keyof HonorariumSettings | null => {
+            if (tahap === 'listing') return 'pengumpulan-data-listing';
+            if (tahap === 'pencacahan') return 'pengumpulan-data-pencacahan';
+            if (tahap === 'pengolahan-analisis') return 'pengolahan-analisis';
+            return null;
+        }
+        const honorSettingKey = getHonorSettingsKey();
+
+        const handleSettingChange = (field: 'satuanBebanKerja' | 'hargaSatuan', value: string) => {
+            if (!honorSettingKey) return;
+            setLocalHonorSettings(prev => ({
+                ...prev,
+                [honorSettingKey!]: { ...prev[honorSettingKey!], [field]: value }
+            }));
         };
 
         const handleSettingBlur = () => {
@@ -796,6 +613,18 @@ export default function EditActivity() {
             setFormData(prev => ({ ...prev, ppl: prev.ppl?.filter(p => p.tahap !== tahap)}));
             setShowClearConfirmModal({isOpen: false, tahap: null});
         }
+        
+        const allYearMonths = useMemo(() => {
+            const currentYear = getYear(new Date());
+            return Array.from({ length: 12 }, (_, i) => {
+                const monthDate = new Date(currentYear, i, 1);
+                return {
+                    value: formatDateFns(monthDate, 'MM-yyyy'),
+                    label: formatDateFns(monthDate, 'MMMM yyyy', { locale: localeID }),
+                };
+            });
+        }, []);
+
 
         return (
             <Card>
@@ -803,11 +632,11 @@ export default function EditActivity() {
                     <div className="flex items-center justify-between">
                         <div>
                             <CardTitle>Alokasi PPL & PML ({title})</CardTitle>
-                            <CardDescription>Atur honorarium, lalu alokasikan PPL.</CardDescription>
+                            <CardDescription>Atur honorarium, bulan pembayaran, lalu alokasikan PPL.</CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
                             {pplForStage.length > 0 && (
-                                <Button   type="button"  variant ="destructive"  size ="sm"  onClick ={() => setShowClearConfirmModal({isOpen: true, tahap})}>
+                                <Button type="button" variant="destructive" size="sm" onClick={() => setShowClearConfirmModal({isOpen: true, tahap})}>
                                     <XCircle className="w-4 h-4 mr-2" />
                                     Clear PPL
                                 </Button>
@@ -819,34 +648,37 @@ export default function EditActivity() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                     <div className="p-4 border rounded-lg bg-blue-50/50 space-y-4">
-                         <h4 className="font-medium text-gray-800">Pengaturan Honorarium {title}</h4>
-                         {tahap === 'pengumpulan-data' && (
-                             <>
-                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                     <div className="font-semibold text-sm md:col-span-2 pt-2 border-t">Updating/Listing</div>
-                                     <div className="space-y-2"><Label>Satuan Beban Kerja</Label><Input value={localHonorSettings['pengumpulan-data-listing'].satuanBebanKerja} onChange={e => handleSettingChange('pengumpulan-data-listing', 'satuanBebanKerja', e.target.value)} onBlur={handleSettingBlur} /></div>
-                                     <div className="space-y-2"><Label>Harga per Satuan (Rp)</Label><Input value={formatHonor(localHonorSettings['pengumpulan-data-listing'].hargaSatuan)} onChange={e => handleSettingChange('pengumpulan-data-listing', 'hargaSatuan', e.target.value)} onBlur={handleSettingBlur} /></div>
-                                     <div className="font-semibold text-sm md:col-span-2 pt-2 border-t">Pendataan/Pencacahan</div>
-                                     <div className="space-y-2"><Label>Satuan Beban Kerja</Label><Input value={localHonorSettings['pengumpulan-data-pencacahan'].satuanBebanKerja} onChange={e => handleSettingChange('pengumpulan-data-pencacahan', 'satuanBebanKerja', e.target.value)} onBlur={handleSettingBlur} /></div>
-                                     <div className="space-y-2"><Label>Harga per Satuan (Rp)</Label><Input value={formatHonor(localHonorSettings['pengumpulan-data-pencacahan'].hargaSatuan)} onChange={e => handleSettingChange('pengumpulan-data-pencacahan', 'hargaSatuan', e.target.value)} onBlur={handleSettingBlur} /></div>
-                                 </div>
-                             </>
-                         )}
-                         {tahap === 'pengolahan-analisis' && (
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                 <div className="space-y-2"><Label>Satuan Beban Kerja</Label><Input value={localHonorSettings['pengolahan-analisis'].satuanBebanKerja} onChange={e => handleSettingChange('pengolahan-analisis', 'satuanBebanKerja', e.target.value)} onBlur={handleSettingBlur} /></div>
-                                 <div className="space-y-2"><Label>Harga per Satuan (Rp)</Label><Input value={formatHonor(localHonorSettings['pengolahan-analisis'].hargaSatuan)} onChange={e => handleSettingChange('pengolahan-analisis', 'hargaSatuan', e.target.value)} onBlur={handleSettingBlur} /></div>
-                             </div>
-                         )}
-                         </div>
+                    <div className="p-4 border rounded-lg bg-blue-50/50 space-y-4">
+                       <h4 className="font-medium text-gray-800">Pengaturan Honorarium & Pembayaran</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label>Satuan Beban Kerja</Label>
+                                <Input value={honorSettingKey ? localHonorSettings[honorSettingKey].satuanBebanKerja : ''} onChange={e => handleSettingChange('satuanBebanKerja', e.target.value)} onBlur={handleSettingBlur} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Harga per Satuan (Rp)</Label>
+                                <Input value={honorSettingKey ? formatHonor(localHonorSettings[honorSettingKey].hargaSatuan) : ''} onChange={e => handleSettingChange('hargaSatuan', e.target.value)} onBlur={handleSettingBlur} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Bulan Pembayaran Honor *</Label>
+                                <Select value={bulanPembayaranHonor} onValueChange={handleBulanHonorChange}>
+                                    <SelectTrigger><SelectValue placeholder="Pilih bulan..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {allYearMonths.map(option => (
+                                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                       </div>
+                    </div>
                     <div className="space-y-4">
                         {pplForStage.map((ppl, index) => {
-                             const existingPplIdsForCurrentStage = pplForStage
-                               .map(p => p.ppl_master_id)
-                               .filter(id => id && id !== ppl.ppl_master_id) as string[];
+                            const existingPplIdsForCurrentStage = pplForStage
+                                .map(p => p.ppl_master_id)
+                                .filter(id => id && id !== ppl.ppl_master_id) as string[];
 
-                             return (
+                            return (
                                 <PPLAllocationItem 
                                     key={ppl.clientId}
                                     ppl={ppl}
@@ -858,7 +690,7 @@ export default function EditActivity() {
                                     honorariumSettings={formData.honorariumSettings!}
                                     existingPplIds={existingPplIdsForCurrentStage}
                                 />
-                             )
+                            )
                         })}
                         <Button type="button" variant="outline" onClick={() => addPPL(tahap)} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL Manual</Button>
                     </div>
@@ -951,20 +783,20 @@ export default function EditActivity() {
         return (
             <Layout>
                 <div className="max-w-4xl mx-auto space-y-8 animate-pulse">
-                    <div className="flex items-center gap-4 mb-8">
-                        <Skeleton className="h-10 w-48" />
-                        <Skeleton className="h-10 w-48" />
-                    </div>
-                     <Skeleton className="h-12 w-full mb-6" />
-                     <Card>
-                        <CardHeader>
-                            <Skeleton className="h-8 w-1/2" />
-                            <Skeleton className="h-4 w-3/4 mt-2" />
-                        </CardHeader>
-                        <CardContent>
-                            <Skeleton className="h-40 w-full" />
-                        </CardContent>
-                     </Card>
+                     <div className="flex items-center gap-4 mb-8">
+                         <Skeleton className="h-10 w-48" />
+                         <Skeleton className="h-10 w-48" />
+                     </div>
+                      <Skeleton className="h-12 w-full mb-6" />
+                      <Card>
+                         <CardHeader>
+                             <Skeleton className="h-8 w-1/2" />
+                             <Skeleton className="h-4 w-3/4 mt-2" />
+                         </CardHeader>
+                         <CardContent>
+                             <Skeleton className="h-40 w-full" />
+                         </CardContent>
+                      </Card>
                 </div>
             </Layout>
         );
@@ -996,41 +828,42 @@ export default function EditActivity() {
                                 <Card>
                                     <CardHeader><CardTitle>Informasi Kegiatan</CardTitle><CardDescription>Perbarui detail dasar mengenai kegiatan.</CardDescription></CardHeader>
                                     <CardContent className="space-y-4">
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" /></div>
-                                        <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
-                                            <Select value={String(formData.ketua_tim_id)} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
-                                                <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
-                                                <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={String(ketua.id)}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
-                                            </Select>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-2"><Label htmlFor="namaKegiatan">Nama Kegiatan *</Label><Input id="namaKegiatan" value={formData.namaKegiatan || ''} onChange={(e) => handleFormFieldChange('namaKegiatan', e.target.value)} placeholder="Contoh: Sensus Penduduk 2024" /></div>
+                                            <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
+                                                <Select value={String(formData.ketua_tim_id)} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
+                                                    <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
+                                                    <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={String(ketua.id)}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
+                                                </Select>
+                                            </div>
                                         </div>
-                                      </div>
-                                      <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={formData.deskripsiKegiatan || ''} onChange={(e) => handleFormFieldChange('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan dan pembagian tugas secara singkat." /></div>
+                                        <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={formData.deskripsiKegiatan || ''} onChange={(e) => handleFormFieldChange('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan dan pembagian tugas secara singkat." /></div>
                                     </CardContent>
                                 </Card>
                                 <Card>
                                     <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
                                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                                        {([ {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},{label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'}, {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'}, {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'}, {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'}, {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'}, {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}] as {label: string, field: DateFieldName}[]).map(({label, field}) => (
+                                        {( [ {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},{label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'}, {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'}, {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'}, {label: 'Selesai Pengolahan & Analisis', field: 'tanggalMulaiDiseminasiEvaluasi'}, {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}] as {label: string, field: DateFieldName}[] ).map(({label, field}) => (
                                             <div key={field} className="space-y-2"><Label>{label}</Label>
                                                 <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start", !formData[field] && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{formData[field] ? format(formData[field]!, "dd MMMM yyyy", { locale: localeID }) : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date as Date)} /></PopoverContent></Popover>
                                             </div>
                                         ))}
                                     </CardContent>
-                                    <CardContent>
-                                         <HonorPaymentMonthSelector formData={formData} handleFormFieldChange={handleFormFieldChange} />
-                                    </CardContent>
                                 </Card>
                             </div>
                         </TabsContent>
                         <TabsContent value="alokasi-ppl" className="mt-6">
-                            <Tabs value={pplStageTab} onValueChange={(val) => setPplStageTab(val as TahapPPL)}>
-                                <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
+                            <Tabs value={pplStageTab} onValueChange={(val) => setPplStageTab(val as PPL['tahap'])}>
+                                <TabsList className="grid w-full grid-cols-3">
+                                    <TabsTrigger value="listing">Listing</TabsTrigger>
+                                    <TabsTrigger value="pencacahan">Pencacahan</TabsTrigger>
                                     <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>
                                 </TabsList>
-                                <TabsContent value="pengumpulan-data" className="mt-4">
-                                    <AlokasiPPLContent tahap="pengumpulan-data" title="Pengumpulan Data" />
+                                <TabsContent value="listing" className="mt-4">
+                                    <AlokasiPPLContent tahap="listing" title="Listing" />
+                                </TabsContent>
+                                <TabsContent value="pencacahan" className="mt-4">
+                                    <AlokasiPPLContent tahap="pencacahan" title="Pencacahan" />
                                 </TabsContent>
                                 <TabsContent value="pengolahan-analisis" className="mt-4">
                                     <AlokasiPPLContent tahap="pengolahan-analisis" title="Pengolahan & Analisis" />
@@ -1038,25 +871,25 @@ export default function EditActivity() {
                             </Tabs>
                         </TabsContent>
                         <TabsContent value="dokumen" className="mt-6">
-                            <Tabs value={docStageTab} onValueChange={(val) => setDocStageTab(val as Tahap)}>
+                            <Tabs value={docStageTab} onValueChange={(val) => setDocStageTab(val as TahapDokumen)}>
                                 <TabsList className="grid w-full grid-cols-4">
                                     <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
                                     <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
                                     <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>
                                     <TabsTrigger value="diseminasi-evaluasi">Diseminasi</TabsTrigger>
                                 </TabsList>
-                                    <TabsContent value="persiapan" className="mt-4">
-                                        <DokumenContent tipe="persiapan" title="Persiapan" username={user?.username} />
-                                    </TabsContent>
-                                    <TabsContent value="pengumpulan-data" className="mt-4">
-                                        <DokumenContent tipe="pengumpulan-data" title="Pengumpulan Data" username={user?.username} />
-                                    </TabsContent>
-                                    <TabsContent value="pengolahan-analisis" className="mt-4">
-                                        <DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" username={user?.username} />
-                                    </TabsContent>
-                                    <TabsContent value="diseminasi-evaluasi" className="mt-4">
-                                        <DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" username={user?.username} />
-                                    </TabsContent>
+                                 <TabsContent value="persiapan" className="mt-4">
+                                     <DokumenContent tipe="persiapan" title="Persiapan" username={user?.username} />
+                                 </TabsContent>
+                                 <TabsContent value="pengumpulan-data" className="mt-4">
+                                     <DokumenContent tipe="pengumpulan-data" title="Pengumpulan Data" username={user?.username} />
+                                 </TabsContent>
+                                 <TabsContent value="pengolahan-analisis" className="mt-4">
+                                     <DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" username={user?.username} />
+                                 </TabsContent>
+                                 <TabsContent value="diseminasi-evaluasi" className="mt-4">
+                                     <DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" username={user?.username} />
+                                 </TabsContent>
                             </Tabs>
                         </TabsContent>
                     </Tabs>
@@ -1085,12 +918,12 @@ export default function EditActivity() {
                  <ConfirmationModal
                     isOpen={showHonorWarningModal}
                     onClose={() => setShowHonorWarningModal(false)}
-                    onConfirm={handleConfirmHonorWarning}
+                    onConfirm={() => { setShowHonorWarningModal(false); proceedToSubmit(); }}
                     title="Peringatan Batas Honor"
                     description={`Total honor untuk ${honorWarningDetails?.pplName} di bulan terpilih akan menjadi ${formatHonor(honorWarningDetails?.totalHonor || 0)}, melebihi batas ${formatHonor(honorWarningDetails?.limit || 0)}. Lanjutkan?`}
                     confirmLabel="Ya, Lanjutkan"
                     variant="warning"
-               />
+                  />
             </div>
             <AlertModal isOpen={alertModal.isOpen} onClose={() => setAlertModal({ isOpen: false, title: "", message: "" })} title={alertModal.title} description={alertModal.message} />
         </Layout>

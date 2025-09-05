@@ -30,6 +30,7 @@ const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 const getCurrentMonth = () => new Date().getMonth();
 
+// Fungsi fetch data memanggil endpoint /api/honor yang sudah diperbarui
 const fetchHonorData = async (bulan: number, tahun: number): Promise<PPLHonorData[]> => {
     return apiClient.get<PPLHonorData[]>(`/honor?bulan=${bulan + 1}&tahun=${tahun}`);
 }
@@ -61,6 +62,7 @@ const ActivityDetailModal = ({ isOpen, onClose, pplData, selectedMonth, selected
                             {pplData.kegiatanNames.map((kegiatan, index) => (
                                 <li key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-md">
                                     <List className="w-4 h-4 text-bps-blue-500 mt-1 flex-shrink-0" />
+                                    {/* Nama kegiatan sekarang akan menampilkan (Listing), (Pencacahan), dll. */}
                                     <span>{kegiatan}</span>
                                 </li>
                             ))}
@@ -101,15 +103,13 @@ export default function ManajemenHonor() {
   const { data: pplData = [], isLoading } = useQuery({
       queryKey: ['honor', globalSettings.selectedMonth, globalSettings.selectedYear],
       queryFn: () => fetchHonorData(globalSettings.selectedMonth, globalSettings.selectedYear),
-      });
+  });
 
-  // Mengambil data batas honor dari database
   const { data: honorLimitData, isLoading: isLoadingHonorLimit } = useQuery({
     queryKey: ['settings', 'HONOR_LIMIT'],
     queryFn: fetchHonorLimit,
   });
 
-  // Sinkronisasi state lokal dengan data dari database
   useEffect(() => {
     if (honorLimitData !== undefined) {
       setGlobalSettings(prev => ({ ...prev, batasHonorBulananGlobal: honorLimitData }));
@@ -117,7 +117,6 @@ export default function ManajemenHonor() {
     }
   }, [honorLimitData]);
 
-  // Mutasi untuk menyimpan perubahan batas honor
   const updateMutation = useMutation({
     mutationFn: updateHonorLimit,
     onSuccess: () => {
@@ -128,7 +127,7 @@ export default function ManajemenHonor() {
     onError: (error) => {
         setErrorModal({isOpen: true, title: "Gagal", message: `Gagal memperbarui batas honor: ${error.message}`});
     }
-    });
+  });
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -193,7 +192,6 @@ export default function ManajemenHonor() {
     return sortedData;
   }, [pplData, searchTerm, sortConfig, globalSettings.batasHonorBulananGlobal]);
   
-  // PERBAIKAN: Logika untuk data yang dipaginasi
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
@@ -239,14 +237,14 @@ export default function ManajemenHonor() {
               {isEditingGlobalLimit ? (
                 <div className="flex items-center gap-2">
                   <Input type="number" value={tempGlobalLimit} onChange={e => setTempGlobalLimit(Number(e.target.value))} className="w-36 h-8" placeholder="Honor limit" disabled={updateMutation.isPending}/>
-                  <Button size="sm" onClick={() => updateMutation.mutate(tempGlobalLimit)} className="h-8 w-8 p-0" disabled={updateMutation.isPending || isLoadingHonorLimit}>
+                  <Button size="sm" onClick={() => updateMutation.mutate(tempGlobalLimit)} className="h-8 w-8 p-0" disabled={updateMutation.isPending || isLoadingHonorLimit}>
                     {updateMutation.isPending ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                         <Save className="w-4 h-4" />
                     )}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setIsEditingGlobalLimit(false)} className="h-8 w-8 p-0" disabled={updateMutation.isPending || isLoadingHonorLimit}>
+                  <Button size="sm" variant="outline" onClick={() => setIsEditingGlobalLimit(false)} className="h-8 w-8 p-0" disabled={updateMutation.isPending || isLoadingHonorLimit}>
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
@@ -284,7 +282,6 @@ export default function ManajemenHonor() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              {/* PERBAIKAN: Menambahkan table-fixed dan lebar kolom */}
               <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
@@ -297,9 +294,9 @@ export default function ManajemenHonor() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
                   ) : paginatedData.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{searchTerm ? `Tidak ada PPL yang cocok dengan "${searchTerm}"` : 'Tidak ada data PPL'}</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{searchTerm ? `Tidak ada PPL yang cocok dengan "${searchTerm}"` : 'Tidak ada data honor untuk periode ini'}</TableCell></TableRow>
                   ) : (
                     paginatedData.map((ppl) => {
                       const overLimit = ppl.honorBulanIni > globalSettings.batasHonorBulananGlobal;
@@ -322,7 +319,6 @@ export default function ManajemenHonor() {
                 </TableBody>
               </Table>
             </div>
-            {/* PERBAIKAN: Kontrol paginasi baru */}
             <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-600">
                     Menampilkan <strong>{paginatedData.length}</strong> dari <strong>{filteredAndSortedData.length}</strong> data
@@ -347,7 +343,7 @@ export default function ManajemenHonor() {
                                 </Button>
                             </PaginationItem>
                             <PaginationItem className="text-sm font-medium px-3">
-                                {currentPage} / {totalPages}
+                                {currentPage} / {totalPages || 1}
                             </PaginationItem>
                             <PaginationItem>
                                 <Button variant="outline" size="sm" onClick={() => { if(currentPage < totalPages) setCurrentPage(currentPage + 1); }} disabled={currentPage === totalPages}>

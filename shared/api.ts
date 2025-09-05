@@ -32,7 +32,7 @@ export interface PPL {
   namaPML: string;
   bebanKerja: string; 
   besaranHonor: string; 
-  tahap: 'pengumpulan-data' | 'pengolahan-analisis';
+  tahap: 'listing' | 'pencacahan' | 'pengolahan-analisis';
   progress?: Partial<Record<ProgressType, number>>;
   honorarium?: HonorariumDetail[];
 }
@@ -67,7 +67,9 @@ export interface Kegiatan {
   deskripsiKegiatan: string;
   adaListing: boolean;
   isFasih: boolean; 
-  bulanPembayaranHonor?: number | string; // Diubah agar bisa menerima string dari form
+  bulanHonorListing?: string;
+  bulanHonorPencacahan?: string;
+  bulanHonorPengolahan?: string;
   status: 'Persiapan' | 'Pengumpulan Data' | 'Pengolahan & Analisis' | 'Diseminasi & Evaluasi' | 'Selesai';
   progressKeseluruhan: number;
   progressPendataanApproved: number;
