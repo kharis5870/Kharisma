@@ -76,6 +76,10 @@ export interface Kegiatan {
   progressPengolahanApproved: number;
   progressPendataanSubmit: number;
   progressPengolahanSubmit: number;
+  progressListingApproved: number;
+  progressListingSubmit: number;
+  progressPencacahanApproved: number;
+  progressPencacahanSubmit: number;
   lastUpdated: string;
   lastUpdatedBy?: string;
   lastEdited?: string;

@@ -174,13 +174,24 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
         // =================================================================
         // START OF MODIFICATION: Progress calculation call
         // =================================================================
-        kegiatan.progressPendataanApproved = calculateProgress(kegiatan.ppl, 'pendataan', 'Approved');
+        kegiatan.progressListingApproved = calculateProgress(kegiatan.ppl, 'listing', 'Approved');
+        kegiatan.progressListingSubmit = calculateProgress(kegiatan.ppl, 'listing', 'Submitted');
+        kegiatan.progressPencacahanApproved = calculateProgress(kegiatan.ppl, 'pencacahan', 'Approved');
+        kegiatan.progressPencacahanSubmit = calculateProgress(kegiatan.ppl, 'pencacahan', 'Submitted');
         kegiatan.progressPengolahanApproved = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Approved');
-        kegiatan.progressPendataanSubmit = calculateProgress(kegiatan.ppl, 'pendataan', 'Submitted');
         kegiatan.progressPengolahanSubmit = calculateProgress(kegiatan.ppl, 'pengolahan-analisis', 'Submitted');
         // =================================================================
         // END OF MODIFICATION: Progress calculation call
         // =================================================================
+
+        // Kalkulasi untuk progress keseluruhan
+        const totalBeban = kegiatan.ppl.reduce((acc, p) => acc + (parseInt(p.bebanKerja, 10) || 0), 0);
+        const totalApprovedClean = kegiatan.ppl.reduce((acc, p) => acc + (p.progress?.approved || 0) + (p.progress?.clean || 0), 0);
+        kegiatan.progressKeseluruhan = totalBeban > 0 ? Math.round((totalApprovedClean / totalBeban) * 100) : 0;
+        
+        // Tetap sediakan properti lama untuk kompatibilitas jika masih ada yang memakai
+        kegiatan.progressPendataanApproved = calculateProgress(kegiatan.ppl, 'pendataan', 'Approved');
+        kegiatan.progressPendataanSubmit = calculateProgress(kegiatan.ppl, 'pendataan', 'Submitted');
     }
     return kegiatanRows;
 };
@@ -242,15 +253,17 @@ export const createKegiatan = async (data: any, bypassHonorLimit = false): Promi
         const kegiatanQuery = `
             INSERT INTO kegiatan
             (namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih, 
-             bulanHonorListing, bulanHonorPencacahan, bulanHonorPengolahan,
-             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
-             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
-             tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
-             tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
-             status, progressKeseluruhan, lastUpdatedBy, lastEditedBy, 
-             progressPendataanApproved, progressPengolahanApproved, 
-             progressPendataanSubmit, progressPengolahanSubmit)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', 0, ?, ?, 0, 0, 0, 0)
+            bulanHonorListing, bulanHonorPencacahan, bulanHonorPengolahan,
+            tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
+            tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
+            tanggalMulaiPengolahanAnalisis, tanggalSelesaiPengolahanAnalisis,
+            tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
+            status, lastUpdatedBy, lastEditedBy, 
+            progressKeseluruhan, progressPendataanApproved, progressPengolahanApproved, 
+            progressPendataanSubmit, progressPengolahanSubmit,
+            progressListingApproved, progressListingSubmit,
+            progressPencacahanApproved, progressPencacahanSubmit)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
             namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false,
@@ -696,23 +709,42 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
             }
         }
         
-        const progressPendataanApproved = calculateProgress(allPplForKegiatan, 'pendataan', 'Approved');
-        const progressPengolahanApproved = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Approved');
-        const progressPendataanSubmit = calculateProgress(allPplForKegiatan, 'pendataan', 'Submitted');
-        const progressPengolahanSubmit = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Submitted');
-        
-        const totalBebanKerjaKegiatan = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja, 10) || 0), 0);
-        const totalApproved = allPplForKegiatan.reduce((acc, p) => {
-            const approvedValue = (p.progress?.approved || 0) + (p.progress?.clean || 0);
-            return acc + approvedValue;
-        }, 0);
-        
-        const progressKeseluruhan = totalBebanKerjaKegiatan > 0 ? Math.round((totalApproved / totalBebanKerjaKegiatan) * 100) : 0;
-        
-        await connection.execute(
-            'UPDATE kegiatan SET lastUpdated = CURRENT_TIMESTAMP, lastUpdatedBy = ?, progressKeseluruhan = ?, progressPendataanApproved = ?, progressPengolahanApproved = ?, progressPendataanSubmit = ?, progressPengolahanSubmit = ? WHERE id = ?',
-            [username, progressKeseluruhan, progressPendataanApproved, progressPengolahanApproved, progressPendataanSubmit, progressPengolahanSubmit, kegiatanId]
-        );
+        const progressListingApproved = calculateProgress(allPplForKegiatan, 'listing', 'Approved');
+    const progressListingSubmit = calculateProgress(allPplForKegiatan, 'listing', 'Submitted');
+    const progressPencacahanApproved = calculateProgress(allPplForKegiatan, 'pencacahan', 'Approved');
+    const progressPencacahanSubmit = calculateProgress(allPplForKegiatan, 'pencacahan', 'Submitted');
+    const progressPengolahanApproved = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Approved');
+    const progressPengolahanSubmit = calculateProgress(allPplForKegiatan, 'pengolahan-analisis', 'Submitted');
+    
+    // Tetap hitung progress gabungan
+    const progressPendataanApproved = calculateProgress(allPplForKegiatan, 'pendataan', 'Approved');
+    const progressPendataanSubmit = calculateProgress(allPplForKegiatan, 'pendataan', 'Submitted');
+    
+    const totalBebanKerjaKegiatan = allPplForKegiatan.reduce((acc, p) => acc + (parseInt(p.bebanKerja, 10) || 0), 0);
+    const totalApproved = allPplForKegiatan.reduce((acc, p) => {
+        const approvedValue = (p.progress?.approved || 0) + (p.progress?.clean || 0);
+        return acc + approvedValue;
+    }, 0);
+    const progressKeseluruhan = totalBebanKerjaKegiatan > 0 ? Math.round((totalApproved / totalBebanKerjaKegiatan) * 100) : 0;
+    
+    // Perbarui query UPDATE untuk menyertakan semua kolom baru
+    await connection.execute(
+        `UPDATE kegiatan SET 
+            lastUpdated = CURRENT_TIMESTAMP, lastUpdatedBy = ?, progressKeseluruhan = ?, 
+            progressPendataanApproved = ?, progressPengolahanApproved = ?, 
+            progressPendataanSubmit = ?, progressPengolahanSubmit = ?,
+            progressListingApproved = ?, progressListingSubmit = ?,
+            progressPencacahanApproved = ?, progressPencacahanSubmit = ?
+         WHERE id = ?`,
+        [
+            username, progressKeseluruhan, 
+            progressPendataanApproved, progressPengolahanApproved, 
+            progressPendataanSubmit, progressPengolahanSubmit,
+            progressListingApproved, progressListingSubmit,
+            progressPencacahanApproved, progressPencacahanSubmit,
+            kegiatanId
+        ]
+    );
         
         await connection.commit();
         

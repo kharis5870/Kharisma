@@ -137,23 +137,24 @@ export default function Dashboard() {
     const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
-    const [progressView, setProgressView] = useState<'pendataan' | 'pengolahan'>('pendataan');
+    const [progressView, setProgressView] = useState<'keseluruhan' | 'listing' | 'pencacahan' | 'pengolahan'>('keseluruhan');
     const [progressType, setProgressType] = useState<ProgressTypeFilter>('approved');
     const [pplSearchView, setPplSearchView] = useState("");
     const [pplSearchUpdate, setPplSearchUpdate] = useState("");
     const [warningModalContent, setWarningModalContent] = useState<{title: string; warnings: string[]} | null>(null);
 
     useEffect(() => {
-        if (progressView === 'pendataan') {
-            if (progressType !== 'submit' && progressType !== 'approved') {
-                setProgressType('approved');
-            }
-        } else if (progressView === 'pengolahan') {
-            if (progressType !== 'sudah_entry' && progressType !== 'clean') {
-                setProgressType('clean');
-            }
+    // Gabungkan 'listing' dan 'pencacahan' ke dalam logika 'pendataan'
+    if (progressView === 'listing' || progressView === 'pencacahan') {
+        if (progressType !== 'submit' && progressType !== 'approved') {
+            setProgressType('approved');
         }
-    }, [progressView, progressType]);
+    } else if (progressView === 'pengolahan') {
+        if (progressType !== 'sudah_entry' && progressType !== 'clean') {
+            setProgressType('clean');
+        }
+    }
+}, [progressView, progressType]);
 
     const { data: activities = [], isLoading } = useQuery<Kegiatan[]>({ queryKey: ['kegiatan'], queryFn: fetchActivities });
 
@@ -489,6 +490,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="flex items-end gap-2">
+                        {progressView !== 'keseluruhan' && (
                         <div className="sm:w-48">
                             <Label htmlFor="progress-type" className="text-sm font-medium text-gray-700 mb-2 block">Tipe Progress</Label>
                             <Select value={progressType} onValueChange={(v) => setProgressType(v as ProgressTypeFilter)}>
@@ -497,7 +499,7 @@ export default function Dashboard() {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {progressView === 'pendataan' ? (
+                                    {(progressView === 'listing' || progressView === 'pencacahan') ? (
                                         <>
                                             <SelectItem value="submit">Submit</SelectItem>
                                             <SelectItem value="approved">Approved</SelectItem>
@@ -511,15 +513,18 @@ export default function Dashboard() {
                                 </SelectContent>
                             </Select>
                         </div>
+                    )}
                         <div className="sm:w-48">
                             <Label htmlFor="progress-view" className="text-sm font-medium text-gray-700 mb-2 block">Tahap Progress</Label>
-                            <Select value={progressView} onValueChange={(v) => setProgressView(v as 'pendataan' | 'pengolahan')}>
+                            <Select value={progressView} onValueChange={(v) => setProgressView(v as any)}>
                                 <SelectTrigger>
                                     <Layers className="w-4 h-4 mr-2" />
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="pendataan">Pendataan</SelectItem>
+                                    <SelectItem value="keseluruhan">Keseluruhan</SelectItem>
+                                    <SelectItem value="listing">Listing</SelectItem>
+                                    <SelectItem value="pencacahan">Pencacahan</SelectItem>
                                     <SelectItem value="pengolahan">Pengolahan</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -557,22 +562,33 @@ export default function Dashboard() {
                             const { status, color, warnings } = activity.dynamicStatus;
 
                             let progressValue = 0;
-                            if (progressView === 'pendataan') {
-                                progressValue = progressType === 'submit'
-                                    ? activity.progressPendataanSubmit
-                                    : activity.progressPendataanApproved;
-                            } else { // pengolahan
-                                progressValue = progressType === 'sudah_entry'
-                                    ? activity.progressPengolahanSubmit
-                                    : activity.progressPengolahanApproved;
+                            let progressLabel = "";
+
+                            switch (progressView) {
+                                case 'listing':
+                                    progressValue = progressType === 'submit'
+                                        ? activity.progressListingSubmit
+                                        : activity.progressListingApproved;
+                                    progressLabel = `Progress Listing (${progressType === 'submit' ? 'Submit' : 'Approved'})`;
+                                    break;
+                                case 'pencacahan':
+                                    progressValue = progressType === 'submit'
+                                        ? activity.progressPencacahanSubmit
+                                        : activity.progressPencacahanApproved;
+                                    progressLabel = `Progress Pencacahan (${progressType === 'submit' ? 'Submit' : 'Approved'})`;
+                                    break;
+                                case 'pengolahan':
+                                    progressValue = progressType === 'sudah_entry'
+                                        ? activity.progressPengolahanSubmit
+                                        : activity.progressPengolahanApproved;
+                                    progressLabel = `Progress Pengolahan (${progressType === 'sudah_entry' ? 'Dientry' : 'Clean'})`;
+                                    break;
+                                case 'keseluruhan':
+                                default:
+                                    progressValue = activity.progressKeseluruhan;
+                                    progressLabel = 'Progress Keseluruhan';
+                                    break;
                             }
-
-                            const progressLabel = `Progress ${progressView === 'pendataan' ? 'Pendataan' : 'Pengolahan'} (${
-                                progressType === 'submit' ? 'Submit' :
-                                    progressType === 'approved' ? 'Approved' :
-                                        progressType === 'sudah_entry' ? 'Dientry' : 'Clean'
-                                })`;
-
 
                             const getStageDates = () => {
                                 const formatDate = (dateString?: string) => dateString ? format(new Date(dateString), 'dd MMM yyyy', { locale: localeID }) : '-';
