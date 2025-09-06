@@ -194,7 +194,7 @@ export const getKegiatanById = async (id: number): Promise<Kegiatan | null> => {
     return kegiatan.length > 0 ? kegiatan[0] : null;
 };
 
-export const createKegiatan = async (data: any): Promise<Kegiatan> => {
+export const createKegiatan = async (data: any, bypassHonorLimit = false): Promise<Kegiatan> => {
     const connection = await db.getConnection();
     try {
 
@@ -210,6 +210,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             honorariumSettings
         } = data;
 
+        if (!bypassHonorLimit) {
         if (data.ppl && data.ppl.length > 0) {
             for (const ppl of data.ppl) {
                 let bulanHonorString: string | undefined;
@@ -227,6 +228,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
                 }
             }
         }
+    }
         
         await connection.beginTransaction();
 
@@ -351,7 +353,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
 // =================================================================
 // START OF MODIFICATION: updateKegiatan function
 // =================================================================
-export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> => {
+export const updateKegiatan = async (id: number, data: any, bypassHonorLimit = false): Promise<Kegiatan> => {
     const connection = await db.getConnection();
     try {
 
@@ -366,6 +368,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             honorariumSettings
         } = data;
 
+        if (!bypassHonorLimit) {
         if (data.ppl && data.ppl.length > 0) {
             for (const ppl of data.ppl) {
                 let bulanHonorString: string | undefined;
@@ -384,6 +387,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
                 }
             }
         }
+    }
 
         await connection.beginTransaction();
 

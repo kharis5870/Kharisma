@@ -140,11 +140,8 @@ export const validatePplHonor = async (pplMasterId: string, bulan: number, tahun
   const projectedTotal = existingHonor + currentActivityHonor;
 
   if (projectedTotal > honorLimit) {
-    // --- PERUBAHAN UTAMA ---
-    // Lempar error spesifik jika melebihi batas.
-    // Ini akan ditangkap oleh blok catch() di frontend.
     const error: any = new Error(`Total honor untuk PPL akan menjadi ${projectedTotal}, melebihi batas ${honorLimit}.`);
-    error.statusCode = 409; // 409 Conflict adalah status yang cocok
+    error.statusCode = 409; 
     error.details = {
         code: 'HONOR_LIMIT_EXCEEDED',
         ppl_master_id: pplMasterId,

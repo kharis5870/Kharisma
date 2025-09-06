@@ -43,21 +43,39 @@ router.get('/:id', async (req, res) => {
 // POST new
 router.post('/', async (req, res) => {
   try {
-    const newKegiatan = await createKegiatan(req.body);
+    const { bypassHonorLimit, ...kegiatanData } = req.body;
+    const newKegiatan = await createKegiatan(kegiatanData, bypassHonorLimit);
     res.status(201).json(newKegiatan);
-  } catch (error) {
-    console.error("CREATE KEGIATAN ERROR:", error);
-    res.status(500).json({ message: 'Error creating kegiatan' });
-  }
+  } catch (error: any) {
+    // ✅ PERUBAHAN DI SINI
+    // Jika ini adalah error batas honor yang sudah kita tangani...
+    if (error.details?.code === 'HONOR_LIMIT_EXCEEDED') {
+        // ...cukup catat sebagai info biasa, bukan error menakutkan.
+        console.log(`INFO: Validasi batas honor terpicu untuk PPL ID ${error.details.ppl_master_id}. Respons 409 dikirim.`);
+    } else {
+        // Jika ini adalah error lain yang tidak terduga, baru catat sebagai error.
+        console.error("CREATE KEGIATAN ERROR:", error);
+    }
+
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message, details: error.details });
+    }
+    res.status(500).json({ message: 'Error creating kegiatan' });
+  }
 });
 
 // PUT update (untuk detail kegiatan)
 router.put('/:id', async (req, res) => {
     try {
-        const updatedKegiatan = await updateKegiatan(parseInt(req.params.id), req.body);
+        const { bypassHonorLimit, ...kegiatanData } = req.body;
+        const updatedKegiatan = await updateKegiatan(parseInt(req.params.id), kegiatanData, bypassHonorLimit);
         res.json(updatedKegiatan);
-    } catch (error) {
-        console.error(error);
+    } catch (error: any) {
+        console.error("UPDATE KEGIATAN ERROR:", error);
+        // Lakukan hal yang sama untuk rute update
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ message: error.message, details: error.details });
+        }
         res.status(500).json({ message: 'Error updating kegiatan' });
     }
 });

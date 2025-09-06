@@ -492,35 +492,34 @@ export default function EditActivity() {
             setShowSuccessModal(true);
         },
         onError: (error: any) => {
-            // Cek jika error berasal dari server dengan data respons
-            if (error.response && error.response.data) {
-                const errorData = error.response.data;
-                const errorDetails = errorData.details;
+      // Cek apakah error memiliki struktur yang kita harapkan dari server
+      if (error.response && error.response.data) {
+        const errorData = error.response.data;
+        const errorDetails = errorData.details;
 
-                // Jika ini adalah error batas honor yang kita cari
-                if (errorDetails && errorDetails.code === 'HONOR_LIMIT_EXCEEDED') {
-                    // Beri tipe pada 'p' untuk memperbaiki error TypeScript
-                    const pplWithError = formData.ppl?.find((p: ClientPPL) => String(p.ppl_master_id) === String(errorDetails.ppl_master_id));
+        // Jika ada 'details' dan kodenya sesuai, tampilkan modal konfirmasi
+        if (errorDetails && errorDetails.code === 'HONOR_LIMIT_EXCEEDED') {
+            const pplWithError = formData.ppl?.find((p: any) => String(p.ppl_master_id) === String(errorDetails.ppl_master_id));
 
-                    setHonorWarningDetails({
-                        pplName: pplWithError?.namaPPL || 'salah satu PPL',
-                        totalHonor: errorDetails.projectedTotal,
-                        limit: errorDetails.limit
-                    });
-                    setShowHonorWarningModal(true);
-                    return; // PENTING: Hentikan eksekusi agar alert di bawah tidak muncul
-                }
-            }
-          
-            // Jika error lain, tampilkan alert umum
-            console.error("Gagal menyimpan:", error);
-            setAlertModal({ 
-                isOpen: true, 
-                title: "Gagal Menyimpan", 
-                message: `Terjadi kesalahan: ${error.response?.data?.message || error.message}` 
+            setHonorWarningDetails({
+                pplName: pplWithError?.namaPPL || 'salah satu PPL',
+                totalHonor: errorDetails.projectedTotal,
+                limit: errorDetails.limit
             });
+            setShowHonorWarningModal(true);
+            return; // <-- PENTING: Hentikan eksekusi di sini
         }
-    });
+      }
+    
+      // Jika errornya bukan soal honor, atau strukturnya berbeda, tampilkan modal error umum
+      console.error("Gagal menyimpan:", error);
+      setAlertModal({ 
+        isOpen: true, 
+        title: "Gagal Menyimpan", 
+        message: `Terjadi kesalahan: ${error.response?.data?.message || error.message}` 
+      });
+   }
+    });
 
     const validateDates = (): string | null => {
         const {
@@ -553,34 +552,26 @@ export default function EditActivity() {
         return null;
     };
 
-    const proceedToSubmit = () => {
-        if (!formData.id) return;
-        
-        const dataToSubmit = {
-            ...formData,
-            id: formData.id,
-            lastEditedBy: user?.username,
-            lastUpdatedBy: user?.username,
-            bulanPembayaranHonor: undefined, // Hapus field lama
-        };
-        
-        mutation.mutate(dataToSubmit as Partial<FormState> & {id: number});
-    }
-
-    const handleSubmit = async () => {
-     submitButtonRef.current?.focus();
-     await new Promise(resolve => setTimeout(resolve, 50));
-
-     if (!formData.id) return alert("Error: ID Kegiatan tidak ditemukan.");
-
-     const dateError = validateDates();
-     if (dateError) {
-       setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
-       return;
-     }
-
-     proceedToSubmit();
-   };
+    const handleFormSubmit = (bypassHonorLimit = false) => {
+        if (!formData.id) return alert("Error: ID Kegiatan tidak ditemukan.");
+    
+        const dateError = validateDates();
+        if (dateError) {
+            setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
+            return;
+        }
+    
+        const dataToSubmit = {
+            ...formData,
+            id: formData.id,
+            lastEditedBy: user?.username,
+            lastUpdatedBy: user?.username,
+            bulanPembayaranHonor: undefined,
+            bypassHonorLimit: bypassHonorLimit
+        };
+        
+        mutation.mutate(dataToSubmit as Partial<FormState> & {id: number});
+    };
    
     const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: string }) => {
         const pplForStage = useMemo(() => formData.ppl?.filter(p => p.tahap === tahap) || [], [formData.ppl, tahap]);
@@ -840,7 +831,7 @@ export default function EditActivity() {
                 <p className="text-blue-800 text-sm"> ✅ {addedPPLCount} PPL telah ditambahkan ke Tahap {pplStageTab.replace('-', ' ')}.</p>
                 </div>
                 )}
-                <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-8">
+                <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(false); }} className="space-y-8">
                     <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
                         <TabsList className="grid w-full grid-cols-3">
                             <TabsTrigger value="info-dasar">Info Dasar & Jadwal</TabsTrigger>
@@ -868,7 +859,16 @@ export default function EditActivity() {
                                 <Card>
                                     <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
                                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                                        {( [ {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},{label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'}, {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'}, {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'}, {label: 'Selesai Pengolahan & Analisis', field: 'tanggalMulaiDiseminasiEvaluasi'}, {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}] as {label: string, field: DateFieldName}[] ).map(({label, field}) => (
+                                        {( [ 
+                                            {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'},
+                                            {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'},
+                                            {label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'},
+                                            {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'},
+                                            {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'},
+                                            {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'},
+                                            {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'},
+                                            {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'}] as {label: string, field: DateFieldName}[
+                                            ] ).map(({label, field}) => (
                                             <div key={field} className="space-y-2"><Label>{label}</Label>
                                                 <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start", !formData[field] && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{formData[field] ? format(formData[field]!, "dd MMMM yyyy", { locale: localeID }) : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData[field]} onSelect={(date) => handleFormFieldChange(field, date as Date)} /></PopoverContent></Popover>
                                             </div>
@@ -953,7 +953,10 @@ export default function EditActivity() {
                  <ConfirmationModal
                     isOpen={showHonorWarningModal}
                     onClose={() => setShowHonorWarningModal(false)}
-                    onConfirm={() => { setShowHonorWarningModal(false); proceedToSubmit(); }}
+                    onConfirm={() => {
+                        setShowHonorWarningModal(false);
+                        handleFormSubmit(true); // Kirim dengan flag bypass
+                     }}
                     title="Peringatan Batas Honor"
                     description={`Total honor untuk ${honorWarningDetails?.pplName} di bulan terpilih akan menjadi ${formatHonor(honorWarningDetails?.totalHonor || 0)}, melebihi batas ${formatHonor(honorWarningDetails?.limit || 0)}. Lanjutkan?`}
                     confirmLabel="Ya, Lanjutkan"

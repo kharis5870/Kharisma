@@ -21,11 +21,21 @@ async function request(endpoint: string, options: RequestInit = {}) {
   const response = await fetch(fullUrl, { ...options, headers });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: `Request Gagal: ${response.status} ${response.statusText}`,
-    }));
-    throw new Error(errorData.message || "Terjadi kesalahan pada server.");
-  }
+    // 1. Ambil seluruh data JSON dari respons error (termasuk 'details')
+    const errorData = await response.json().catch(() => ({
+      message: `Request Gagal: ${response.status} ${response.statusText}`,
+    }));
+    
+    // 2. Buat objek Error standar dengan pesan yang jelas
+    const error = new Error(errorData.message || "Terjadi kesalahan pada server.");
+
+    // 3. Tempelkan seluruh data respons ke dalam objek error
+    //    agar bisa diakses di komponen (mirip struktur Axios)
+    (error as any).response = { data: errorData };
+    
+    // 4. Lempar error yang sudah diperkaya dengan detail
+    throw error;
+  }
 
   if (response.status === 204) {
     return; // Handle respons "No Content"

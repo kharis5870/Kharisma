@@ -535,33 +535,33 @@ export default function InputKegiatan() {
        store.resetForm();
      },
      onError: (error: any) => {
-        // Cek dulu apakah error memiliki respons dari server dan data di dalamnya
-        if (error.response && error.response.data) {
-            const errorData = error.response.data;
-            const errorDetails = errorData.details;
+      // Cek apakah error memiliki struktur yang kita harapkan dari server
+      if (error.response && error.response.data) {
+        const errorData = error.response.data;
+        const errorDetails = errorData.details;
 
-            // Jika kodenya sesuai, tampilkan modal konfirmasi
-            if (errorDetails && errorDetails.code === 'HONOR_LIMIT_EXCEEDED') {
-                const pplWithError = store.pplAllocations.find(p => p.ppl_master_id === errorDetails.ppl_master_id);
-                
-                setHonorWarningDetails({
-                    pplName: pplWithError?.namaPPL || 'salah satu PPL',
-                    totalHonor: errorDetails.projectedTotal,
-                    limit: errorDetails.limit
-                });
-                setShowHonorWarningModal(true);
-                return; // <-- PENTING: Hentikan eksekusi di sini
-            }
+        // Jika ada 'details' dan kodenya sesuai, tampilkan modal konfirmasi
+        if (errorDetails && errorDetails.code === 'HONOR_LIMIT_EXCEEDED') {
+            const pplWithError = store.pplAllocations.find(p => p.ppl_master_id === errorDetails.ppl_master_id);
+            
+            setHonorWarningDetails({
+                pplName: pplWithError?.namaPPL || 'salah satu PPL',
+                totalHonor: errorDetails.projectedTotal,
+                limit: errorDetails.limit
+            });
+            setShowHonorWarningModal(true);
+            return; // <-- PENTING: Hentikan eksekusi di sini agar modal error tidak muncul
         }
-        
-        // Jika bukan error honor, baru tampilkan alert error umum
-        setAlertModal({ 
-            isOpen: true, 
-            title: "Gagal Menyimpan", 
-            message: `Terjadi kesalahan: ${error.response?.data?.message || error.message}` 
-        });
-    }
-    });
+      }
+      
+      // Jika errornya bukan soal honor, atau strukturnya berbeda, tampilkan modal error umum
+      setAlertModal({ 
+        isOpen: true, 
+        title: "Gagal Menyimpan", 
+        message: `Terjadi kesalahan: ${error.response?.data?.message || error.message}` 
+      });
+   }
+    });
 
    const isFormIncomplete = (): boolean => {
      const {
@@ -574,27 +574,21 @@ export default function InputKegiatan() {
    const [showHonorWarningModal, setShowHonorWarningModal] = useState(false);
    const [honorWarningDetails, setHonorWarningDetails] = useState<{ pplName: string; totalHonor: number; limit: number } | null>(null);
 
-   
-   const handleSubmit = async (e: React.FormEvent) => {
-     e.preventDefault();
-     const dateError = validateDates();
-     if (dateError) {
-       setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
-       return;
-     }
+   const handleFormSubmit = (bypassHonorLimit = false) => {
+        const dateError = validateDates();
+        if (dateError) {
+            setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
+            return;
+        }
 
-     proceedToSubmit();
-   };
+        setLastActivityName(store.namaKegiatan);
 
-    const proceedToSubmit = () => {
-        setLastActivityName(store.namaKegiatan);
-
-        const formatDateForSubmission = (date: Date | undefined) => {
-            if (!date) return undefined;
-            return isValid(date) ? date.toISOString() : undefined;
-        };
-        
-        const dataToSubmit = {
+        const formatDateForSubmission = (date: Date | undefined) => {
+            if (!date) return undefined;
+            return isValid(date) ? date.toISOString() : undefined;
+        };
+        
+        const dataToSubmit = {
           namaKegiatan: store.namaKegiatan,
           ketua_tim_id: store.ketua_tim_id,
           deskripsiKegiatan: store.deskripsiKegiatan,
@@ -628,9 +622,11 @@ export default function InputKegiatan() {
           bulanHonorListing: store.bulanHonorListing,
           bulanHonorPencacahan: store.bulanHonorPencacahan,
           bulanHonorPengolahan: store.bulanHonorPengolahan,
+          bypassHonorLimit: bypassHonorLimit
         };
-       mutation.mutate(dataToSubmit);
-    };
+
+        mutation.mutate(dataToSubmit);
+    };
 
    const handleSuccessAction = () => {
      navigate('/dashboard');
@@ -648,7 +644,7 @@ export default function InputKegiatan() {
                </div>
            )}
          </div>
-         <form onSubmit={handleSubmit} className="space-y-8">
+         <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(false); }} className="space-y-8">
            <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
                <TabsList className="grid w-full grid-cols-3">
                    <TabsTrigger value="info-dasar">Info Dasar & Jadwal</TabsTrigger>
@@ -755,7 +751,10 @@ export default function InputKegiatan() {
          <ConfirmationModal
              isOpen={showHonorWarningModal}
              onClose={() => setShowHonorWarningModal(false)}
-             onConfirm={() => { setShowHonorWarningModal(false); proceedToSubmit(); }}
+             onConfirm={() => {
+                setShowHonorWarningModal(false);
+                handleFormSubmit(true); // Kirim dengan flag bypass
+             }}
              title="Peringatan Batas Honor"
              description={`Total honor untuk ${honorWarningDetails?.pplName} di bulan terpilih akan menjadi ${formatHonor(honorWarningDetails?.totalHonor || 0)}, melebihi batas ${formatHonor(honorWarningDetails?.limit || 0)}. Lanjutkan?`}
              confirmLabel="Ya, Lanjutkan"
