@@ -101,7 +101,7 @@ const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Prom
 };
 
 // --- Sub-Components ---
-const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList, pmlList, honorariumSettings, existingPplIds }: any) => {
+const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList, pmlList, honorariumSettings, existingPplIds, setAlertModal }: any) => {
     const [openPPL, setOpenPPL] = useState(false);
     const [openPML, setOpenPML] = useState(false);
     
@@ -115,25 +115,62 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
     }, [honorDetail.bebanKerja]);
 
     const handleBebanKerjaBlur = () => {
-        const newBebanKerja = localBebanKerja || '0';
-        if (honorDetail && honorDetail.bebanKerja !== newBebanKerja) {
-            const updatedHonorarium = ppl.honorarium.map((h: any) => {
-                if (h.jenis_pekerjaan === jenisPekerjaan) {
-                    let hargaSatuanKey: keyof typeof honorariumSettings;
-                    if (jenisPekerjaan === 'listing') hargaSatuanKey = 'pengumpulan-data-listing';
-                    else if (jenisPekerjaan === 'pencacahan') hargaSatuanKey = 'pengumpulan-data-pencacahan';
-                    else hargaSatuanKey = 'pengolahan-analisis';
-                    const hargaSatuan = parseInt(parseHonor(honorariumSettings[hargaSatuanKey].hargaSatuan)) || 0;
-                    return {
-                        ...h,
-                        bebanKerja: newBebanKerja,
-                        besaranHonor: (parseInt(newBebanKerja) * hargaSatuan).toString()
-                    };
-                }
-                return h;
+        const oldBebanKerja = parseInt(honorDetail.bebanKerja || '0', 10);
+        const newBebanKerja = parseInt(localBebanKerja || '0', 10);
+        const delta = newBebanKerja - oldBebanKerja;
+
+        // Jika tidak ada perubahan, jangan lakukan apa-apa
+        if (delta === 0) return;
+
+        // Tentukan tipe progress stage pertama ('open' atau 'belum_entry')
+        const firstStageType = (ppl.tahap === 'listing' || ppl.tahap === 'pencacahan') ? 'open' : 'belum_entry';
+        const currentFirstStageValue = ppl.progress?.[firstStageType] ?? 0;
+
+        // Validasi saat mengurangi beban kerja
+        if (delta < 0 && currentFirstStageValue < Math.abs(delta)) {
+            // Tampilkan modal error karena progress 'open' tidak mencukupi
+            // Anda perlu meneruskan fungsi setAlertModal ke komponen ini
+            // atau gunakan alert() sederhana untuk tes
+            setAlertModal({
+            isOpen: true,
+            title: "Validasi Gagal",
+            message: `Tidak bisa mengurangi beban kerja sebanyak ${Math.abs(delta)}. Selesaikan progress yang sedang berjalan dahulu. Progress 'Open' saat ini: ${currentFirstStageValue}.`
             });
-            onUpdate(ppl.clientId, 'honorarium', updatedHonorarium);
+            // Kembalikan input ke nilai semula
+            setLocalBebanKerja(oldBebanKerja.toString());
+            return;
         }
+        
+        // Hitung ulang besaran honor
+        const updatedHonorarium = ppl.honorarium.map((h: any) => {
+            if (h.jenis_pekerjaan === jenisPekerjaan) {
+                let hargaSatuanKey: keyof typeof honorariumSettings;
+                if (jenisPekerjaan === 'listing') hargaSatuanKey = 'pengumpulan-data-listing';
+                else if (jenisPekerjaan === 'pencacahan') hargaSatuanKey = 'pengumpulan-data-pencacahan';
+                else hargaSatuanKey = 'pengolahan-analisis';
+                const hargaSatuan = parseInt(parseHonor(honorariumSettings[hargaSatuanKey].hargaSatuan)) || 0;
+                return {
+                    ...h,
+                    bebanKerja: newBebanKerja.toString(),
+                    besaranHonor: (newBebanKerja * hargaSatuan).toString()
+                };
+            }
+            return h;
+        });
+
+        // Buat objek progress yang baru
+        const updatedProgress = {
+            ...ppl.progress,
+            [firstStageType]: currentFirstStageValue + delta
+        };
+        
+        // Panggil onUpdate untuk semua field yang berubah
+        onUpdate(ppl.clientId, 'honorarium', updatedHonorarium);
+        onUpdate(ppl.clientId, 'progress', updatedProgress);
+
+        // Hitung ulang total beban kerja di level PPL
+        const newTotalBebanKerjaPPL = updatedHonorarium.reduce((sum: number, h: any) => sum + parseInt(h.bebanKerja || '0'), 0);
+        onUpdate(ppl.clientId, 'bebanKerja', newTotalBebanKerjaPPL.toString());
     };
     
     const totalHonorPPL = ppl.honorarium?.reduce((sum: number, h: any) => sum + parseInt(h.besaranHonor || '0'), 0) || 0;
@@ -345,7 +382,7 @@ export default function EditActivity() {
     const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
     const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: PPL['tahap'] | null}>({isOpen: false, tahap: null});
     const submitButtonRef = useRef<HTMLButtonElement>(null); 
-
+    const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
 
     const handleFormFieldChange = useCallback((field: keyof FormState, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -374,50 +411,60 @@ export default function EditActivity() {
     }, []);
     
     useEffect(() => {
-        const { newPpls, tahap, from } = location.state || {};
+    // 1. Tambahkan pengecekan ini: Jangan lakukan apapun jika data awal belum dimuat
+    if (!isInitialDataLoaded) {
+        return;
+    }
 
-        if (from === 'daftar-ppl' && newPpls && tahap && Array.isArray(newPpls) && newPpls.length > 0) {
-            setFormData(currentFormData => {
-                const currentPplsInStage = currentFormData.ppl?.filter(p => p.tahap === tahap) || [];
-                const existingPplIds = currentPplsInStage.map(p => String(p.ppl_master_id));
-                const pplsToAdd = newPpls.filter((p: PPLMaster) => !existingPplIds.includes(String(p.id)));
+    const { newPpls, tahap, from } = location.state || {};
 
-                if (pplsToAdd.length > 0) {
-                    const newAllocations = pplsToAdd.map((ppl: PPLMaster) => {
-                        const newPpl: ClientPPL = {
-                            clientId: `new-ppl-${Date.now()}-${ppl.id}`,
-                            ppl_master_id: ppl.id,
-                            namaPPL: ppl.namaPPL,
-                            namaPML: "",
-                            tahap: tahap,
-                            bebanKerja: '',
-                            besaranHonor: '0',
-                            honorarium: []
-                        };
-                        if (tahap === 'listing') newPpl.honorarium = [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' }];
-                        if (tahap === 'pencacahan') newPpl.honorarium = [{ jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }];
-                        if (tahap === 'pengolahan-analisis') newPpl.honorarium = [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }];
-                        return newPpl;
-                    });
+    if (from === 'daftar-ppl' && newPpls && tahap && Array.isArray(newPpls) && newPpls.length > 0) {
+        setFormData(currentFormData => {
+            const currentPplsInStage = currentFormData.ppl?.filter(p => p.tahap === tahap) || [];
+            const existingPplIds = new Set(currentPplsInStage.map(p => String(p.ppl_master_id)));
+            const pplsToAdd = newPpls.filter((p: PPLMaster) => !existingPplIds.has(String(p.id)));
 
-                    setAddedPPLCount(pplsToAdd.length);
-                    setShowAutoPopulateMessage(true);
-                    setTimeout(() => setShowAutoPopulateMessage(false), 5000);
+            if (pplsToAdd.length > 0) {
+                const newAllocations = pplsToAdd.map((ppl: PPLMaster) => {
+                    const newPpl: ClientPPL = {
+                        clientId: `new-ppl-${Date.now()}-${ppl.id}`,
+                        ppl_master_id: ppl.id,
+                        namaPPL: ppl.namaPPL,
+                        namaPML: "",
+                        tahap: tahap,
+                        bebanKerja: '',
+                        besaranHonor: '0',
+                        honorarium: []
+                    };
+                    if (tahap === 'listing') newPpl.honorarium = [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' }];
+                    if (tahap === 'pencacahan') newPpl.honorarium = [{ jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }];
+                    if (tahap === 'pengolahan-analisis') newPpl.honorarium = [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }];
+                    return newPpl;
+                });
 
-                    return { ...currentFormData, ppl: [...(currentFormData.ppl || []), ...newAllocations] };
-                }
-                return currentFormData;
-            });
+                setAddedPPLCount(pplsToAdd.length);
+                setShowAutoPopulateMessage(true);
+                setTimeout(() => setShowAutoPopulateMessage(false), 5000);
 
-            setMainTab('alokasi-ppl');
-            setPplStageTab(tahap);
-            window.history.replaceState({}, document.title);
-        } else if (from === 'batal-pilih' && tahap) {
-            setMainTab('alokasi-ppl');
-            setPplStageTab(tahap);
-            window.history.replaceState({}, document.title);
-        }
-    }, [location.state, formData]);
+                return { 
+                    ...currentFormData, 
+                    ppl: [...(currentFormData.ppl || []), ...newAllocations] 
+                };
+            }
+            return currentFormData;
+        });
+
+        setMainTab('alokasi-ppl');
+        setPplStageTab(tahap);
+        window.history.replaceState({}, document.title);
+        
+    } else if (from === 'batal-pilih' && tahap) {
+        setMainTab('alokasi-ppl');
+        setPplStageTab(tahap);
+        window.history.replaceState({}, document.title);
+    }
+// 2. Perbarui dependency array
+}, [location.state, isInitialDataLoaded]);
     
     const [showHonorWarningModal, setShowHonorWarningModal] = useState(false);
     const [honorWarningDetails, setHonorWarningDetails] = useState<{ pplName: string; totalHonor: number; limit: number } | null>(null);
@@ -469,12 +516,17 @@ export default function EditActivity() {
                     }))
                 }))
             });
+            setIsInitialDataLoaded(true);
         }
     }, [initialData]);
 
-    const removePPL = (clientId: string) => {
-        setFormData(prev => ({ ...prev, ppl: prev.ppl?.filter(p => p.clientId !== clientId)}));
-    };
+    const removePPL = useCallback((clientId: string) => {
+    setFormData(prev => ({
+        ...prev,
+        // Pastikan ppl selalu array, bahkan setelah filter
+        ppl: prev.ppl?.filter(p => p.clientId !== clientId) || [] 
+    }));
+}, []); 
     
     const updatePPL = useCallback((clientId: string, field: keyof ClientPPL, value: any) => {
         setFormData(prev => {
@@ -573,7 +625,7 @@ export default function EditActivity() {
         mutation.mutate(dataToSubmit as Partial<FormState> & {id: number});
     };
    
-    const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: string }) => {
+    const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: string, setAlertModal: React.Dispatch<React.SetStateAction<{isOpen: boolean; title: string; message: string;}>> }) => {
         const pplForStage = useMemo(() => formData.ppl?.filter(p => p.tahap === tahap) || [], [formData.ppl, tahap]);
         
         const bulanPembayaranHonor = useMemo(() => {
@@ -631,15 +683,40 @@ export default function EditActivity() {
         }
         
         const allYearMonths = useMemo(() => {
-            const currentYear = getYear(new Date());
-            return Array.from({ length: 12 }, (_, i) => {
-                const monthDate = new Date(currentYear, i, 1);
-                return {
-                    value: formatDateFns(monthDate, 'MM-yyyy'),
-                    label: formatDateFns(monthDate, 'MMMM yyyy', { locale: localeID }),
-                };
-            });
-        }, []);
+    // 1. Ambil tanggal mulai PALING AWAL dan tanggal selesai PALING AKHIR dari seluruh kegiatan
+    const startDate = formData.tanggalMulaiPersiapan;
+    const endDate = formData.tanggalSelesaiDiseminasiEvaluasi;
+
+    // 2. Jika salah satu tanggal tidak valid, kembalikan array kosong
+    if (!startDate || !endDate || !isValid(startDate) || !isValid(endDate)) {
+        return [{ value: '', label: 'Harap atur jadwal kegiatan terlebih dahulu' }];
+    }
+    
+    // 3. Buat daftar bulan dalam rentang tanggal yang valid
+    const months = new Set<string>(); // Gunakan Set untuk menghindari duplikasi
+    let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+
+    while (currentMonth <= endDate) {
+        const monthValue = formatDateFns(currentMonth, 'MM-yyyy');
+        months.add(monthValue);
+        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+    }
+
+    // Ubah Set menjadi array objek yang bisa digunakan oleh Select
+    return Array.from(months).map(monthValue => {
+        const [month, year] = monthValue.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+        return {
+            value: monthValue,
+            label: formatDateFns(date, 'MMMM yyyy', { locale: localeID }),
+        };
+    });
+
+// 4. Pastikan dihitung ulang HANYA jika tanggal awal atau akhir berubah
+}, [
+    formData.tanggalMulaiPersiapan, 
+    formData.tanggalSelesaiDiseminasiEvaluasi
+]);
 
 
         return (
@@ -701,6 +778,7 @@ export default function EditActivity() {
                                     index={index}
                                     onRemove={removePPL}
                                     onUpdate={updatePPL}
+                                    setAlertModal={setAlertModal}
                                     pplList={pplList}
                                     pmlList={pmlList}
                                     honorariumSettings={formData.honorariumSettings!}
@@ -885,13 +963,13 @@ export default function EditActivity() {
                                     <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="listing" className="mt-4">
-                                    <AlokasiPPLContent tahap="listing" title="Listing" />
+                                    <AlokasiPPLContent tahap="listing" title="Listing" setAlertModal={setAlertModal} />
                                 </TabsContent>
                                 <TabsContent value="pencacahan" className="mt-4">
-                                    <AlokasiPPLContent tahap="pencacahan" title="Pencacahan" />
+                                    <AlokasiPPLContent tahap="pencacahan" title="Pencacahan" setAlertModal={setAlertModal} />
                                 </TabsContent>
                                 <TabsContent value="pengolahan-analisis" className="mt-4">
-                                    <AlokasiPPLContent tahap="pengolahan-analisis" title="Pengolahan & Analisis" />
+                                    <AlokasiPPLContent tahap="pengolahan-analisis" title="Pengolahan & Analisis" setAlertModal={setAlertModal} />
                                 </TabsContent>
                             </Tabs>
                         </TabsContent>
