@@ -84,12 +84,11 @@ router.put('/:id', async (req, res) => {
 router.put('/ppl/:pplId/progress', async (req, res) => {
     try {
         const { pplId } = req.params;
-        // Ambil username dari body request
-       const { progressData, username } = req.body;
+        const { progressData, username } = req.body;
 
-       if (!username) {
-           return res.status(400).json({ message: 'Username diperlukan untuk update progress' });
-       }
+        if (!progressData || !username) {
+            return res.status(400).json({ message: 'Request body tidak lengkap. Harap sertakan progressData dan username.' });
+        }
 
        // Teruskan username sebagai argumen ketiga
        const updatedPpl = await updatePplProgress(parseInt(pplId), progressData, username);
