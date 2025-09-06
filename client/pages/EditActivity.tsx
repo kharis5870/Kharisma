@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Check, ChevronsUpDown, Users, XCircle } from "lucide-react";
+import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Check, ChevronsUpDown, Users, XCircle, Loader2 } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format, parseISO, isValid, getYear, format as formatDateFns } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
@@ -491,9 +491,34 @@ export default function EditActivity() {
             queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
             setShowSuccessModal(true);
         },
-        onError: (error) => {
+        onError: (error: any) => {
+            // Cek jika error berasal dari server dengan data respons
+            if (error.response && error.response.data) {
+                const errorData = error.response.data;
+                const errorDetails = errorData.details;
+
+                // Jika ini adalah error batas honor yang kita cari
+                if (errorDetails && errorDetails.code === 'HONOR_LIMIT_EXCEEDED') {
+                    // Beri tipe pada 'p' untuk memperbaiki error TypeScript
+                    const pplWithError = formData.ppl?.find((p: ClientPPL) => String(p.ppl_master_id) === String(errorDetails.ppl_master_id));
+
+                    setHonorWarningDetails({
+                        pplName: pplWithError?.namaPPL || 'salah satu PPL',
+                        totalHonor: errorDetails.projectedTotal,
+                        limit: errorDetails.limit
+                    });
+                    setShowHonorWarningModal(true);
+                    return; // PENTING: Hentikan eksekusi agar alert di bawah tidak muncul
+                }
+            }
+          
+            // Jika error lain, tampilkan alert umum
             console.error("Gagal menyimpan:", error);
-            setAlertModal({ isOpen: true, title: "Gagal Menyimpan", message: `Terjadi kesalahan saat menyimpan: ${error.message}` });
+            setAlertModal({ 
+                isOpen: true, 
+                title: "Gagal Menyimpan", 
+                message: `Terjadi kesalahan: ${error.response?.data?.message || error.message}` 
+            });
         }
     });
 
@@ -902,8 +927,18 @@ export default function EditActivity() {
                             className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" 
                             size="lg"
                         >
-                            <Save className="w-4 h-4 mr-2" />
-                            {mutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}
+                            {/* --- PERUBAHAN DI SINI --- */}
+                            {mutation.isPending ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Menyimpan...
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4 mr-2" />
+                                    Simpan Perubahan
+                                </>
+                            )}
                         </Button>
                     </div>
                  </form>

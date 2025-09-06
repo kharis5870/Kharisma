@@ -134,14 +134,30 @@ export const getTotalHonorPPLByMonth = async (pplMasterId: string, bulan: number
 
 // FUNGSI INI TIDAK BERUBAH
 export const validatePplHonor = async (pplMasterId: string, bulan: number, tahun: number, currentActivityHonor: number, kegiatanIdToExclude: number | null) => {
-    const honorLimitString = await getSetting('HONOR_LIMIT', '3000000');
-    const honorLimit = parseInt(honorLimitString, 10);
-    const existingHonor = await getTotalHonorPPLByMonth(pplMasterId, bulan, tahun, kegiatanIdToExclude);
-    const projectedTotal = existingHonor + currentActivityHonor;
+  const honorLimitString = await getSetting('HONOR_LIMIT', '3000000');
+  const honorLimit = parseInt(honorLimitString, 10);
+  const existingHonor = await getTotalHonorPPLByMonth(pplMasterId, bulan, tahun, kegiatanIdToExclude);
+  const projectedTotal = existingHonor + currentActivityHonor;
 
-    return {
-        isOverLimit: projectedTotal > honorLimit,
+  if (projectedTotal > honorLimit) {
+    // --- PERUBAHAN UTAMA ---
+    // Lempar error spesifik jika melebihi batas.
+    // Ini akan ditangkap oleh blok catch() di frontend.
+    const error: any = new Error(`Total honor untuk PPL akan menjadi ${projectedTotal}, melebihi batas ${honorLimit}.`);
+    error.statusCode = 409; // 409 Conflict adalah status yang cocok
+    error.details = {
+        code: 'HONOR_LIMIT_EXCEEDED',
+        ppl_master_id: pplMasterId,
+        projectedTotal,
         limit: honorLimit,
-        projectedTotal: projectedTotal
     };
+    throw error;
+  }
+  
+  // Jika tidak ada error, kembalikan status sukses (opsional, karena fungsi ini sekarang fokus pada error)
+  return {
+    isOverLimit: false,
+    limit: honorLimit,
+    projectedTotal: projectedTotal
+  };
 };

@@ -14,13 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, Plus, Trash2, Link2, X, Lock, Users, XCircle, ChevronsUpDown, Check } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Link2, X, Lock, Users, XCircle, ChevronsUpDown, Check, Loader2 } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore, { HonorariumSettings } from "@/stores/useInputKegiatanStore";
-// FIX: Menambahkan Dokumen ke dalam import
+import { Separator } from "@/components/ui/separator";
 import { PPLMaster, KetuaTim, Kegiatan, UserData, PPL, HonorariumDetail, Dokumen } from "@shared/api";
 import { useAuth } from "@/contexts/AuthContext";
 import AlertModal from "@/components/AlertModal";
@@ -248,6 +248,41 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
         storeActions.updateHonorariumSetting(honorSettingKey, field, localSettings[honorSettingKey][field]);
     };
 
+    const [showAllMonths, setShowAllMonths] = useState(false);
+
+    const suggestedMonths = useMemo(() => {
+        // Ambil tanggal paling awal dan paling akhir dari seluruh jadwal kegiatan
+        const allDates = [
+            store.tanggalMulaiPersiapan, store.tanggalSelesaiPersiapan,
+            store.tanggalMulaiPengumpulanData, store.tanggalSelesaiPengumpulanData,
+            store.tanggalMulaiPengolahanAnalisis, store.tanggalSelesaiPengolahanAnalisis,
+            store.tanggalMulaiDiseminasiEvaluasi, store.tanggalSelesaiDiseminasiEvaluasi
+        ].filter(d => d && isValid(d)); // Filter hanya tanggal yang valid
+
+        if (allDates.length < 2) return [];
+
+        const startDate = new Date(Math.min(...allDates.map(d => d!.getTime())));
+        const endDate = new Date(Math.max(...allDates.map(d => d!.getTime())));
+
+        const monthsInRange: { value: string, label: string }[] = [];
+        let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+
+        while (currentDate <= endDate) {
+            const monthOption = {
+                value: formatDateFns(currentDate, 'MM-yyyy'),
+                label: formatDateFns(currentDate, 'MMMM yyyy', { locale: localeID }),
+            };
+            monthsInRange.push(monthOption);
+            currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+        return monthsInRange;
+    }, [
+        store.tanggalMulaiPersiapan, store.tanggalSelesaiPersiapan,
+        store.tanggalMulaiPengumpulanData, store.tanggalSelesaiPengumpulanData,
+        store.tanggalMulaiPengolahanAnalisis, store.tanggalSelesaiPengolahanAnalisis,
+        store.tanggalMulaiDiseminasiEvaluasi, store.tanggalSelesaiDiseminasiEvaluasi
+    ]);
+
     const allYearMonths = useMemo(() => {
         const currentYear = getYear(new Date());
         return Array.from({ length: 12 }, (_, i) => {
@@ -258,6 +293,8 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
             };
         });
     }, []);
+
+    
 
 
     return (
@@ -306,17 +343,41 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
                         <div className="space-y-2">
                            <Label>Bulan Pembayaran Honor *</Label>
                            <Select value={bulanPembayaranHonor} onValueChange={handleBulanHonorChange}>
-                               <SelectTrigger>
-                                   <SelectValue placeholder="Pilih bulan..." />
-                               </SelectTrigger>
-                               <SelectContent>
-                                   {allYearMonths.map(option => (
-                                       <SelectItem key={option.value} value={option.value}>
-                                           {option.label}
-                                       </SelectItem>
-                                   ))}
-                               </SelectContent>
-                           </Select>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Pilih bulan..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {suggestedMonths.length > 0 && (
+                                        <>
+                                            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">Bulan Sesuai Jadwal</div>
+                                            {suggestedMonths.map(option => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                            <Separator className="my-1" />
+                                        </>
+                                    )}
+
+                                    {showAllMonths || suggestedMonths.length === 0 ? (
+                                        <>
+                                            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">Semua Bulan</div>
+                                            {allYearMonths.map(option => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <div 
+                                            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
+                                            onClick={() => setShowAllMonths(true)}
+                                        >
+                                            Pilih Bulan Lain...
+                                        </div>
+                                    )}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                 </div>
@@ -473,10 +534,34 @@ export default function InputKegiatan() {
        setShowSuccessModal(true);
        store.resetForm();
      },
-     onError: (error) => {
-       setAlertModal({ isOpen: true, title: "Gagal Menyimpan", message: `Terjadi kesalahan saat menyimpan: ${error.message}` });
-     }
-   });
+     onError: (error: any) => {
+        // Cek dulu apakah error memiliki respons dari server dan data di dalamnya
+        if (error.response && error.response.data) {
+            const errorData = error.response.data;
+            const errorDetails = errorData.details;
+
+            // Jika kodenya sesuai, tampilkan modal konfirmasi
+            if (errorDetails && errorDetails.code === 'HONOR_LIMIT_EXCEEDED') {
+                const pplWithError = store.pplAllocations.find(p => p.ppl_master_id === errorDetails.ppl_master_id);
+                
+                setHonorWarningDetails({
+                    pplName: pplWithError?.namaPPL || 'salah satu PPL',
+                    totalHonor: errorDetails.projectedTotal,
+                    limit: errorDetails.limit
+                });
+                setShowHonorWarningModal(true);
+                return; // <-- PENTING: Hentikan eksekusi di sini
+            }
+        }
+        
+        // Jika bukan error honor, baru tampilkan alert error umum
+        setAlertModal({ 
+            isOpen: true, 
+            title: "Gagal Menyimpan", 
+            message: `Terjadi kesalahan: ${error.response?.data?.message || error.message}` 
+        });
+    }
+    });
 
    const isFormIncomplete = (): boolean => {
      const {
@@ -650,10 +735,22 @@ export default function InputKegiatan() {
                </TabsContent>
              </Tabs>
            <div className="flex justify-center mt-8">
-               <Button type="submit" size="lg" disabled={isFormIncomplete() || mutation.isPending} className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700">
-                   {mutation.isPending ? "Menyimpan..." : "Simpan Kegiatan"}
-               </Button>
-           </div>
+            <Button 
+                type="submit" 
+                size="lg" 
+                disabled={isFormIncomplete() || mutation.isPending} 
+                className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700"
+            >
+                {mutation.isPending ? (
+            <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Menyimpan...
+            </>
+        ) : (
+            "Simpan Kegiatan"
+        )}
+    </Button>
+</div>
          </form>
          <ConfirmationModal
              isOpen={showHonorWarningModal}

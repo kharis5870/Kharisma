@@ -3,6 +3,7 @@
 import { RowDataPacket, OkPacket } from 'mysql2';
 import db from '../db';
 import { Kegiatan, Dokumen, PPL, ProgressType, HonorariumDetail } from '@shared/api';
+import { validatePplHonor } from './honorService'; 
 
 // --- TYPE DEFINITIONS ---
 interface HonorariumSettings {
@@ -193,17 +194,12 @@ export const getKegiatanById = async (id: number): Promise<Kegiatan | null> => {
     return kegiatan.length > 0 ? kegiatan[0] : null;
 };
 
-// =================================================================
-// START OF MODIFICATION: createKegiatan function
-// =================================================================
 export const createKegiatan = async (data: any): Promise<Kegiatan> => {
     const connection = await db.getConnection();
     try {
-        await connection.beginTransaction();
 
         const {
             namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih,
-            // Ambil tiga bulan honor baru
             bulanHonorListing, bulanHonorPencacahan, bulanHonorPengolahan,
             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
@@ -213,7 +209,27 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
             documents, username,
             honorariumSettings
         } = data;
+
+        if (data.ppl && data.ppl.length > 0) {
+            for (const ppl of data.ppl) {
+                let bulanHonorString: string | undefined;
+                if (ppl.tahap === 'listing') bulanHonorString = data.bulanHonorListing;
+                else if (ppl.tahap === 'pencacahan') bulanHonorString = data.bulanHonorPencacahan;
+                else if (ppl.tahap === 'pengolahan-analisis') bulanHonorString = data.bulanHonorPengolahan;
+                
+                if (ppl.ppl_master_id && bulanHonorString) {
+                    const [bulanStr, tahunStr] = bulanHonorString.split('-');
+                    const bulan = parseInt(bulanStr, 10);
+                    const tahun = parseInt(tahunStr, 10);
+                    const currentActivityHonor = ppl.honorarium?.reduce((sum: number, h: any) => sum + parseInt(h.besaranHonor || '0', 10), 0) || 0;
+
+                    await validatePplHonor(ppl.ppl_master_id, bulan, tahun, currentActivityHonor, null);
+                }
+            }
+        }
         
+        await connection.beginTransaction();
+
         const {
             'pengumpulan-data-listing': listingSettings,
             'pengumpulan-data-pencacahan': pencacahanSettings,
@@ -322,7 +338,7 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
         console.error("Message:", error.sqlMessage || error.message);
         console.error("Query:", error.sql);
         console.error("Stack:", error.stack);
-        throw new Error('Terjadi kesalahan di server saat menyimpan data.');
+        throw error;
     } finally {
         connection.release();
     }
@@ -338,11 +354,9 @@ export const createKegiatan = async (data: any): Promise<Kegiatan> => {
 export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> => {
     const connection = await db.getConnection();
     try {
-        await connection.beginTransaction();
 
         const {
             namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih,
-            // Ambil tiga bulan honor baru
             bulanHonorListing, bulanHonorPencacahan, bulanHonorPengolahan,
             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
@@ -351,6 +365,27 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
             ppl, documents, lastEditedBy,
             honorariumSettings
         } = data;
+
+        if (data.ppl && data.ppl.length > 0) {
+            for (const ppl of data.ppl) {
+                let bulanHonorString: string | undefined;
+                if (ppl.tahap === 'listing') bulanHonorString = data.bulanHonorListing;
+                else if (ppl.tahap === 'pencacahan') bulanHonorString = data.bulanHonorPencacahan;
+                else if (ppl.tahap === 'pengolahan-analisis') bulanHonorString = data.bulanHonorPengolahan;
+
+                if (ppl.ppl_master_id && bulanHonorString) {
+                    const [bulanStr, tahunStr] = bulanHonorString.split('-');
+                    const bulan = parseInt(bulanStr, 10);
+                    const tahun = parseInt(tahunStr, 10);
+                    const currentActivityHonor = ppl.honorarium?.reduce((sum: number, h: any) => sum + parseInt(h.besaranHonor || '0', 10), 0) || 0;
+                    
+                    // Satu-satunya perbedaan adalah parameter terakhir 'id'
+                    await validatePplHonor(ppl.ppl_master_id, bulan, tahun, currentActivityHonor, id);
+                }
+            }
+        }
+
+        await connection.beginTransaction();
 
         const {
             'pengumpulan-data-listing': listingSettings,
@@ -503,7 +538,7 @@ export const updateKegiatan = async (id: number, data: any): Promise<Kegiatan> =
         console.error("Message:", error.sqlMessage || error.message);
         console.error("Query:", error.sql);
         console.error("Stack:", error.stack);
-        throw new Error('Terjadi kesalahan di server saat menyimpan data.');
+        throw error;
     } finally {
         connection.release();
     }
