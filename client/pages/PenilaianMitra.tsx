@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Layout from "@/components/Layout"; 
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -199,6 +200,8 @@ export default function PenilaianMitraPage() {
     const [filterStatus, setFilterStatus] = useState("all");
     const [selectedPenilaian, setSelectedPenilaian] = useState<PenilaianMitraType | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
+    const [pageIndex, setPageIndex] = useState(0);
+    const [pageSize, setPageSize] = useState(10); // Default 10 baris per halaman
   
     const { data: penilaianData, isLoading, error } = useQuery({
         queryKey: ['penilaianMitra'],
@@ -238,6 +241,16 @@ export default function PenilaianMitraPage() {
         return matchesSearch && matchesKegiatan && matchesStatus;
       });
     }, [penilaianData, searchQuery, filterKegiatan, filterStatus]);
+
+    const totalPages = useMemo(() => {
+        return Math.ceil(filteredData.length / pageSize);
+    }, [filteredData, pageSize]);
+
+    const paginatedData = useMemo(() => {
+        const start = pageIndex * pageSize;
+        const end = start + pageSize;
+        return filteredData.slice(start, end);
+    }, [filteredData, pageIndex, pageSize]);
     
     const uniqueKegiatan = useMemo(() => {
       if (!penilaianData) return [];
@@ -254,6 +267,7 @@ export default function PenilaianMitraPage() {
     }, [penilaianData]);
   
     return (
+      <Layout>
       <div className="p-6 space-y-6 bg-slate-50 min-h-full">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold text-slate-900">Penilaian Mitra</h1>
@@ -315,29 +329,96 @@ export default function PenilaianMitraPage() {
                 ) : filteredData.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8"><Users className="w-8 h-8 mx-auto mb-2" /><p>Tidak ada data ditemukan</p></TableCell></TableRow>
                 ) : (
-                  filteredData.map((item, index) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">{item.namaKegiatan}</TableCell>
-                      <TableCell>{item.namaPPL}</TableCell>
-                      <TableCell>{item.namaPML || '-'}</TableCell>
-                      <TableCell className="text-center">
-                        <Button variant={item.sudahDinilai ? "outline" : "default"} size="sm" onClick={() => handleEvaluate(item)} className={cn(item.sudahDinilai && "bg-green-50 text-green-700 border-green-200 hover:bg-green-100")}><Star className="w-3 h-3 mr-1" />{item.sudahDinilai ? "Edit Nilai" : "Beri Nilai"}</Button>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {item.rataRata !== null ? (
-                          <Badge variant="secondary" className={cn("font-bold", item.rataRata >= 8 ? "bg-green-100 text-green-700" : item.rataRata >= 6 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700")}>
-                            {typeof item.rataRata === 'number' ? item.rataRata.toFixed(1) : item.rataRata}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-slate-500"><StarOff className="w-3 h-3 mr-1" />Belum dinilai</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
+                  paginatedData.map((item: PenilaianMitraType, index: number) => {
+                    // ✔️ 'useAuth' dipanggil di dalam map agar selalu mendapat konteks terbaru
+                    const { user } = useAuth();
+                    const isAuthorizedPML = String(user?.id) === String(item.pmlId);
+                    const isButtonDisabled = !(isAuthorizedPML || user?.role === 'admin');
+
+                    return (
+                        <TableRow key={item.id}>
+                            <TableCell>{pageIndex * pageSize + index + 1}</TableCell>
+                            <TableCell className="font-medium">
+                              {item.namaKegiatan}
+                              <span className="text-slate-500 font-normal ml-1">({item.tahap?.replace('-', ' ')?.replace(/\b\w/g, l => l.toUpperCase())})</span>
+                            </TableCell>
+                            <TableCell>{item.namaPPL}</TableCell>
+                            <TableCell>{item.namaPML || '-'}</TableCell>
+                            <TableCell className="text-center">
+                                <Button 
+                                    variant={item.sudahDinilai ? "outline" : "default"} 
+                                    size="sm" 
+                                    onClick={() => handleEvaluate(item)} 
+                                    disabled={isButtonDisabled}
+                                    title={isButtonDisabled ? "Hanya PML yang bersangkutan atau Admin yang dapat menilai" : ""}
+                                    className={cn(
+                                        item.sudahDinilai && "bg-green-50 text-green-700 border-green-200 hover:bg-green-100",
+                                        isButtonDisabled && "bg-gray-200 text-gray-500 cursor-not-allowed hover:bg-gray-200"
+                                    )}
+                                >
+                                    <Star className="w-3 h-3 mr-1" />
+                                    {item.sudahDinilai ? "Edit Nilai" : "Beri Nilai"}
+                                </Button>
+                            </TableCell>
+                            <TableCell className="text-center">
+                                {item.rataRata !== null ? (
+                                    <Badge variant="secondary" className={cn("font-bold", item.rataRata >= 8 ? "bg-green-100 text-green-700" : item.rataRata >= 6 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700")}>
+                                        {typeof item.rataRata === 'number' ? item.rataRata.toFixed(1) : item.rataRata}
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="text-slate-500"><StarOff className="w-3 h-3 mr-1" />Belum dinilai</Badge>
+                                )}
+                            </TableCell>
+                        </TableRow>
+                    );
+                })
+            )}
+        </TableBody>
             </Table>
+            <div className="flex items-center justify-end space-x-4 pt-4">
+            <div className="flex items-center space-x-2 text-sm">
+                <span>Baris per halaman</span>
+                <Select
+                    value={`${pageSize}`}
+                    onValueChange={(value) => {
+                        setPageSize(Number(value));
+                        setPageIndex(0); // Kembali ke halaman pertama saat ukuran diubah
+                    }}
+                >
+                    <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue placeholder={pageSize} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {[10, 20, 50, 100].map((size) => (
+                            <SelectItem key={size} value={`${size}`}>
+                                {size}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="text-sm font-medium">
+                Halaman {pageIndex + 1} dari {totalPages}
+            </div>
+            <div className="flex items-center space-x-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPageIndex(pageIndex - 1)}
+                    disabled={pageIndex === 0}
+                >
+                    Sebelumnya
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPageIndex(pageIndex + 1)}
+                    disabled={pageIndex >= totalPages - 1}
+                >
+                    Berikutnya
+                </Button>
+            </div>
+        </div>
           </CardContent>
         </Card>
         
@@ -349,5 +430,6 @@ export default function PenilaianMitraPage() {
           isSaving={isSaving}
         />
       </div>
+      </Layout>
     );
   }

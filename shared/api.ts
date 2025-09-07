@@ -152,6 +152,7 @@ export interface PenilaianMitra {
   namaPPL: string;
   pmlId: number | null;
   namaPML: string | null;
+  tahap: string;
   sikapPelikaku: number | null;
   kualitasPekerjaan: number | null;
   ketepatanWaktu: number | null;

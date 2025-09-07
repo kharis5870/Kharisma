@@ -9,26 +9,27 @@ import { PenilaianRequest } from '../../shared/api'; // Kita akan definisikan ti
 export const getPenilaianList = async () => {
   const query = `
     SELECT
-      p.id AS id, -- ID unik dari tabel PPL, kita gunakan sebagai ID utama
+      p.id AS id,
       k.id AS kegiatanId,
       k.namaKegiatan AS namaKegiatan,
       p.id AS pplId,
-      pmaster.nama AS namaPPL,
+      p.tahap AS tahap,
+      pmaster.namaPPL AS namaPPL,
+      p.namaPML AS namaPML,
       u.id AS pmlId,
-      u.nama AS namaPML,
       pn.sikap_perilaku AS sikapPelikaku,
       pn.kualitas_pekerjaan AS kualitasPekerjaan,
       pn.ketepatan_waktu AS ketepatanWaktu,
       pn.rata_rata AS rataRata,
       (CASE WHEN pn.id IS NOT NULL THEN 1 ELSE 0 END) AS sudahDinilai,
       pn.tanggal_penilaian AS tanggalPenilaian,
-      (SELECT nama FROM users WHERE id = pn.dinilai_oleh_userId) AS dinilaiOleh
+      (SELECT nama_lengkap FROM users WHERE id = pn.dinilai_oleh_userId) AS dinilaiOleh
     FROM ppl p
     JOIN kegiatan k ON p.kegiatanId = k.id
     JOIN ppl_master pmaster ON p.ppl_master_id = pmaster.id
-    LEFT JOIN users u ON p.pml_id = u.id -- Mengambil nama PML dari tabel PPL
+    LEFT JOIN users u ON p.namaPML = u.nama_Lengkap
     LEFT JOIN penilaian_mitra pn ON p.id = pn.pplId AND k.id = pn.kegiatanId
-    ORDER BY k.namaKegiatan, pmaster.nama;
+    ORDER BY k.namaKegiatan, pmaster.namaPPL;
   `;
 
   const [rows] = await pool.query(query);
