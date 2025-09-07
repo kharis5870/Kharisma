@@ -105,7 +105,7 @@ export default function ViewDocuments() {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Nama Dokumen</TableHead>
+                        <TableHead>Nama Dokumen / Isi Catatan</TableHead> {/* Judul kolom diubah */}
                         <TableHead>Jenis</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Tanggal</TableHead>
@@ -117,14 +117,25 @@ export default function ViewDocuments() {
                 <TableBody>
                     {documents.map((doc) => {
                         const isApproved = doc.status === 'Approved';
-                        const isApprovalDisabled = user?.role === 'user'; // <-- Cek role
+                        const isApprovalDisabled = user?.role === 'user';
+                        
+                        // Tentukan apakah item ini adalah catatan
+                        const isNote = doc.jenis === 'catatan';
+
                         return (
                             <TableRow key={doc.id}>
-                                <TableCell className="font-medium flex items-center gap-2">
-                                    {doc.jenis === 'link' ? <Link2 className="w-4 h-4 text-blue-600" /> : doc.jenis === 'catatan' ? <Notebook className="w-4 h-4 text-orange-600" /> : <FileText className="w-4 h-4 text-green-600" />} 
-                                    {doc.nama}
+                                <TableCell className="font-medium">
+                                    <div className="flex items-start gap-2">
+                                        {isNote ? <Notebook className="w-4 h-4 text-orange-600 mt-1 flex-shrink-0" /> : <Link2 className="w-4 h-4 text-blue-600 mt-1 flex-shrink-0" />} 
+                                        {/* ✔️ Logika Tampilan Baru */}
+                                        {isNote ? (
+                                            <p className="text-gray-700 whitespace-pre-wrap break-words">{doc.nama}</p>
+                                        ) : (
+                                            <p>{doc.nama}</p>
+                                        )}
+                                    </div>
                                 </TableCell>
-                                <TableCell><Badge variant="outline">{doc.jenis === 'link' ? 'Drive Link' : doc.jenis === 'catatan' ? 'Catatan' : 'File'}</Badge></TableCell>
+                                <TableCell><Badge variant="outline">{isNote ? 'Catatan' : 'Dokumen Link'}</Badge></TableCell>
                                 <TableCell><Badge className={cn("flex items-center gap-1 w-fit", getStatusColor(doc.status))}>{getStatusIcon(doc.status)} {doc.status || 'N/A'}</Badge></TableCell>
                                 <TableCell>{getRelativeTime(doc.uploadedAt)}</TableCell>
                                 <TableCell>
@@ -136,15 +147,25 @@ export default function ViewDocuments() {
                                     ) : '-'}
                                 </TableCell>
                                 <TableCell>
-                                    {doc.jenis === 'catatan' ? (
-                                        <Button variant="outline" size="sm" onClick={() => setNoteViewModal({ isOpen: true, title: doc.nama, content: doc.link })} className="flex items-center gap-1">
-                                            <Notebook className="w-3 h-3" /> Lihat Catatan
+                                    {isNote ? (
+                                        // ✔️ PERBAIKAN UTAMA DI SINI
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => setNoteViewModal({ 
+                                                isOpen: true, 
+                                                title: `Catatan ${doc.tipe.replace('-', ' ')}`, // Judul otomatis
+                                                content: doc.nama // Isi catatan diambil dari 'nama'
+                                            })} 
+                                            className="flex items-center gap-1"
+                                        >
+                                            <Eye className="w-3 h-3" /> Lihat Detail
                                         </Button>
                                     ) : (
                                         doc.link ? (
                                             <Button variant="outline" size="sm" asChild>
                                                 <a href={doc.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
-                                                    <ExternalLink className="w-3 h-3" /> Buka
+                                                    <ExternalLink className="w-3 h-3" /> Buka Link
                                                 </a>
                                             </Button>
                                         ) : <span className="text-xs text-gray-500">Link kosong</span>
@@ -155,7 +176,7 @@ export default function ViewDocuments() {
                                         variant={isApproved ? "destructive" : "default"} 
                                         size="sm" 
                                         onClick={() => handleStatusChange(doc.id!, doc.status)}
-                                        disabled={isApprovalDisabled} // <-- Terapkan disabled
+                                        disabled={isApprovalDisabled}
                                         className={cn("flex items-center gap-1", isApproved ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700")}
                                         title={isApprovalDisabled ? "Anda tidak memiliki izin untuk aksi ini" : ""}
                                     >

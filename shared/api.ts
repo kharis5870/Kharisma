@@ -10,6 +10,7 @@ export interface Dokumen {
   status?: 'Pending' | 'Reviewed' | 'Approved';
   uploadedAt?: string;
   isWajib?: boolean;
+  catatan?: string; 
   lastApproved?: string;
   lastApprovedBy?: string;
 }

@@ -1,5 +1,3 @@
-// client/pages/EditActivity.tsx
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -15,7 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Check, ChevronsUpDown, Users, XCircle, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { ArrowLeft, Save, Link2, X, CalendarIcon, Plus, Trash2, Lock, Check, ChevronsUpDown, Users, XCircle, Loader2, MessageSquare } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format, parseISO, isValid, getYear, format as formatDateFns } from "date-fns";
 import { id as localeID } from 'date-fns/locale';
@@ -34,9 +33,9 @@ type ClientPPL = Omit<PPL, 'honorarium'> & { clientId: string; honorarium: Honor
 type ClientDokumen = Dokumen & { clientId: string };
 
 type HonorariumSettings = {
-  'pengumpulan-data-listing': { satuanBebanKerja: string, hargaSatuan: string };
-  'pengumpulan-data-pencacahan': { satuanBebanKerja: string, hargaSatuan: string };
-  'pengolahan-analisis': { satuanBebanKerja: string, hargaSatuan: string };
+    'pengumpulan-data-listing': { satuanBebanKerja: string, hargaSatuan: string };
+    'pengumpulan-data-pencacahan': { satuanBebanKerja: string, hargaSatuan: string };
+    'pengolahan-analisis': { satuanBebanKerja: string, hargaSatuan: string };
 };
 
 type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'lastUpdatedBy' | 'namaKetua' | 'bulanPembayaranHonor' | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan' | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData' | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis' | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi'> & {
@@ -57,10 +56,10 @@ type FormState = Omit<Kegiatan, 'ppl' | 'dokumen' | 'lastUpdated' | 'lastUpdated
 };
 
 type DateFieldName =
-  | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
-  | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData'
-  | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
-  | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
+    | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
+    | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData'
+    | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
+    | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
 const formatHonor = (value: string | number): string => {
     if (value === '' || value === null || value === undefined) return '';
@@ -119,29 +118,21 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
         const newBebanKerja = parseInt(localBebanKerja || '0', 10);
         const delta = newBebanKerja - oldBebanKerja;
 
-        // Jika tidak ada perubahan, jangan lakukan apa-apa
         if (delta === 0) return;
 
-        // Tentukan tipe progress stage pertama ('open' atau 'belum_entry')
         const firstStageType = (ppl.tahap === 'listing' || ppl.tahap === 'pencacahan') ? 'open' : 'belum_entry';
         const currentFirstStageValue = ppl.progress?.[firstStageType] ?? 0;
 
-        // Validasi saat mengurangi beban kerja
         if (delta < 0 && currentFirstStageValue < Math.abs(delta)) {
-            // Tampilkan modal error karena progress 'open' tidak mencukupi
-            // Anda perlu meneruskan fungsi setAlertModal ke komponen ini
-            // atau gunakan alert() sederhana untuk tes
             setAlertModal({
             isOpen: true,
             title: "Validasi Gagal",
             message: `Tidak bisa mengurangi beban kerja sebanyak ${Math.abs(delta)}. Selesaikan progress yang sedang berjalan dahulu. Progress 'Open' saat ini: ${currentFirstStageValue}.`
             });
-            // Kembalikan input ke nilai semula
             setLocalBebanKerja(oldBebanKerja.toString());
             return;
         }
         
-        // Hitung ulang besaran honor
         const updatedHonorarium = ppl.honorarium.map((h: any) => {
             if (h.jenis_pekerjaan === jenisPekerjaan) {
                 let hargaSatuanKey: keyof typeof honorariumSettings;
@@ -158,17 +149,14 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
             return h;
         });
 
-        // Buat objek progress yang baru
         const updatedProgress = {
             ...ppl.progress,
             [firstStageType]: currentFirstStageValue + delta
         };
         
-        // Panggil onUpdate untuk semua field yang berubah
         onUpdate(ppl.clientId, 'honorarium', updatedHonorarium);
         onUpdate(ppl.clientId, 'progress', updatedProgress);
 
-        // Hitung ulang total beban kerja di level PPL
         const newTotalBebanKerjaPPL = updatedHonorarium.reduce((sum: number, h: any) => sum + parseInt(h.bebanKerja || '0'), 0);
         onUpdate(ppl.clientId, 'bebanKerja', newTotalBebanKerjaPPL.toString());
     };
@@ -199,97 +187,98 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
                 </Button>
             </div>
             <div className="space-y-4">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div className="space-y-2">
-                         <Label>Pilih PPL *</Label>
-                         <Popover open={openPPL} onOpenChange={setOpenPPL}>
-                             <PopoverTrigger asChild>
-                                 <Button variant="outline" role="combobox" className="w-full justify-between">
-                                     {selectedPPL ? selectedPPL.namaPPL : "Pilih PPL..."}
-                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                 </Button>
-                             </PopoverTrigger>
-                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                 <Command>
-                                     <CommandInput placeholder="Cari PPL..." />
-                                     <CommandList>
-                                         <CommandEmpty>PPL tidak ditemukan atau sudah dialokasikan.</CommandEmpty>
-                                         <CommandGroup>
-                                             {availablePplList.map((p: PPLMaster) => (
-                                                 <CommandItem key={p.id} value={`${p.id} ${p.namaPPL}`} onSelect={() => {
-                                                     onUpdate(ppl.clientId, 'ppl_master_id', p.id);
-                                                     onUpdate(ppl.clientId, 'namaPPL', p.namaPPL);
-                                                     setOpenPPL(false);
-                                                 }}>
-                                                     <Check className={cn("mr-2 h-4 w-4", String(ppl.ppl_master_id) === String(p.id) ? "opacity-100" : "opacity-0")} />
-                                                     <div>{p.namaPPL} <span className="text-xs text-gray-500">({p.id})</span></div>
-                                                 </CommandItem>
-                                             ))}
-                                         </CommandGroup>
-                                     </CommandList>
-                                 </Command>
-                             </PopoverContent>
-                         </Popover>
-                     </div>
-                     <div className="space-y-2">
-                         <Label>Nama PML *</Label>
-                         <Popover open={openPML} onOpenChange={setOpenPML}>
-                             <PopoverTrigger asChild>
-                                 <Button variant="outline" role="combobox" className="w-full justify-between">
-                                     {selectedPML ? selectedPML.namaLengkap : "Pilih PML..."}
-                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                 </Button>
-                             </PopoverTrigger>
-                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                 <Command>
-                                     <CommandInput placeholder="Cari PML..." />
-                                     <CommandList>
-                                         <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
-                                         <CommandGroup>
-                                             {pmlList.map((pml: UserData) => (
-                                                 <CommandItem key={pml.id} value={`${pml.id} ${pml.namaLengkap}`} onSelect={() => {
-                                                     onUpdate(ppl.clientId, 'namaPML', pml.namaLengkap);
-                                                     setOpenPML(false);
-                                                 }}>
-                                                     <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
-                                                     <div className="flex flex-col">
-                                                         <span>{pml.namaLengkap}</span>
-                                                         <span className="text-xs text-gray-500">ID: {pml.id}</span>
-                                                     </div>
-                                                 </CommandItem>
-                                             ))}
-                                         </CommandGroup>
-                                     </CommandList>
-                                 </Command>
-                             </PopoverContent>
-                         </Popover>
-                     </div>
-                 </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Pilih PPL *</Label>
+                            <Popover open={openPPL} onOpenChange={setOpenPPL}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" role="combobox" className="w-full justify-between">
+                                        {selectedPPL ? selectedPPL.namaPPL : "Pilih PPL..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="Cari PPL..." />
+                                        <CommandList>
+                                            <CommandEmpty>PPL tidak ditemukan atau sudah dialokasikan.</CommandEmpty>
+                                            <CommandGroup>
+                                                {availablePplList.map((p: PPLMaster) => (
+                                                    <CommandItem key={p.id} value={`${p.id} ${p.namaPPL}`} onSelect={() => {
+                                                        onUpdate(ppl.clientId, 'ppl_master_id', p.id);
+                                                        onUpdate(ppl.clientId, 'namaPPL', p.namaPPL);
+                                                        setOpenPPL(false);
+                                                    }}>
+                                                        <Check className={cn("mr-2 h-4 w-4", String(ppl.ppl_master_id) === String(p.id) ? "opacity-100" : "opacity-0")} />
+                                                        <div>{p.namaPPL} <span className="text-xs text-gray-500">({p.id})</span></div>
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Nama PML *</Label>
+                            <Popover open={openPML} onOpenChange={setOpenPML}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" role="combobox" className="w-full justify-between">
+                                        {selectedPML ? selectedPML.namaLengkap : "Pilih PML..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="Cari PML..." />
+                                        <CommandList>
+                                            <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
+                                            <CommandGroup>
+                                                {pmlList.map((pml: UserData) => (
+                                                    <CommandItem key={pml.id} value={`${pml.id} ${pml.namaLengkap}`} onSelect={() => {
+                                                        onUpdate(ppl.clientId, 'namaPML', pml.namaLengkap);
+                                                        setOpenPML(false);
+                                                    }}>
+                                                        <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
+                                                        <div className="flex flex-col">
+                                                            <span>{pml.namaLengkap}</span>
+                                                            <span className="text-xs text-gray-500">ID: {pml.id}</span>
+                                                        </div>
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-                     <div className="space-y-2">
-                         <Label>{getBebanKerjaLabel()}</Label>
-                         <Input type="number" placeholder="Jumlah..." value={localBebanKerja} onChange={(e) => setLocalBebanKerja(e.target.value)} onBlur={handleBebanKerjaBlur} />
-                     </div>
-                     <div className="space-y-2">
-                         <Label>Total Honor (Rp)</Label>
-                         <Input value={formatHonor(totalHonorPPL)} readOnly className="bg-gray-100 font-bold"/>
-                     </div>
-                 </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+                        <div className="space-y-2">
+                            <Label>{getBebanKerjaLabel()}</Label>
+                            <Input type="number" placeholder="Jumlah..." value={localBebanKerja} onChange={(e) => setLocalBebanKerja(e.target.value)} onBlur={handleBebanKerjaBlur} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Total Honor (Rp)</Label>
+                            <Input value={formatHonor(totalHonorPPL)} readOnly className="bg-gray-100 font-bold"/>
+                        </div>
+                    </div>
             </div>
         </div>
     );
 });
 
-const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleting, username }: any) => {
-    const { id, isWajib, status, nama, link, kegiatanId, tipe, clientId } = doc;
+const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleting, username, onNoteClick }: any) => {
+    const { id, isWajib, status, nama, link, kegiatanId, tipe, clientId, jenis } = doc;
     const isNew = !id; 
 
-    const [isEditing, setIsEditing] = useState(isNew);
+    const [isEditing, setIsEditing] = useState(isNew && jenis !== 'catatan');
     const [localNama, setLocalNama] = useState(nama);
     const [localLink, setLocalLink] = useState(link ?? '');
 
     const isApproved = status === 'Approved';
+    const isNote = jenis === 'catatan';
 
     const mutation = useMutation({
         mutationFn: (payload: { documentData: Partial<Dokumen>; username?: string }) => {
@@ -306,13 +295,27 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
         onError: (error: any) => alert(`Error: ${error.message}`)
     });
 
+    // =================================================================
+    // START OF MODIFICATION
+    // =================================================================
     const handleSave = () => {
-        const payload = {
-            documentData: { nama: localNama, link: localLink, kegiatanId, tipe, isWajib },
-            username: username 
+        // Definisikan tipe payload secara eksplisit agar sesuai dengan yang diharapkan mutationFn
+        const payload: { documentData: Partial<Dokumen>; username?: string } = {
+            documentData: {
+                nama: localNama,
+                link: localLink,
+                kegiatanId,
+                tipe,
+                isWajib,
+                jenis: 'link' // Pastikan jenisnya adalah 'link' untuk form ini
+            },
+            username: username
         };
         mutation.mutate(payload);
     };
+    // =================================================================
+    // END OF MODIFICATION
+    // =================================================================
 
     const handleCancel = () => {
         if (isNew) {
@@ -324,8 +327,36 @@ const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, isDeleti
         }
     };
 
+    if (isNote) {
+        return (
+            <div
+                className="flex items-start gap-3 p-3 border rounded-lg bg-yellow-50 hover:bg-yellow-100 cursor-pointer transition-colors"
+                onClick={() => onNoteClick(doc)}
+            >
+                <MessageSquare className="w-5 h-5 text-yellow-700 mt-1 flex-shrink-0" />
+                <div className="flex-grow min-w-0">
+                    <p className="font-semibold text-yellow-800">Catatan</p>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{nama || <i className="text-gray-500">Klik untuk menambah isi catatan...</i>}</p>
+                </div>
+                {!isWajib && (
+                     <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => { e.stopPropagation(); removeDocument(clientId, id); }} 
+                        className="flex-shrink-0 text-gray-500 hover:text-red-500" 
+                        disabled={isDeleting}
+                        title="Hapus Catatan"
+                    >
+                        <X className="w-4 h-4"/>
+                    </Button>
+                )}
+            </div>
+        )
+    }
+
     return (
-        <div className={cn("flex items-start gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50" : isEditing ? "bg-yellow-50" : "bg-gray-50/50")}>
+        <div className={cn("flex items-start gap-3 p-3 border rounded-lg", isApproved ? "bg-green-50" : isEditing ? "bg-blue-50" : "bg-gray-50/50")}>
             <div className="flex-grow space-y-2">
                 {isWajib ? ( <Label className="font-semibold pt-2 block">{nama} *</Label> ) : (
                     <Input placeholder="Nama Dokumen" value={localNama} onChange={(e) => setLocalNama(e.target.value)} disabled={!isEditing || mutation.isPending || isApproved} />
@@ -383,6 +414,10 @@ export default function EditActivity() {
     const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: PPL['tahap'] | null}>({isOpen: false, tahap: null});
     const submitButtonRef = useRef<HTMLButtonElement>(null); 
     const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
+    
+    // State for Note Modal
+    const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+    const [currentNote, setCurrentNote] = useState<ClientDokumen | null>(null);
 
     const handleFormFieldChange = useCallback((field: keyof FormState, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -411,60 +446,58 @@ export default function EditActivity() {
     }, []);
     
     useEffect(() => {
-    // 1. Tambahkan pengecekan ini: Jangan lakukan apapun jika data awal belum dimuat
-    if (!isInitialDataLoaded) {
-        return;
-    }
+        if (!isInitialDataLoaded) {
+            return;
+        }
 
-    const { newPpls, tahap, from } = location.state || {};
+        const { newPpls, tahap, from } = location.state || {};
 
-    if (from === 'daftar-ppl' && newPpls && tahap && Array.isArray(newPpls) && newPpls.length > 0) {
-        setFormData(currentFormData => {
-            const currentPplsInStage = currentFormData.ppl?.filter(p => p.tahap === tahap) || [];
-            const existingPplIds = new Set(currentPplsInStage.map(p => String(p.ppl_master_id)));
-            const pplsToAdd = newPpls.filter((p: PPLMaster) => !existingPplIds.has(String(p.id)));
+        if (from === 'daftar-ppl' && newPpls && tahap && Array.isArray(newPpls) && newPpls.length > 0) {
+            setFormData(currentFormData => {
+                const currentPplsInStage = currentFormData.ppl?.filter(p => p.tahap === tahap) || [];
+                const existingPplIds = new Set(currentPplsInStage.map(p => String(p.ppl_master_id)));
+                const pplsToAdd = newPpls.filter((p: PPLMaster) => !existingPplIds.has(String(p.id)));
 
-            if (pplsToAdd.length > 0) {
-                const newAllocations = pplsToAdd.map((ppl: PPLMaster) => {
-                    const newPpl: ClientPPL = {
-                        clientId: `new-ppl-${Date.now()}-${ppl.id}`,
-                        ppl_master_id: ppl.id,
-                        namaPPL: ppl.namaPPL,
-                        namaPML: "",
-                        tahap: tahap,
-                        bebanKerja: '',
-                        besaranHonor: '0',
-                        honorarium: []
+                if (pplsToAdd.length > 0) {
+                    const newAllocations = pplsToAdd.map((ppl: PPLMaster) => {
+                        const newPpl: ClientPPL = {
+                            clientId: `new-ppl-${Date.now()}-${ppl.id}`,
+                            ppl_master_id: ppl.id,
+                            namaPPL: ppl.namaPPL,
+                            namaPML: "",
+                            tahap: tahap,
+                            bebanKerja: '',
+                            besaranHonor: '0',
+                            honorarium: []
+                        };
+                        if (tahap === 'listing') newPpl.honorarium = [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' }];
+                        if (tahap === 'pencacahan') newPpl.honorarium = [{ jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }];
+                        if (tahap === 'pengolahan-analisis') newPpl.honorarium = [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }];
+                        return newPpl;
+                    });
+
+                    setAddedPPLCount(pplsToAdd.length);
+                    setShowAutoPopulateMessage(true);
+                    setTimeout(() => setShowAutoPopulateMessage(false), 5000);
+
+                    return { 
+                        ...currentFormData, 
+                        ppl: [...(currentFormData.ppl || []), ...newAllocations] 
                     };
-                    if (tahap === 'listing') newPpl.honorarium = [{ jenis_pekerjaan: 'listing', bebanKerja: '', besaranHonor: '0' }];
-                    if (tahap === 'pencacahan') newPpl.honorarium = [{ jenis_pekerjaan: 'pencacahan', bebanKerja: '', besaranHonor: '0' }];
-                    if (tahap === 'pengolahan-analisis') newPpl.honorarium = [{ jenis_pekerjaan: 'pengolahan', bebanKerja: '', besaranHonor: '0' }];
-                    return newPpl;
-                });
+                }
+                return currentFormData;
+            });
 
-                setAddedPPLCount(pplsToAdd.length);
-                setShowAutoPopulateMessage(true);
-                setTimeout(() => setShowAutoPopulateMessage(false), 5000);
-
-                return { 
-                    ...currentFormData, 
-                    ppl: [...(currentFormData.ppl || []), ...newAllocations] 
-                };
-            }
-            return currentFormData;
-        });
-
-        setMainTab('alokasi-ppl');
-        setPplStageTab(tahap);
-        window.history.replaceState({}, document.title);
-        
-    } else if (from === 'batal-pilih' && tahap) {
-        setMainTab('alokasi-ppl');
-        setPplStageTab(tahap);
-        window.history.replaceState({}, document.title);
-    }
-// 2. Perbarui dependency array
-}, [location.state, isInitialDataLoaded]);
+            setMainTab('alokasi-ppl');
+            setPplStageTab(tahap);
+            window.history.replaceState({}, document.title);
+            
+        } else if (from === 'batal-pilih' && tahap) {
+            setMainTab('alokasi-ppl');
+            setPplStageTab(tahap);
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state, isInitialDataLoaded]);
     
     const [showHonorWarningModal, setShowHonorWarningModal] = useState(false);
     const [honorWarningDetails, setHonorWarningDetails] = useState<{ pplName: string; totalHonor: number; limit: number } | null>(null);
@@ -523,7 +556,6 @@ export default function EditActivity() {
     const removePPL = useCallback((clientId: string) => {
     setFormData(prev => ({
         ...prev,
-        // Pastikan ppl selalu array, bahkan setelah filter
         ppl: prev.ppl?.filter(p => p.clientId !== clientId) || [] 
     }));
 }, []); 
@@ -544,34 +576,31 @@ export default function EditActivity() {
             setShowSuccessModal(true);
         },
         onError: (error: any) => {
-      // Cek apakah error memiliki struktur yang kita harapkan dari server
-      if (error.response && error.response.data) {
-        const errorData = error.response.data;
-        const errorDetails = errorData.details;
+            if (error.response && error.response.data) {
+                const errorData = error.response.data;
+                const errorDetails = errorData.details;
 
-        // Jika ada 'details' dan kodenya sesuai, tampilkan modal konfirmasi
-        if (errorDetails && errorDetails.code === 'HONOR_LIMIT_EXCEEDED') {
-            const pplWithError = formData.ppl?.find((p: any) => String(p.ppl_master_id) === String(errorDetails.ppl_master_id));
+                if (errorDetails && errorDetails.code === 'HONOR_LIMIT_EXCEEDED') {
+                    const pplWithError = formData.ppl?.find((p: any) => String(p.ppl_master_id) === String(errorDetails.ppl_master_id));
 
-            setHonorWarningDetails({
-                pplName: pplWithError?.namaPPL || 'salah satu PPL',
-                totalHonor: errorDetails.projectedTotal,
-                limit: errorDetails.limit
+                    setHonorWarningDetails({
+                        pplName: pplWithError?.namaPPL || 'salah satu PPL',
+                        totalHonor: errorDetails.projectedTotal,
+                        limit: errorDetails.limit
+                    });
+                    setShowHonorWarningModal(true);
+                    return;
+                }
+            }
+        
+            console.error("Gagal menyimpan:", error);
+            setAlertModal({ 
+                isOpen: true, 
+                title: "Gagal Menyimpan", 
+                message: `Terjadi kesalahan: ${error.response?.data?.message || error.message}` 
             });
-            setShowHonorWarningModal(true);
-            return; // <-- PENTING: Hentikan eksekusi di sini
         }
-      }
-    
-      // Jika errornya bukan soal honor, atau strukturnya berbeda, tampilkan modal error umum
-      console.error("Gagal menyimpan:", error);
-      setAlertModal({ 
-        isOpen: true, 
-        title: "Gagal Menyimpan", 
-        message: `Terjadi kesalahan: ${error.response?.data?.message || error.message}` 
-      });
-   }
-    });
+    });
 
     const validateDates = (): string | null => {
         const {
@@ -605,26 +634,88 @@ export default function EditActivity() {
     };
 
     const handleFormSubmit = (bypassHonorLimit = false) => {
-        if (!formData.id) return alert("Error: ID Kegiatan tidak ditemukan.");
-    
-        const dateError = validateDates();
-        if (dateError) {
-            setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
-            return;
-        }
-    
-        const dataToSubmit = {
-            ...formData,
-            id: formData.id,
-            lastEditedBy: user?.username,
-            lastUpdatedBy: user?.username,
-            bulanPembayaranHonor: undefined,
-            bypassHonorLimit: bypassHonorLimit
-        };
-        
-        mutation.mutate(dataToSubmit as Partial<FormState> & {id: number});
-    };
-   
+        if (!formData.id) return alert("Error: ID Kegiatan tidak ditemukan.");
+    
+        const dateError = validateDates();
+        if (dateError) {
+            setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
+            return;
+        }
+    
+        const dataToSubmit = {
+            ...formData,
+            id: formData.id,
+            lastEditedBy: user?.username,
+            lastUpdatedBy: user?.username,
+            bulanPembayaranHonor: undefined,
+            bypassHonorLimit: bypassHonorLimit
+        };
+        
+        mutation.mutate(dataToSubmit as Partial<FormState> & {id: number});
+    };
+
+    const handleNoteClick = (doc: ClientDokumen) => {
+        setCurrentNote(doc);
+        setIsNoteModalOpen(true);
+    };
+
+    const noteMutation = useMutation({
+    mutationFn: (payload: { documentData: Partial<Dokumen>; username?: string }) => {
+        const docId = payload.documentData.id;
+        if (docId) {
+            // Jika sudah ada ID, ini adalah update
+            return apiClient.put<Dokumen>(`/kegiatan/dokumen/${docId}`, payload);
+        } else {
+            // Jika belum ada ID, ini adalah dokumen baru
+            return apiClient.post<Dokumen>('/kegiatan/dokumen', payload);
+        }
+    },
+    onSuccess: (savedData: Dokumen) => {
+        // Setelah sukses, perbarui state formData dengan data dari server
+        setFormData(prev => {
+            const existing = prev.dokumen?.find(d => d.id === savedData.id);
+            if (existing) {
+                // Update dokumen yang sudah ada
+                return {
+                    ...prev,
+                    dokumen: prev.dokumen?.map(d => d.id === savedData.id ? { ...d, ...savedData } : d)
+                };
+            } else {
+                // Tambahkan dokumen baru (mengganti yang sementara/placeholder)
+                return {
+                    ...prev,
+                    dokumen: [...(prev.dokumen?.filter(d => d.clientId !== currentNote?.clientId) || []), { ...savedData, clientId: currentNote!.clientId }]
+                };
+            }
+        });
+        setIsNoteModalOpen(false);
+        setCurrentNote(null);
+    },
+    onError: (error: any) => {
+        setAlertModal({ isOpen: true, title: "Gagal Menyimpan Catatan", message: error.message });
+    }
+});
+
+const handleSaveNote = () => {
+    if (!currentNote) return;
+
+    // Definisikan tipe untuk variabel payload secara eksplisit
+    const payload: { documentData: Partial<Dokumen>; username?: string } = {
+        documentData: {
+            id: currentNote.id,
+            nama: currentNote.nama, // Isi catatan disimpan di field 'nama'
+            link: '', 
+            jenis: 'catatan', // Sekarang TypeScript akan paham ini adalah tipe literal
+            tipe: currentNote.tipe,
+            kegiatanId: currentNote.kegiatanId,
+            isWajib: currentNote.isWajib,
+        },
+        username: user?.username
+    };
+    
+    noteMutation.mutate(payload);
+};
+    
     const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: string, setAlertModal: React.Dispatch<React.SetStateAction<{isOpen: boolean; title: string; message: string;}>> }) => {
         const pplForStage = useMemo(() => formData.ppl?.filter(p => p.tahap === tahap) || [], [formData.ppl, tahap]);
         
@@ -683,40 +774,34 @@ export default function EditActivity() {
         }
         
         const allYearMonths = useMemo(() => {
-    // 1. Ambil tanggal mulai PALING AWAL dan tanggal selesai PALING AKHIR dari seluruh kegiatan
-    const startDate = formData.tanggalMulaiPersiapan;
-    const endDate = formData.tanggalSelesaiDiseminasiEvaluasi;
+            const startDate = formData.tanggalMulaiPersiapan;
+            const endDate = formData.tanggalSelesaiDiseminasiEvaluasi;
 
-    // 2. Jika salah satu tanggal tidak valid, kembalikan array kosong
-    if (!startDate || !endDate || !isValid(startDate) || !isValid(endDate)) {
-        return [{ value: '', label: 'Harap atur jadwal kegiatan terlebih dahulu' }];
-    }
-    
-    // 3. Buat daftar bulan dalam rentang tanggal yang valid
-    const months = new Set<string>(); // Gunakan Set untuk menghindari duplikasi
-    let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+            if (!startDate || !endDate || !isValid(startDate) || !isValid(endDate)) {
+                return [{ value: '', label: 'Harap atur jadwal kegiatan terlebih dahulu' }];
+            }
+            
+            const months = new Set<string>();
+            let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
 
-    while (currentMonth <= endDate) {
-        const monthValue = formatDateFns(currentMonth, 'MM-yyyy');
-        months.add(monthValue);
-        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
-    }
+            while (currentMonth <= endDate) {
+                const monthValue = formatDateFns(currentMonth, 'MM-yyyy');
+                months.add(monthValue);
+                currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+            }
 
-    // Ubah Set menjadi array objek yang bisa digunakan oleh Select
-    return Array.from(months).map(monthValue => {
-        const [month, year] = monthValue.split('-');
-        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-        return {
-            value: monthValue,
-            label: formatDateFns(date, 'MMMM yyyy', { locale: localeID }),
-        };
-    });
-
-// 4. Pastikan dihitung ulang HANYA jika tanggal awal atau akhir berubah
-}, [
-    formData.tanggalMulaiPersiapan, 
-    formData.tanggalSelesaiDiseminasiEvaluasi
-]);
+            return Array.from(months).map(monthValue => {
+                const [month, year] = monthValue.split('-');
+                const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+                return {
+                    value: monthValue,
+                    label: formatDateFns(date, 'MMMM yyyy', { locale: localeID }),
+                };
+            });
+        }, [
+            formData.tanggalMulaiPersiapan, 
+            formData.tanggalSelesaiDiseminasiEvaluasi
+        ]);
 
 
         return (
@@ -742,8 +827,8 @@ export default function EditActivity() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="p-4 border rounded-lg bg-blue-50/50 space-y-4">
-                       <h4 className="font-medium text-gray-800">Pengaturan Honorarium & Pembayaran</h4>
-                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <h4 className="font-medium text-gray-800">Pengaturan Honorarium & Pembayaran</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label>Satuan Beban Kerja</Label>
                                 <Input value={honorSettingKey ? localHonorSettings[honorSettingKey].satuanBebanKerja : ''} onChange={e => handleSettingChange('satuanBebanKerja', e.target.value)} onBlur={handleSettingBlur} />
@@ -763,7 +848,7 @@ export default function EditActivity() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                       </div>
+                        </div>
                     </div>
                     <div className="space-y-4">
                         {pplForStage.map((ppl, index) => {
@@ -803,94 +888,117 @@ export default function EditActivity() {
     };
     
     const DokumenContent = ({ tipe, title, username }: { tipe: Dokumen['tipe'], title: string, username?: string }) => {
-    const documents = useMemo(() => formData.dokumen?.filter(d => d.tipe === tipe) || [], [formData.dokumen, tipe]);
+        const documents = useMemo(() => formData.dokumen?.filter(d => d.tipe === tipe).sort((a, b) => (a.jenis === 'catatan' ? -1 : 1)) || [], [formData.dokumen, tipe]);
 
-    const deleteMutation = useMutation({
-        mutationFn: (docId: number) => apiClient.delete(`/kegiatan/dokumen/${docId}`),
-        onSuccess: (response, docId) => {
-            setFormData(prev => ({
-                ...prev,
-                dokumen: prev.dokumen?.filter(d => d.id !== docId)
-            }));
-        },
-        onError: (error: any) => alert(`Error: ${error.message}`)
-    });
-
-    const removeDocument = (clientId: string, docId?: number) => {
-        if (docId) {
-            deleteMutation.mutate(docId);
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                dokumen: prev.dokumen?.filter(d => d.clientId !== clientId)
-            }));
-        }
-    };
-
-    const handleDocumentSaved = (savedDoc: Dokumen, oldClientId: string) => {
-        setFormData(prev => {
-            const newDokumenList = prev.dokumen?.map(d => 
-                d.clientId === oldClientId ? { ...savedDoc, clientId: oldClientId } : d
-            );
-            return { ...prev, dokumen: newDokumenList };
+        const deleteMutation = useMutation({
+            mutationFn: (docId: number) => apiClient.delete(`/kegiatan/dokumen/${docId}`),
+            onSuccess: (response, docId) => {
+                setFormData(prev => ({
+                    ...prev,
+                    dokumen: prev.dokumen?.filter(d => d.id !== docId)
+                }));
+            },
+            onError: (error: any) => alert(`Error: ${error.message}`)
         });
-    };
 
-    const addDocument = (tipe: Dokumen['tipe']) => {
-        const newDoc: ClientDokumen = { 
-            clientId: `new-doc-${Date.now()}`, 
-            kegiatanId: Number(id), 
-            tipe, 
-            nama: "", link: "", jenis: 'link', isWajib: false, 
-            status: 'Pending', uploadedAt: new Date().toISOString() 
+        const removeDocument = (clientId: string, docId?: number) => {
+            if (docId) {
+                deleteMutation.mutate(docId);
+            } else {
+                setFormData(prev => ({
+                    ...prev,
+                    dokumen: prev.dokumen?.filter(d => d.clientId !== clientId)
+                }));
+            }
         };
-        setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
-    };
 
-    return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <CardTitle>Dokumen {title}</CardTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2">
-                        <Plus className="w-4 h-4" />Tambah Dokumen
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {documents.map(doc => (
-                    <DokumenItem 
-                        key={doc.clientId} 
-                        doc={doc} 
-                        removeDocument={removeDocument}
-                        onDocumentSaved={handleDocumentSaved}
-                        isDeleting={deleteMutation.isPending}
-                        username={username}
-                    />
-                ))}
-            </CardContent>
-        </Card>
-    );
+        const handleDocumentSaved = (savedDoc: Dokumen, oldClientId: string) => {
+            setFormData(prev => {
+                const newDokumenList = prev.dokumen?.map(d => 
+                    d.clientId === oldClientId ? { ...savedDoc, clientId: oldClientId } : d
+                );
+                return { ...prev, dokumen: newDokumenList };
+            });
+        };
+
+        const addDocument = (tipe: Dokumen['tipe']) => {
+            const newDoc: ClientDokumen = { 
+                clientId: `new-doc-${Date.now()}`, 
+                kegiatanId: Number(id), 
+                tipe, 
+                nama: "", link: "", jenis: 'link', isWajib: false, 
+                status: 'Pending', uploadedAt: new Date().toISOString() 
+            };
+            setFormData(prev => ({...prev, dokumen: [...(prev.dokumen || []), newDoc] }));
+        };
+        
+        const addNote = (tipe: Dokumen['tipe']) => {
+    const newNoteTemplate: ClientDokumen = {
+        clientId: `new-note-${Date.now()}`,
+        kegiatanId: Number(id),
+        tipe,
+        nama: "", // Isi catatan akan diisi di modal
+        link: "",
+        jenis: 'catatan',
+        isWajib: false,
+        status: 'Pending',
+        uploadedAt: new Date().toISOString()
+    };
+    // Langsung buka modal untuk catatan baru
+    handleNoteClick(newNoteTemplate);
 };
+
+        return (
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                        <CardTitle>Dokumen {title}</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => addNote(tipe)} className="flex items-center gap-2">
+                                <MessageSquare className="w-4 h-4" />Tambah Catatan
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => addDocument(tipe)} className="flex items-center gap-2">
+                                <Plus className="w-4 h-4" />Tambah Dokumen
+                            </Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {documents.length === 0 && <p className="text-sm text-gray-500 text-center py-4">Belum ada dokumen atau catatan.</p>}
+                    {documents.map(doc => (
+                        <DokumenItem 
+                            key={doc.clientId} 
+                            doc={doc} 
+                            removeDocument={removeDocument}
+                            onDocumentSaved={handleDocumentSaved}
+                            isDeleting={deleteMutation.isPending}
+                            username={username}
+                            onNoteClick={handleNoteClick}
+                        />
+                    ))}
+                </CardContent>
+            </Card>
+        );
+    };
 
     if (isLoading) {
         return (
             <Layout>
                 <div className="max-w-4xl mx-auto space-y-8 animate-pulse">
-                     <div className="flex items-center gap-4 mb-8">
-                         <Skeleton className="h-10 w-48" />
-                         <Skeleton className="h-10 w-48" />
-                     </div>
-                      <Skeleton className="h-12 w-full mb-6" />
-                      <Card>
-                         <CardHeader>
-                             <Skeleton className="h-8 w-1/2" />
-                             <Skeleton className="h-4 w-3/4 mt-2" />
-                         </CardHeader>
-                         <CardContent>
-                             <Skeleton className="h-40 w-full" />
-                         </CardContent>
-                      </Card>
+                        <div className="flex items-center gap-4 mb-8">
+                            <Skeleton className="h-10 w-48" />
+                            <Skeleton className="h-10 w-48" />
+                        </div>
+                        <Skeleton className="h-12 w-full mb-6" />
+                        <Card>
+                            <CardHeader>
+                                <Skeleton className="h-8 w-1/2" />
+                                <Skeleton className="h-4 w-3/4 mt-2" />
+                            </CardHeader>
+                            <CardContent>
+                                <Skeleton className="h-40 w-full" />
+                            </CardContent>
+                        </Card>
                 </div>
             </Layout>
         );
@@ -981,18 +1089,18 @@ export default function EditActivity() {
                                     <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>
                                     <TabsTrigger value="diseminasi-evaluasi">Diseminasi</TabsTrigger>
                                 </TabsList>
-                                 <TabsContent value="persiapan" className="mt-4">
-                                     <DokumenContent tipe="persiapan" title="Persiapan" username={user?.username} />
-                                 </TabsContent>
-                                 <TabsContent value="pengumpulan-data" className="mt-4">
-                                     <DokumenContent tipe="pengumpulan-data" title="Pengumpulan Data" username={user?.username} />
-                                 </TabsContent>
-                                 <TabsContent value="pengolahan-analisis" className="mt-4">
-                                     <DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" username={user?.username} />
-                                 </TabsContent>
-                                 <TabsContent value="diseminasi-evaluasi" className="mt-4">
-                                     <DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" username={user?.username} />
-                                 </TabsContent>
+                                <TabsContent value="persiapan" className="mt-4">
+                                    <DokumenContent tipe="persiapan" title="Persiapan" username={user?.username} />
+                                </TabsContent>
+                                <TabsContent value="pengumpulan-data" className="mt-4">
+                                    <DokumenContent tipe="pengumpulan-data" title="Pengumpulan Data" username={user?.username} />
+                                </TabsContent>
+                                <TabsContent value="pengolahan-analisis" className="mt-4">
+                                    <DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" username={user?.username} />
+                                </TabsContent>
+                                <TabsContent value="diseminasi-evaluasi" className="mt-4">
+                                    <DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" username={user?.username} />
+                                </TabsContent>
                             </Tabs>
                         </TabsContent>
                     </Tabs>
@@ -1005,7 +1113,6 @@ export default function EditActivity() {
                             className="min-w-48 bg-bps-green-600 hover:bg-bps-green-700" 
                             size="lg"
                         >
-                            {/* --- PERUBAHAN DI SINI --- */}
                             {mutation.isPending ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1019,7 +1126,7 @@ export default function EditActivity() {
                             )}
                         </Button>
                     </div>
-                 </form>
+                </form>
                 <SuccessModal 
                     isOpen={showSuccessModal} 
                     onClose={() => setShowSuccessModal(false)} 
@@ -1028,19 +1135,47 @@ export default function EditActivity() {
                     description={`Perubahan pada "${formData.namaKegiatan}" telah disimpan.`}
                     actionLabel="Ke Dashboard" 
                 />
-                 <ConfirmationModal
+                <ConfirmationModal
                     isOpen={showHonorWarningModal}
                     onClose={() => setShowHonorWarningModal(false)}
                     onConfirm={() => {
-                        setShowHonorWarningModal(false);
-                        handleFormSubmit(true); // Kirim dengan flag bypass
-                     }}
+                        setShowHonorWarningModal(false);
+                        handleFormSubmit(true);
+                    }}
                     title="Peringatan Batas Honor"
                     description={`Total honor untuk ${honorWarningDetails?.pplName} di bulan terpilih akan menjadi ${formatHonor(honorWarningDetails?.totalHonor || 0)}, melebihi batas ${formatHonor(honorWarningDetails?.limit || 0)}. Lanjutkan?`}
                     confirmLabel="Ya, Lanjutkan"
                     variant="warning"
-                  />
+                />
             </div>
+
+            {/* Note Modal */}
+            <Dialog open={isNoteModalOpen} onOpenChange={setIsNoteModalOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>{currentNote?.id ? 'Edit Catatan' : 'Tambah Catatan Baru'}</DialogTitle>
+                        <DialogDescription>
+                           Tuliskan catatan atau informasi penting terkait tahap kegiatan ini. Klik simpan untuk menyimpan.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Textarea
+                            placeholder="Isi catatan di sini..."
+                            value={currentNote?.nama || ''}
+                            onChange={(e) =>
+                                setCurrentNote(prev => prev ? { ...prev, nama: e.target.value } : null)
+                            }
+                            rows={8}
+                            className="w-full"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsNoteModalOpen(false)}>Batal</Button>
+                        <Button onClick={handleSaveNote} disabled={!currentNote?.nama.trim()}>Simpan Catatan</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <AlertModal isOpen={alertModal.isOpen} onClose={() => setAlertModal({ isOpen: false, title: "", message: "" })} title={alertModal.title} description={alertModal.message} />
         </Layout>
     );
