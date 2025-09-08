@@ -16,13 +16,12 @@ import pmlRoutes from './routes/pml';
 
 export function createServer() {
   const app = express();
-  const baseURI = "/kharisma"; // prefix untuk semua route di produksi
+  const baseURI = "/kharisma"; 
 
   app.use(cors());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Semua endpoint API sekarang otomatis diawali /kharisma/api/...
   app.use(`${baseURI}/api/auth`, authRoutes); 
   app.use(`${baseURI}/api/kegiatan`, kegiatanRoutes);
   app.use(`${baseURI}/api/honor`, honorRoutes);

@@ -69,7 +69,7 @@ function EvaluationModal({ isOpen, onClose, penilaian, onSave, isSaving }: Evalu
       sikapPelikaku: parseInt(sikapPerilaku),
       kualitasPekerjaan: parseInt(kualitasPekerjaan),
       ketepatanWaktu: parseInt(ketepatanWaktu),
-      dinilaiOleh_userId: Number(user.id),
+      dinilaiOleh_userId: user.id,
     };
     onSave(data);
   };

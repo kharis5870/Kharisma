@@ -160,7 +160,7 @@ export interface PenilaianMitra {
   namaKegiatan: string;
   pplId: number;
   namaPPL: string;
-  pmlId: number | null;
+  pmlId: string | null;
   namaPML: string | null;
   tahap: string;
   sikapPelikaku: number | null;
@@ -176,8 +176,8 @@ export interface PenilaianRequest {
   penilaianId?: number; // ID dari penilaian_mitra jika sudah ada (untuk update)
   pplId: number;
   kegiatanId: number;
-  pmlId: number | null;
-  dinilaiOleh_userId: number; // ID user yang sedang login
+  pmlId: string | null;
+  dinilaiOleh_userId: string; // ID user yang sedang login
   sikapPelikaku: number;
   kualitasPekerjaan: number;
   ketepatanWaktu: number;

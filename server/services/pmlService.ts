@@ -9,7 +9,7 @@ export const getPmlAdminData = async (): Promise<PMLAdminData[]> => {
         SELECT
             u.id,
             u.nama_lengkap AS namaPML,
-            COUNT(DISTINCT p.kegiatanId) AS totalKegiatan,
+            COUNT(DISTINCT CONCAT(p.kegiatanId, '-', p.tahap)) AS totalKegiatan,
             GROUP_CONCAT(DISTINCT CONCAT(k.namaKegiatan, ';;', p.tahap) SEPARATOR '||') AS kegiatanDetails
         FROM
             users u
