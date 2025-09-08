@@ -12,6 +12,7 @@ import authRoutes from './routes/auth';
 import settingsRoutes from './routes/settings';
 import notifikasiRoutes from './routes/notifikasi';
 import penilaianRoutes from './routes/penilaian';
+import pmlRoutes from './routes/pml';
 
 export function createServer() {
   const app = express();
@@ -31,6 +32,7 @@ export function createServer() {
   app.use(`${baseURI}/api/settings`, settingsRoutes);
   app.use(`${baseURI}/api/notifikasi`, notifikasiRoutes);
   app.use(`${baseURI}/api/penilaian`, penilaianRoutes);
+  app.use(`${baseURI}/api/pml`, pmlRoutes); 
 
   return app;
 }

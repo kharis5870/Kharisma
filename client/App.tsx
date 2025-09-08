@@ -17,6 +17,7 @@ import EditActivity from "./pages/EditActivity";
 import ViewDocuments from "./pages/ViewDocuments";
 import PenilaianMitraPage from './pages/PenilaianMitra';
 import NotFound from "./pages/NotFound";
+import DaftarPML from './pages/DaftarPML';
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
                 <Route path="/edit-activity/:id" element={<ProtectedRoute><EditActivity /></ProtectedRoute>} />
                 <Route path="/view-documents/:id" element={<ProtectedRoute><ViewDocuments /></ProtectedRoute>} />
                 <Route path="/penilaian-mitra" element={<ProtectedRoute><PenilaianMitraPage /></ProtectedRoute>} />
+                <Route path="/daftar-pml" element={<DaftarPML />} />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>

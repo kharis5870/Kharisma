@@ -1,6 +1,6 @@
 // client/components/Sidebar.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Users, FileText, Settings, LogOut, PlusCircle, Menu, ArrowLeft, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,6 +32,62 @@ const SidebarLink: React.FC<{isExpanded: boolean; href: string; icon: React.Elem
     </Link>
 );
 
+const SidebarDropdown: React.FC<{
+    isExpanded: boolean;
+    item: any; // Ganti 'any' dengan tipe yang lebih spesifik jika Anda punya
+    location: any;
+    theme: 'light' | 'dark';
+}> = ({ isExpanded, item, location, theme }) => {
+    // Cek apakah salah satu submenu aktif
+    const isSubmenuActive = item.submenu.some((subItem: any) => location.pathname === subItem.href);
+    
+    // State untuk mengontrol buka/tutup dropdown
+    const [isOpen, setIsOpen] = useState(isSubmenuActive);
+
+    // Buka dropdown jika sidebar expand dan submenu aktif
+    useEffect(() => {
+        if (isExpanded && isSubmenuActive) {
+            setIsOpen(true);
+        }
+    }, [isExpanded, isSubmenuActive]);
+
+    return (
+        <div>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={cn(
+                    "flex items-center p-3 my-1 rounded-lg transition-colors w-full text-left",
+                    theme === 'light' ? 'text-gray-700 hover:bg-blue-100 hover:text-blue-600' : 'text-gray-200 hover:bg-gray-700',
+                    isSubmenuActive && (theme === 'light' ? 'bg-blue-100 text-blue-600' : 'bg-gray-700')
+                )}
+            >
+                <item.icon className="w-6 h-6 flex-shrink-0" />
+                <span className={cn('ml-4 overflow-hidden whitespace-nowrap transition-all duration-300', isExpanded ? 'w-full opacity-100' : 'w-0 opacity-0')}>
+                    {item.label}
+                </span>
+                {/* Ikon panah dropdown */}
+                <ArrowLeft className={cn('ml-auto w-4 h-4 transition-transform duration-300', isExpanded ? 'opacity-100' : 'opacity-0', isOpen && '-rotate-90')} />
+            </button>
+            {/* Konten Dropdown */}
+            <div className={cn("overflow-hidden transition-all duration-300", isOpen && isExpanded ? 'max-h-40' : 'max-h-0')}>
+                <ul className="pl-6 border-l ml-6 my-1 border-gray-300 dark:border-gray-600">
+                    {item.submenu.map((subItem: any) => (
+                        <li key={subItem.href}>
+                            <SidebarLink
+                                isExpanded={isExpanded}
+                                href={subItem.href}
+                                icon={subItem.icon}
+                                label={subItem.label}
+                                active={location.pathname === subItem.href}
+                                theme={theme}
+                            />
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </div>
+    );
+};
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
@@ -47,12 +103,19 @@ const Sidebar: React.FC = () => {
 
   // 1. Definisikan SEMUA kemungkinan item menu di sini
   const allMenuItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: Home },
-    { href: '/daftar-ppl', label: 'Daftar PPL', icon: Users },
-    { href: '/manajemen-honor', label: 'Manajemen Honor', icon: FileText },
-    { href: '/penilaian-mitra', label: 'Penilaian Mitra', icon: Star },
-    { href: '/manajemen-admin', label: 'Manajemen Admin', icon: Settings },
-  ];
+    { href: '/dashboard', label: 'Dashboard', icon: Home, submenu: [] },
+    { 
+        label: 'Daftar', 
+        icon: Users, 
+        submenu: [
+            { href: '/daftar-ppl', label: 'Daftar PPL', icon: Users },
+            { href: '/daftar-pml', label: 'Daftar PML', icon: Users },
+        ] 
+    },
+    { href: '/manajemen-honor', label: 'Manajemen Honor', icon: FileText, submenu: [] },
+    { href: '/penilaian-mitra', label: 'Penilaian Mitra', icon: Star, submenu: [] },
+    { href: '/manajemen-admin', label: 'Manajemen Admin', icon: Settings, submenu: [] },
+];
 
   // 2. Buat daftar menu yang SUDAH DIFILTER sebelum masuk ke JSX
   const filteredMenuItems = allMenuItems.filter(item => {
@@ -91,17 +154,25 @@ const Sidebar: React.FC = () => {
 
         <nav className="mt-4 flex-grow px-4">
           <ul>
-            {/* 3. Gunakan daftar yang sudah bersih dan difilter di sini */}
             {filteredMenuItems.map((item) => (
               <li key={item.href}>
+                {item.submenu && item.submenu.length > 0 ? (
+                    <SidebarDropdown
+                        isExpanded={isExpanded}
+                        item={item}
+                        location={location}
+                        theme={theme}
+                    />
+                ) : (
                 <SidebarLink
                   isExpanded={isExpanded}
-                  href={item.href}
+                  href={item.href!}
                   icon={item.icon}
                   label={item.label}
                   active={location.pathname === item.href}
                   theme={theme}
                 />
+                )}
               </li>
             ))}
           </ul>

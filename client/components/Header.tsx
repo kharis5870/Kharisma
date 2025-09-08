@@ -17,8 +17,12 @@ const getTitleFromPath = (path: string): string => {
       return 'Dashboard';
     case '/daftar-ppl':
       return 'Daftar PPL';
+    case '/daftar-pml':
+      return 'Daftar PML';
     case '/manajemen-honor':
       return 'Manajemen Honor';
+    case '/penilaian-mitra':
+      return 'Penilaian Mitra';
     case '/manajemen-admin':
       return 'Manajemen Admin';
     case '/input-kegiatan':

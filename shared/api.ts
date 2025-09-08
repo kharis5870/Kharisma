@@ -54,6 +54,16 @@ export interface PPLMaster {
   namaPPL: string;
 }
 
+export interface PMLAdminData {
+    id: string;
+    namaPML: string;
+    totalKegiatan: number;
+    kegiatanDetails: {
+        nama: string;
+        tahap: string;
+    }[];
+}
+
 export interface KetuaTim {
   id: string;
   namaKetua: string;
