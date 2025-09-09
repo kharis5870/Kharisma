@@ -10,7 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Calendar, Clock, Search, Bell, Settings } from "lucide-react";
 import NotificationDropdown from './NotificationDropdown';
 
-// Fungsi getTitleFromPath tetap sama
 const getTitleFromPath = (path: string): string => {
   switch (path) {
     case '/dashboard':
@@ -41,16 +40,13 @@ const Header: React.FC = () => {
   const [pageTitle, setPageTitle] = useState('Dashboard');
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Effect untuk memperbarui judul halaman saat path berubah
   useEffect(() => {
     const newTitle = getTitleFromPath(location.pathname);
     setPageTitle(newTitle);
   }, [location]);
 
-  // Effect untuk memperbarui waktu setiap detik
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    // Cleanup function untuk menghentikan interval saat komponen di-unmount
     return () => clearInterval(timer);
   }, []);
 

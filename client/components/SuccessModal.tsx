@@ -10,7 +10,7 @@ interface SuccessModalProps {
   description?: string;
   actionLabel?: string;
   onAction?: () => void;
-  autoCloseDelay?: number; // in milliseconds
+  autoCloseDelay?: number; 
 }
 
 export default function SuccessModal({

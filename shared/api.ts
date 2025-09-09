@@ -148,7 +148,7 @@ export interface DocumentNotification {
   kegiatanId: number;
   linkFile: string;
   uploadedBy: string;
-  uploadedAt: string; // ISO date string
+  uploadedAt: string; 
   status: 'pending_approval';
   type: 'document_uploaded';
   tahap: string;
@@ -168,16 +168,16 @@ export interface PenilaianMitra {
   ketepatanWaktu: number | null;
   rataRata: number | null;
   sudahDinilai: boolean;
-  tanggalPenilaian?: string | null; // ISO date string
+  tanggalPenilaian?: string | null; 
   dinilaiOleh?: string | null;
 }
 
 export interface PenilaianRequest {
-  penilaianId?: number; // ID dari penilaian_mitra jika sudah ada (untuk update)
+  penilaianId?: number; 
   pplId: number;
   kegiatanId: number;
   pmlId: string | null;
-  dinilaiOleh_userId: string; // ID user yang sedang login
+  dinilaiOleh_userId: string;
   sikapPelikaku: number;
   kualitasPekerjaan: number;
   ketepatanWaktu: number;

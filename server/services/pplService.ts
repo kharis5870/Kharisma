@@ -13,7 +13,7 @@ interface PPLAdminQueryResult extends RowDataPacket {
     alamat: string;
     noTelepon: string;
     totalKegiatan: number;
-    kegiatanNames: string | null; // <-- Kunci perbaikannya: DB mengirim string atau null
+    kegiatanNames: string | null; 
 }
 
 // Fungsi ini tetap ada untuk manajemen data master PPL
@@ -53,10 +53,8 @@ export const getPplAdminData = async (): Promise<PPLAdminData[]> => {
         ORDER BY pm.namaPPL ASC
     `;
     
-    // Gunakan interface query result yang baru
     const [rows] = await db.query<PPLAdminQueryResult[]>(query);
     
-    // Proses mapping sekarang aman secara tipe data
     return rows.map(row => ({
         id: row.id,
         namaPPL: row.namaPPL,

@@ -383,38 +383,73 @@ export default function Dashboard() {
     );
 
     const PPLUpdateCard = ({ ppl, handleUpdatePPL }: { ppl: PPLWithProgress, handleUpdatePPL: (pplId: number, field: EditableProgressKey, value: string) => void }) => {
+        // 1. Tambahkan state lokal untuk menampung nilai input sementara
+        const [localProgress, setLocalProgress] = useState(ppl.progress);
+
+        // Sinkronkan state lokal jika data dari luar (props) berubah
+        useEffect(() => {
+            setLocalProgress(ppl.progress);
+        }, [ppl.progress]);
+
         const isPendataan = ppl.tahap === 'listing' || ppl.tahap === 'pencacahan';
-        const isPengolahan = ppl.tahap === 'pengolahan-analisis';
         const honorDetail = ppl.honorarium?.[0];
         const targetBebanKerja = honorDetail?.bebanKerja || '0';
 
+        // 2. Buat handler untuk onChange (hanya mengubah state lokal)
+        const handleLocalChange = (field: EditableProgressKey, value: string) => {
+            const numValue = parseInt(value, 10);
+            setLocalProgress(prev => ({
+                ...prev,
+                [field]: isNaN(numValue) ? 0 : numValue
+            }));
+        };
+
+        // 3. Buat handler untuk onBlur (menyimpan ke state global)
+        const handleBlur = (field: EditableProgressKey) => {
+            handleUpdatePPL(ppl.id!, field, String(localProgress[field] ?? '0'));
+        };
+
         const renderProgressInputs = () => {
             if (isPendataan) {
-                const progress = ppl.progress;
                 const stages: EditableProgressKey[] = ['submit', 'diperiksa', 'approved'];
                 return (
                     <div className="grid grid-cols-4 gap-3">
-                        <div><Label className="text-xs text-slate-600">Open</Label><Input type="number" value={progress.open ?? 0} disabled className="mt-1 text-center bg-slate-100" /></div>
-                        {stages.map(field => (<div key={field}><Label className="text-xs text-slate-600 capitalize">{field}</Label><Input type="number" min="0" value={progress[field] ?? 0} onChange={e => handleUpdatePPL(ppl.id!, field, e.target.value)} className="mt-1 text-center" /></div>))}
-                    </div>
-                );
-            }
-            if (isPengolahan) {
-                const progress = ppl.progress;
-                const stages: EditableProgressKey[] = ['sudah_entry', 'validasi', 'clean'];
-                return (
-                    <div className="grid grid-cols-4 gap-3">
-                        <div><Label className="text-xs text-slate-600">Belum Entry</Label><Input type="number" value={progress.belum_entry ?? 0} disabled className="mt-1 text-center bg-slate-100" /></div>
+                        <div><Label className="text-xs text-slate-600">Open</Label><Input type="number" value={localProgress.open ?? 0} disabled className="mt-1 text-center bg-slate-100"/></div>
+                        {/* 4. Perbarui props pada komponen <Input> */}
                         {stages.map(field => (
                             <div key={field}>
-                                <Label className="text-xs text-slate-600 capitalize">{field === 'sudah_entry' ? 'Dientry' : field}</Label>
-                                <Input type="number" min="0" value={progress[field] ?? 0} onChange={e => handleUpdatePPL(ppl.id!, field, e.target.value)} className="mt-1 text-center" />
+                                <Label className="text-xs text-slate-600 capitalize">{field}</Label>
+                                <Input 
+                                    type="number" 
+                                    min="0" 
+                                    value={localProgress[field] ?? 0} 
+                                    onChange={e => handleLocalChange(field, e.target.value)} 
+                                    onBlur={() => handleBlur(field)}
+                                    className="mt-1 text-center" />
                             </div>
                         ))}
                     </div>
                 );
             }
-            return null;
+            
+            const pengolahanStages: EditableProgressKey[] = ['sudah_entry', 'validasi', 'clean'];
+            return (
+                <div className="grid grid-cols-4 gap-3">
+                    <div><Label className="text-xs text-slate-600">Belum Entry</Label><Input type="number" value={localProgress.belum_entry ?? 0} disabled className="mt-1 text-center bg-slate-100"/></div>
+                    {pengolahanStages.map(field => (
+                        <div key={field}>
+                            <Label className="text-xs text-slate-600 capitalize">{field === 'sudah_entry' ? 'Dientry' : field}</Label>
+                            <Input 
+                                type="number" 
+                                min="0" 
+                                value={localProgress[field] ?? 0} 
+                                onChange={e => handleLocalChange(field, e.target.value)} 
+                                onBlur={() => handleBlur(field)} 
+                                className="mt-1 text-center" />
+                        </div>
+                    ))}
+                </div>
+            );
         };
 
         return (

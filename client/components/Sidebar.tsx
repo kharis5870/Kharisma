@@ -34,11 +34,10 @@ const SidebarLink: React.FC<{isExpanded: boolean; href: string; icon: React.Elem
 
 const SidebarDropdown: React.FC<{
     isExpanded: boolean;
-    item: any; // Ganti 'any' dengan tipe yang lebih spesifik jika Anda punya
+    item: any; 
     location: any;
     theme: 'light' | 'dark';
 }> = ({ isExpanded, item, location, theme }) => {
-    // Cek apakah salah satu submenu aktif
     const isSubmenuActive = item.submenu.some((subItem: any) => location.pathname === subItem.href);
     
     // State untuk mengontrol buka/tutup dropdown
@@ -92,7 +91,7 @@ const SidebarDropdown: React.FC<{
 const Sidebar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth(); // Pastikan 'user' diambil
+  const { user, logout } = useAuth(); 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { isExpanded, toggleSidebar, theme, setTheme } = useSidebarStore();
 
@@ -101,7 +100,6 @@ const Sidebar: React.FC = () => {
     navigate('/login', { state: { fromLogout: true } });
   };
 
-  // 1. Definisikan SEMUA kemungkinan item menu di sini
   const allMenuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: Home, submenu: [] },
     { 
@@ -117,9 +115,7 @@ const Sidebar: React.FC = () => {
     { href: '/manajemen-admin', label: 'Manajemen Admin', icon: Settings, submenu: [] },
 ];
 
-  // 2. Buat daftar menu yang SUDAH DIFILTER sebelum masuk ke JSX
   const filteredMenuItems = allMenuItems.filter(item => {
-    // Aturan #1: Sembunyikan 'Manajemen Admin' jika peran bukan 'admin'
     if (item.href === '/manajemen-admin') {
       return user?.role === 'admin';
     }

@@ -252,28 +252,23 @@ export default function DaftarPPL() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {selectionMode ? (
-              <>
-                <Button variant="destructive" onClick={handleCancelSelection}>
-                    <XCircle className="w-4 h-4 mr-2"/>
-                    Batal Pilih
-                </Button>
-                <Button 
-                    className="bg-blue-600 hover:bg-blue-700" 
-                    onClick={handleBulkAddToActivity}
-                    disabled={selectedPPLs.length === 0}
-                >
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Tambahkan PPL ({selectedPPLs.length})
-                </Button>
-              </>
-            ) : (
-                <Button variant="outline" onClick={() => setSelectionMode(true)}>
-                    <CheckSquare className="w-4 h-4 mr-2"/>
-                    Pilih PPL
-                </Button>
+            {selectionMode && (
+                <>
+                    <Button variant="destructive" onClick={handleCancelSelection}>
+                        <XCircle className="w-4 h-4 mr-2"/>
+                        Batal Pilih
+                    </Button>
+                    <Button 
+                        className="bg-blue-600 hover:bg-blue-700" 
+                        onClick={handleBulkAddToActivity}
+                        disabled={selectedPPLs.length === 0}
+                    >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Tambahkan PPL ({selectedPPLs.length})
+                    </Button>
+                </>
             )}
-          </div>
+        </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total PPL</p><p className="text-2xl font-bold text-gray-900">{stats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>

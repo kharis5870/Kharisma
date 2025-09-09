@@ -10,7 +10,7 @@ export const getSetting = async (key: string, defaultValue: string): Promise<str
     if (rows.length > 0) {
         return rows[0].setting_value;
     }
-    return defaultValue; // Kembalikan nilai default jika tidak ditemukan
+    return defaultValue;
 };
 
 export const updateSetting = async (key: string, value: string): Promise<boolean> => {

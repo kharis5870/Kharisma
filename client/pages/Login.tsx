@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext"; // <-- Impor useAuth
+import { useAuth } from "@/contexts/AuthContext"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ import { apiClient } from "@/lib/apiClient";
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth(); // <-- Gunakan login dari context
+  const { login } = useAuth(); 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -36,22 +36,18 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Definisikan tipe data yang diharapkan dari respons login
       type LoginResponse = { success: boolean, user: any, message?: string };
 
-      // Ganti fetch dengan apiClient.post
       const data = await apiClient.post<LoginResponse>('/auth/login', { username, password });
 
-      // apiClient sudah menangani !response.ok, jadi kita hanya perlu cek logika sukses
       if (data.success) {
-        login(data.user); // Simpan data user (termasuk role) ke context
+        login(data.user); 
         navigate("/dashboard");
       } else {
         setError(data.message || "Terjadi kesalahan. Silakan coba lagi.");
       }
     } catch (err: any) {
-      // apiClient akan melempar error dengan properti message
-      setError(err.message || "Tidak dapat terhubung ke server. Periksa koneksi Anda.");
+      setError(err.message || "Tidak dapat terhubung ke server. Periksa koneksi Anda.");
     } finally {
       setIsLoading(false);
     }
