@@ -11,7 +11,10 @@ const router = express.Router();
 // Jika Anda punya middleware, tambahkan seperti ini: router.get('/', authenticateToken, async (req, res) => {
 router.get('/', async (req, res) => {
   try {
-    const penilaianList = await getPenilaianList();
+    const tahun = req.query.tahun ? parseInt(req.query.tahun as string) : undefined;
+    const triwulan = req.query.triwulan ? parseInt(req.query.triwulan as string) : undefined;
+        
+    const penilaianList = await getPenilaianList(tahun, triwulan);
     res.json(penilaianList);
   } catch (error) {
     console.error('Error fetching penilaian list:', error);

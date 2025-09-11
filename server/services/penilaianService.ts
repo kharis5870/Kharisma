@@ -8,9 +8,21 @@ import db from '../db';
 /**
  * Mengambil daftar gabungan PPL dari sebuah kegiatan beserta data penilaiannya (jika ada).
  */
-export const getPenilaianList = async () => {
-  const query = `
-      SELECT
+export const getPenilaianList = async (tahun?: number, triwulan?: number) => {
+    let whereClauses = [];
+    let params = [];
+
+    if (tahun && triwulan) {
+        const bulanMulai = (triwulan - 1) * 3 + 1;
+        const bulanSelesai = triwulan * 3;
+        whereClauses.push('YEAR(pn.tanggal_penilaian) = ? AND MONTH(pn.tanggal_penilaian) BETWEEN ? AND ?');
+        params.push(tahun, bulanMulai, bulanSelesai);
+    }
+    
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    
+    const query = `
+        SELECT
             p.id AS id,
             k.id AS kegiatanId,
             k.namaKegiatan AS namaKegiatan,
@@ -31,11 +43,12 @@ export const getPenilaianList = async () => {
         JOIN ppl_master pm ON p.ppl_master_id = pm.id
         LEFT JOIN users u ON p.pml_id = u.id
         LEFT JOIN penilaian_mitra pn ON p.id = pn.pplId
+        ${whereSql}
         ORDER BY k.namaKegiatan, pm.namaPPL;
     `;
 
-  const [rows] = await db.query<RowDataPacket[]>(query);
-  return rows.map(row => ({
+    const [rows] = await db.query<RowDataPacket[]>(query, params);
+    return rows.map(row => ({
         ...row,
         sudahDinilai: Boolean(row.sudahDinilai),
         rataRata: row.rataRata ? Number(row.rataRata) : null,

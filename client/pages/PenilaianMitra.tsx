@@ -184,9 +184,9 @@ function EvaluationModal({ isOpen, onClose, penilaian, onSave, isSaving }: Evalu
 //================================================================================
 // MAIN PAGE COMPONENT (SESUAI PROTOTIPE)
 //================================================================================
-const fetchPenilaianData = async (): Promise<PenilaianMitraType[]> => {
-  const penilaianData = await apiClient.get<PenilaianMitraType[]>("/penilaian");
-  return penilaianData;
+const fetchPenilaianData = async (tahun: number, triwulan: number): Promise<PenilaianMitraType[]> => {
+    const params = triwulan > 0 ? `?tahun=${tahun}&triwulan=${triwulan}` : '';
+    return apiClient.get<PenilaianMitraType[]>(`/penilaian${params}`);
 };
 
 const savePenilaian = async (penilaianData: PenilaianRequest) => {
@@ -194,19 +194,32 @@ const savePenilaian = async (penilaianData: PenilaianRequest) => {
   return result;
 };
 
+const currentYear = new Date().getFullYear();
+const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+const triwulans = [
+    { value: 0, label: 'Semua Triwulan' }, // Opsi untuk menampilkan semua
+    { value: 1, label: 'Triwulan 1 (Jan-Mar)' },
+    { value: 2, label: 'Triwulan 2 (Apr-Jun)' },
+    { value: 3, label: 'Triwulan 3 (Jul-Sep)' },
+    { value: 4, label: 'Triwulan 4 (Okt-Des)' }
+];
+const getCurrentTriwulan = () => Math.floor(new Date().getMonth() / 3) + 1;
+
 export default function PenilaianMitraPage() {
     const queryClient = useQueryClient();
     const [searchQuery, setSearchQuery] = useState("");
     const [filterKegiatan, setFilterKegiatan] = useState("all");
     const [filterStatus, setFilterStatus] = useState("all");
+    const [selectedTahun, setSelectedTahun] = useState(currentYear);
+    const [selectedTriwulan, setSelectedTriwulan] = useState(getCurrentTriwulan());
     const [selectedPenilaian, setSelectedPenilaian] = useState<PenilaianMitraType | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [pageIndex, setPageIndex] = useState(0);
     const [pageSize, setPageSize] = useState(10); // Default 10 baris per halaman
   
     const { data: penilaianData, isLoading, error } = useQuery({
-        queryKey: ['penilaianMitra'],
-        queryFn: fetchPenilaianData
+        queryKey: ['penilaianMitra', selectedTahun, selectedTriwulan],
+        queryFn: () => fetchPenilaianData(selectedTahun, selectedTriwulan)
     });
   
     const { mutate: saveEvaluation, isPending: isSaving } = useMutation({
@@ -295,10 +308,28 @@ export default function PenilaianMitraPage() {
             <CardTitle>Filter dan Pencarian</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <Label>Cari Mitra/Kegiatan</Label>
                 <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" /><Input placeholder="Cari nama PPL..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10"/></div>
+              </div>
+              <div>
+                  <Label>Tahun</Label>
+                  <Select value={String(selectedTahun)} onValueChange={(v) => setSelectedTahun(Number(v))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                          {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <div>
+                  <Label>Triwulan</Label>
+                  <Select value={String(selectedTriwulan)} onValueChange={(v) => setSelectedTriwulan(Number(v))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                          {triwulans.map(t => <SelectItem key={t.value} value={String(t.value)}>{t.label}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
               </div>
               <div>
                 <Label>Filter Kegiatan</Label>
@@ -313,9 +344,6 @@ export default function PenilaianMitraPage() {
                   <SelectTrigger><SelectValue placeholder="Pilih status" /></SelectTrigger>
                   <SelectContent><SelectItem value="all">Semua Status</SelectItem><SelectItem value="sudah">Sudah Dinilai</SelectItem><SelectItem value="belum">Belum Dinilai</SelectItem></SelectContent>
                 </Select>
-              </div>
-              <div className="flex items-end">
-                <Button variant="outline" onClick={() => { setSearchQuery(""); setFilterKegiatan("all"); setFilterStatus("all"); }} className="w-full"><Filter className="w-4 h-4 mr-2" /> Reset Filter</Button>
               </div>
             </div>
           </CardContent>
