@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -125,7 +126,7 @@ function EvaluationModal({ isOpen, onClose, penilaian, onSave, isSaving }: Evalu
                 <Label>{item.label}</Label>
                 <Select value={item.value} onValueChange={item.setter}>
                   <SelectTrigger><SelectValue placeholder="Pilih nilai (1-10)" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="max-h-56">
                     {Array.from({ length: 10 }, (_, i) => i + 1).map(num => (
                       <SelectItem key={num} value={num.toString()}>
                         <div className="flex items-center justify-between w-full">
@@ -269,10 +270,18 @@ export default function PenilaianMitraPage() {
     return (
       <Layout>
       <div className="p-6 space-y-6 bg-slate-50 min-h-full">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold text-slate-900">Penilaian Mitra</h1>
-          <p className="text-slate-600">Kelola dan nilai performa mitra PPL pada setiap kegiatan.</p>
-        </div>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-900">Penilaian Mitra</h1>
+                        <p className="text-slate-600">Kelola dan nilai performa mitra PPL pada setiap kegiatan.</p>
+                    </div>
+                    <Button asChild>
+                        <Link to="/rekap-penilaian">
+                            <Award className="w-4 h-4 mr-2" />
+                            Lihat Rekap Penilaian
+                        </Link>
+                    </Button>
+                </div>
   
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="border-l-4 border-l-blue-500"><CardContent className="p-4 flex items-center justify-between"><div className="space-y-1"><p className="text-sm font-medium text-slate-600">Total Mitra</p><p className="text-2xl font-bold">{stats.total}</p></div><Users className="w-8 h-8 text-blue-500" /></CardContent></Card>

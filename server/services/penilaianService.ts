@@ -1,39 +1,45 @@
 // server/services/penilaianService.ts
 
+import { RowDataPacket } from 'mysql2';
 import pool from '../db';
-import { PenilaianRequest } from '../../shared/api'; // Kita akan definisikan tipe ini nanti
+import { RekapPenilaian, PenilaianRequest } from '../../shared/api'; // Kita akan definisikan tipe ini nanti
+import db from '../db';
 
 /**
  * Mengambil daftar gabungan PPL dari sebuah kegiatan beserta data penilaiannya (jika ada).
  */
 export const getPenilaianList = async () => {
   const query = `
-    SELECT
-      p.id AS id,
-      k.id AS kegiatanId,
-      k.namaKegiatan AS namaKegiatan,
-      p.id AS pplId,
-      p.tahap AS tahap,
-      pmaster.namaPPL AS namaPPL,
-      p.namaPML AS namaPML,
-      u.id AS pmlId,
-      pn.sikap_perilaku AS sikapPelikaku,
-      pn.kualitas_pekerjaan AS kualitasPekerjaan,
-      pn.ketepatan_waktu AS ketepatanWaktu,
-      pn.rata_rata AS rataRata,
-      (CASE WHEN pn.id IS NOT NULL THEN 1 ELSE 0 END) AS sudahDinilai,
-      pn.tanggal_penilaian AS tanggalPenilaian,
-      (SELECT nama_lengkap FROM users WHERE id = pn.dinilai_oleh_userId) AS dinilaiOleh
-    FROM ppl p
-    JOIN kegiatan k ON p.kegiatanId = k.id
-    JOIN ppl_master pmaster ON p.ppl_master_id = pmaster.id
-    LEFT JOIN users u ON p.namaPML = u.nama_Lengkap
-    LEFT JOIN penilaian_mitra pn ON p.id = pn.pplId AND k.id = pn.kegiatanId
-    ORDER BY k.namaKegiatan, pmaster.namaPPL;
-  `;
+      SELECT
+            p.id AS id,
+            k.id AS kegiatanId,
+            k.namaKegiatan AS namaKegiatan,
+            p.id AS pplId,
+            p.tahap AS tahap,
+            pm.namaPPL AS namaPPL,
+            p.namaPML AS namaPML,
+            p.pml_id AS pmlId,
+            pn.sikap_perilaku AS sikapPelikaku,
+            pn.kualitas_pekerjaan AS kualitasPekerjaan,
+            pn.ketepatan_waktu AS ketepatanWaktu,
+            pn.rata_rata AS rataRata,
+            (CASE WHEN pn.id IS NOT NULL THEN 1 ELSE 0 END) AS sudahDinilai,
+            pn.tanggal_penilaian AS tanggalPenilaian,
+            (SELECT nama_lengkap FROM users WHERE id = pn.dinilai_oleh_userId) AS dinilaiOleh
+        FROM ppl p
+        JOIN kegiatan k ON p.kegiatanId = k.id
+        JOIN ppl_master pm ON p.ppl_master_id = pm.id
+        LEFT JOIN users u ON p.pml_id = u.id
+        LEFT JOIN penilaian_mitra pn ON p.id = pn.pplId
+        ORDER BY k.namaKegiatan, pm.namaPPL;
+    `;
 
-  const [rows] = await pool.query(query);
-  return rows;
+  const [rows] = await db.query<RowDataPacket[]>(query);
+  return rows.map(row => ({
+        ...row,
+        sudahDinilai: Boolean(row.sudahDinilai),
+        rataRata: row.rataRata ? Number(row.rataRata) : null,
+    }));
 };
 
 /**
@@ -71,5 +77,43 @@ export const saveOrUpdatePenilaian = async (data: PenilaianRequest) => {
     dinilaiOleh_userId
   ]);
 
+
+
   return result;
+};
+
+export const getRekapPenilaian = async (tahun: number, triwulan: number): Promise<RekapPenilaian[]> => {
+    // Tentukan rentang bulan berdasarkan triwulan
+    const bulanMulai = (triwulan - 1) * 3 + 1;
+    const bulanSelesai = triwulan * 3;
+
+    const query = `
+        SELECT
+            p.ppl_master_id AS pplId,
+            pm.namaPPL,
+            COUNT(pn.id) AS totalKegiatan,
+            AVG(pn.rata_rata) AS rataRataNilai,
+            (AVG(pn.rata_rata) + (0.01 * COUNT(pn.id))) AS nilaiAkhir
+        FROM
+            penilaian_mitra pn
+        JOIN ppl p ON pn.pplId = p.id
+        JOIN ppl_master pm ON p.ppl_master_id = pm.id
+        WHERE
+            YEAR(pn.tanggal_penilaian) = ?
+            AND MONTH(pn.tanggal_penilaian) BETWEEN ? AND ?
+        GROUP BY
+            p.ppl_master_id, pm.namaPPL
+        ORDER BY
+            nilaiAkhir DESC;
+    `;
+
+    const [rows] = await db.query<RowDataPacket[]>(query, [tahun, bulanMulai, bulanSelesai]);
+
+    return rows.map(row => ({
+        pplId: row.pplId,
+        namaPPL: row.namaPPL,
+        totalKegiatan: Number(row.totalKegiatan),
+        rataRataNilai: row.rataRataNilai ? Number(row.rataRataNilai) : null,
+        nilaiAkhir: row.nilaiAkhir ? Number(row.nilaiAkhir) : null,
+    }));
 };

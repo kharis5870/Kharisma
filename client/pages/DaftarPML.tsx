@@ -99,21 +99,28 @@ export default function DaftarPML() {
 
     const filteredAndSortedData = useMemo(() => {
         let data = [...pmlList].filter(pml => 
-            pml.namaPML.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            pml.id.toLowerCase().includes(searchTerm.toLowerCase())
+            (pml.namaPML || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (pml.id || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
+
         if (sortConfig) {
             data.sort((a, b) => {
                 const aValue = a[sortConfig.key];
                 const bValue = b[sortConfig.key];
+
+                // ✔️ PERBAIKAN: Tangani jika salah satu nilai null
+                if (aValue == null) return 1;  // Pindahkan null ke akhir
+                if (bValue == null) return -1; // Pindahkan null ke akhir
+
+                // Perbandingan normal jika kedua nilai ada
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+                
                 return 0;
             });
         }
         return data;
     }, [pmlList, searchTerm, sortConfig]);
-
     const totalPages = Math.ceil(filteredAndSortedData.length / rowsPerPage);
 
     const paginatedData = useMemo(() => {

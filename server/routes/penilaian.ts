@@ -1,7 +1,8 @@
 // server/routes/penilaian.ts
 
 import express from 'express';
-import { getPenilaianList, saveOrUpdatePenilaian } from '../services/penilaianService';
+import { getPenilaianList, saveOrUpdatePenilaian, getRekapPenilaian } from '../services/penilaianService';
+
 // Impor middleware otentikasi jika Anda punya, contoh: import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
@@ -29,6 +30,23 @@ router.post('/', async (req, res) => {
     console.error('Error saving penilaian:', error);
     res.status(500).json({ message: 'Gagal menyimpan penilaian' });
   }
+});
+
+router.get('/rekap', async (req, res) => {
+    try {
+        const tahun = parseInt(req.query.tahun as string);
+        const triwulan = parseInt(req.query.triwulan as string);
+
+        if (!tahun || !triwulan) {
+            return res.status(400).json({ message: 'Parameter tahun dan triwulan diperlukan' });
+        }
+
+        const rekapList = await getRekapPenilaian(tahun, triwulan);
+        res.json(rekapList);
+    } catch (error) {
+        console.error('Error fetching rekap penilaian:', error);
+        res.status(500).json({ message: 'Gagal mengambil rekap penilaian' });
+    }
 });
 
 export default router;

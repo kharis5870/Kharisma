@@ -202,3 +202,11 @@ export interface PenilaianRequest {
   kualitasPekerjaan: number;
   ketepatanWaktu: number;
 }
+
+export interface RekapPenilaian {
+    pplId: number;
+    namaPPL: string;
+    totalKegiatan: number;
+    rataRataNilai: number | null;
+    nilaiAkhir: number | null;
+}
