@@ -1,11 +1,11 @@
 // client/pages/ManajemenAdmin.tsx
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useAdmin } from "@/contexts/AdminContext";
-import { UserData, KetuaTimData, PPLAdminData } from "@shared/api";
+import { UserData, KetuaTimData, PPLAdminData, Kecamatan, Desa } from "@shared/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,11 @@ import {
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query"; 
+import { apiClient } from "@/lib/apiClient";
+
+const fetchKecamatan = async (): Promise<Kecamatan[]> => apiClient.get('/alamat/kecamatan');
+const fetchDesa = async (kecamatanId: string): Promise<Desa[]> => apiClient.get(`/alamat/desa?kecamatanId=${kecamatanId}`);
 
 export default function ManajemenAdmin() {
   const {
@@ -57,6 +62,8 @@ export default function ManajemenAdmin() {
     updatePPLAdmin
   } = useAdmin();
   
+  const { data: kecamatanList = [] } = useQuery({ queryKey: ['kecamatan'], queryFn: fetchKecamatan });
+  const [desaOptions, setDesaOptions] = useState<Desa[]>([]);
   const [activeTab, setActiveTab] = useState("users");
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -122,6 +129,17 @@ export default function ManajemenAdmin() {
       ketuaTim: { currentPage: 1, rowsPerPage: 10 },
       ppl: { currentPage: 1, rowsPerPage: 10 },
   });
+
+  useEffect(() => {
+        // Jika ada PPL yang sedang diedit dan PPL tersebut punya kecamatanId
+        if (editPPLData?.kecamatanId) {
+            // Ambil daftar desa untuk kecamatan tersebut
+            fetchDesa(editPPLData.kecamatanId.toString()).then(setDesaOptions);
+        } else {
+            // Jika tidak, kosongkan pilihan desa
+            setDesaOptions([]);
+        }
+    }, [editPPLData]); 
 
   const isValidUserId = (id: string) => id.trim().length >= 1;
   const isValidUsername = (username: string) => username.trim().length >= 3;
@@ -541,25 +559,27 @@ export default function ManajemenAdmin() {
 </div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddUserModal(false)}>Batal</Button><Button onClick={handleAddUser} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
         {showAddKetuaTimModal && <Dialog open={showAddKetuaTimModal} onOpenChange={setShowAddKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Tambah Ketua Tim Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newKetuaTimId">ID Ketua Tim *</Label><Input id="newKetuaTimId" value={newKetuaTimData.id} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID Ketua Tim (contoh: KT001)"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNama">Nama *</Label><Input id="newKetuaTimNama" value={newKetuaTimData.nama} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nama: e.target.value }))} placeholder="Masukkan nama ketua tim"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNip">NIP *</Label><Input id="newKetuaTimNip" value={newKetuaTimData.nip} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nip: e.target.value }))} placeholder="Masukkan NIP (minimal 10 karakter)"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddKetuaTimModal(false)}>Batal</Button><Button onClick={handleAddKetuaTim} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
         {showAddPPLModal && <Dialog open={showAddPPLModal} onOpenChange={setShowAddPPLModal}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Tambah PPL Baru</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <FormError message={formError} />
-              <div className="space-y-2">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Tambah PPL Baru</DialogTitle>
+        </DialogHeader>
+        {/* Konten form dipindahkan kembali ke sini */}
+        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
+            {/* ✔️ Pemanggilan FormError yang benar */}
+            <FormError message={formError} />
+
+            <div className="space-y-2">
                 <Label htmlFor="newPPLId">ID PPL *</Label>
-                <Input id="newPPLId" value={newPPLData.id} onChange={(e) => setNewPPLData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID PPL (contoh: PPL001)"/>
-              </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="newPPLNama">Nama PPL *</Label>
-                  <Input id="newPPLNama" value={newPPLData.namaPPL} onChange={(e) => setNewPPLData(prev => ({ ...prev, namaPPL: e.target.value }))} placeholder="Masukkan nama PPL"/>
-                </div>
-                <div className="space-y-2">
+                <Input id="newPPLId" value={newPPLData.id} onChange={(e) => setNewPPLData(prev => ({ ...prev, id: e.target.value }))} placeholder="Contoh: PPL001"/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="newPPLNama">Nama PPL *</Label>
+                <Input id="newPPLNama" value={newPPLData.namaPPL} onChange={(e) => setNewPPLData(prev => ({ ...prev, namaPPL: e.target.value }))} placeholder="Masukkan nama PPL"/>
+            </div>
+            <div className="space-y-2">
                 <Label htmlFor="newPPLPosisi">Posisi *</Label>
                 <Select value={newPPLData.posisi} onValueChange={(value: PPLAdminData['posisi']) => setNewPPLData(prev => ({ ...prev, posisi: value }))}>
-                    <SelectTrigger id="newPPLPosisi">
-                        <SelectValue placeholder="Pilih posisi PPL" />
-                    </SelectTrigger>
+                    <SelectTrigger id="newPPLPosisi"><SelectValue placeholder="Pilih posisi PPL" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="Pendataan">Pendataan</SelectItem>
                         <SelectItem value="Pengolahan">Pengolahan</SelectItem>
@@ -567,9 +587,46 @@ export default function ManajemenAdmin() {
                     </SelectContent>
                 </Select>
             </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newPPLAlamat">Alamat *</Label>
-                    <Input id="newPPLAlamat" value={newPPLData.alamat} onChange={(e) => setNewPPLData(prev => ({ ...prev, alamat: e.target.value }))} placeholder="Masukkan alamat"/></div><div className="space-y-2"><Label htmlFor="newPPLTelepon">No. Telepon *</Label><Input id="newPPLTelepon" value={newPPLData.noTelepon} onChange={(e) => setNewPPLData(prev => ({ ...prev, noTelepon: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="Masukkan no. telepon"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddPPLModal(false)}>Batal</Button><Button onClick={handleAddPPL} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+            <div className="space-y-2">
+                <Label htmlFor="newPPLAlamat">Alamat *</Label>
+                <Input id="newPPLAlamat" value={newPPLData.alamat} onChange={(e) => setNewPPLData(prev => ({ ...prev, alamat: e.target.value }))} placeholder="Masukkan alamat"/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="newPPLTelepon">No. Telepon *</Label>
+                <Input id="newPPLTelepon" value={newPPLData.noTelepon} onChange={(e) => setNewPPLData(prev => ({ ...prev, noTelepon: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="Masukkan no. telepon"/>
+            </div>
+            
+            {/* Dropdown Kecamatan & Desa */}
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                <div className="space-y-2">
+                    <Label htmlFor="newPplKecamatan">Kecamatan</Label>
+                    <Select onValueChange={(kecId) => {
+                        setNewPPLData(prev => ({ ...prev, kecamatanId: parseInt(kecId), desaId: undefined }));
+                        fetchDesa(kecId).then(setDesaOptions);
+                    }}>
+                        <SelectTrigger><SelectValue placeholder="Pilih kecamatan" /></SelectTrigger>
+                        <SelectContent position="popper">{kecamatanList.map(kec => <SelectItem key={kec.id} value={kec.id.toString()}>{kec.nama}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="newPplDesa">Desa</Label>
+                    <Select 
+                        value={newPPLData.desaId?.toString()} 
+                        onValueChange={(desaId) => setNewPPLData(prev => ({ ...prev, desaId: parseInt(desaId) }))} 
+                        disabled={!newPPLData.kecamatanId}
+                    >
+                        <SelectTrigger><SelectValue placeholder="Pilih desa" /></SelectTrigger>
+                        <SelectContent position="popper">{desaOptions.map(desa => <SelectItem key={desa.id} value={desa.id.toString()}>{desa.nama}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+            </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setShowAddPPLModal(false)}>Batal</Button>
+            <Button onClick={handleAddPPL} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button>
+        </div>
+    </DialogContent>
+</Dialog>}
         
         {editUserData && <Dialog open={showEditUserModal} onOpenChange={setShowEditUserModal}><DialogContent><DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editUsername">Username *</Label><Input id="editUsername" value={editUserData.username} onChange={e => setEditUserData({...editUserData, username: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editNamaLengkap">Nama Lengkap *</Label><Input id="editNamaLengkap" value={editUserData.namaLengkap} onChange={e => setEditUserData({...editUserData, namaLengkap: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPassword">Password (kosongkan jika tidak diubah)</Label><Input id="editPassword" type="password" onChange={e => setEditUserData({...editUserData, password: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editRole">Role *</Label><Select value={editUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setEditUserData({...editUserData, role: value})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
   <div className="space-y-0.5">
@@ -609,7 +666,40 @@ export default function ManajemenAdmin() {
                     </SelectContent>
                 </Select>
             </div>
-              <div className="space-y-2"><Label htmlFor="editPplTelepon">No. Telepon *</Label><Input id="editPplTelepon" value={editPPLData.noTelepon} onChange={e => setEditPPLData({...editPPLData, noTelepon: e.target.value.replace(/[^0-9]/g, '')})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditPPLModal(false)}>Batal</Button><Button onClick={handleEditPPL}>Simpan</Button></div></div></DialogContent></Dialog>}
+              <div className="space-y-2"><Label htmlFor="editPplTelepon">No. Telepon *</Label><Input id="editPplTelepon" value={editPPLData.noTelepon} onChange={e => setEditPPLData({...editPPLData, noTelepon: e.target.value.replace(/[^0-9]/g, '')})} /></div>
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                <div className="space-y-2">
+                    <Label htmlFor="editPplKecamatan">Kecamatan</Label>
+                    <Select 
+                        value={editPPLData.kecamatanId?.toString()}
+                        onValueChange={(kecId) => {
+                            setEditPPLData(prev => prev ? {...prev, kecamatanId: parseInt(kecId), desaId: undefined } : null);
+                            fetchDesa(kecId).then(setDesaOptions);
+                        }}
+                    >
+                        <SelectTrigger><SelectValue placeholder="Pilih kecamatan" /></SelectTrigger>
+                        <SelectContent>{kecamatanList.map(kec => <SelectItem key={kec.id} value={kec.id.toString()}>{kec.nama}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="editPplDesa">Desa</Label>
+                    <Select 
+                        value={editPPLData.desaId?.toString()} 
+                        onValueChange={(desaId) => setEditPPLData(prev => prev ? {...prev, desaId: parseInt(desaId)} : null)}
+                        disabled={!editPPLData.kecamatanId}
+                        // Muat opsi desa saat modal pertama kali dibuka
+                        onOpenChange={(isOpen) => {
+                            if (isOpen && editPPLData.kecamatanId && desaOptions.length === 0) {
+                                fetchDesa(editPPLData.kecamatanId.toString()).then(setDesaOptions);
+                            }
+                        }}
+                    >
+                        <SelectTrigger><SelectValue placeholder="Pilih desa" /></SelectTrigger>
+                        <SelectContent>{desaOptions.map(desa => <SelectItem key={desa.id} value={desa.id.toString()}>{desa.nama}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+            </div>
+              <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditPPLModal(false)}>Batal</Button><Button onClick={handleEditPPL}>Simpan</Button></div></div></DialogContent></Dialog>}
       </div>
     </Layout>
   );

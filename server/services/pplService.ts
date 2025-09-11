@@ -36,6 +36,10 @@ export const getPplAdminData = async (): Promise<PPLAdminData[]> => {
             pm.id, 
             pm.namaPPL, 
             pm.posisi,
+            pm.kecamatan_id,
+            pm.desa_id,
+            kec.nama AS namaKecamatan,
+            desa.nama AS namaDesa,
             pm.alamat, 
             pm.noTelepon,
             COUNT(p.id) AS totalKegiatan,
@@ -49,8 +53,10 @@ export const getPplAdminData = async (): Promise<PPLAdminData[]> => {
             ppl_master pm
         LEFT JOIN ppl p ON pm.id = p.ppl_master_id
         LEFT JOIN kegiatan k ON p.kegiatanId = k.id
+        LEFT JOIN kecamatan kec ON pm.kecamatan_id = kec.id
+        LEFT JOIN desa ON pm.desa_id = desa.id
         GROUP BY 
-            pm.id, pm.namaPPL, pm.posisi, pm.alamat, pm.noTelepon
+            pm.id, pm.namaPPL, pm.posisi, pm.alamat, pm.noTelepon, pm.kecamatan_id, pm.desa_id
         ORDER BY 
             pm.namaPPL ASC;
     `;
@@ -64,6 +70,10 @@ export const getPplAdminData = async (): Promise<PPLAdminData[]> => {
         posisi: row.posisi,
         alamat: row.alamat,
         noTelepon: row.noTelepon,
+        kecamatanId: row.kecamatan_id,
+        desaId: row.desa_id, 
+        namaKecamatan: row.namaKecamatan, 
+        namaDesa: row.namaDesa,
         totalKegiatan: row.totalKegiatan || 0,
         kegiatanDetails: row.kegiatanDetails ? row.kegiatanDetails.split('||').map((detail: string) => {
             const [nama, tahap] = detail.split(';;');
@@ -73,16 +83,16 @@ export const getPplAdminData = async (): Promise<PPLAdminData[]> => {
 };
 
 export const createMasterPPL = async (ppl: PPLAdminData): Promise<PPLAdminData> => {
-    const { id, namaPPL, posisi, alamat, noTelepon } = ppl;
-    const query = 'INSERT INTO ppl_master (id, namaPPL, posisi, alamat, noTelepon) VALUES (?, ?, ?, ?, ?)';
-    await db.execute(query, [id, namaPPL, posisi, alamat, noTelepon]);
+    const { id, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId  } = ppl;
+    const query = 'INSERT INTO ppl_master (id, namaPPL, posisi, alamat, noTelepon, kecamatan_id, desa_id) VALUES (?, ?, ?, ?, ?, ?, ?)';
+    await db.execute(query, [id, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId]);
     return ppl;
 };
 
 export const updateMasterPPL = async (originalId: string, pplData: PPLAdminData): Promise<PPLAdminData> => {
-    const { namaPPL, posisi, alamat, noTelepon } = pplData;
-    const query = 'UPDATE ppl_master SET namaPPL = ?, posisi = ?, alamat = ?, noTelepon = ? WHERE id = ?';
-    await db.execute(query, [namaPPL, posisi, alamat, noTelepon, originalId]);
+    const { namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId } = pplData;
+    const query = 'UPDATE ppl_master SET namaPPL = ?, posisi = ?, alamat = ?, noTelepon = ?, kecamatan_id = ?, desa_id = ? WHERE id = ?';
+    await db.execute(query, [namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId, originalId]);
     return pplData;
 };
 

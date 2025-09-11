@@ -53,15 +53,22 @@ export interface PPLMaster {
   id: string;
   namaPPL: string;
   posisi: 'Pendataan' | 'Pengolahan' | 'Pendataan/Pengolahan';
-  alamat: string;     // <-- TAMBAHKAN INI
-  noTelepon: string;  // <-- TAMBAHKAN INI
+  alamat: string;    
+  noTelepon: string; 
 }
+
+export interface Kecamatan { id: number; nama: string; }
+export interface Desa { id: number; nama: string; }
 
 export interface PMLAdminData {
     id: string;
     namaPML: string;
     posisi: 'Pendataan' | 'Pengolahan' | 'Pendataan/Pengolahan';
     totalKegiatan: number;
+    kecamatanId?: number | null;
+    desaId?: number | null;
+    namaKecamatan?: string;
+    namaDesa?: string;
     kegiatanDetails: {
         nama: string;
         tahap: string;
@@ -143,6 +150,10 @@ export interface PPLAdminData {
     totalKegiatan: number;
     alamat: string;
     noTelepon: string;
+    kecamatanId?: number | null;
+    desaId?: number | null;
+    namaKecamatan?: string; 
+    namaDesa?: string;
     kegiatanDetails: {
         nama: string;
         tahap: string;

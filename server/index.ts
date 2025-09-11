@@ -12,6 +12,7 @@ import authRoutes from './routes/auth';
 import settingsRoutes from './routes/settings';
 import notifikasiRoutes from './routes/notifikasi';
 import penilaianRoutes from './routes/penilaian';
+import alamatRoutes from './routes/alamat';
 import pmlRoutes from './routes/pml';
 
 export function createServer() {
@@ -32,6 +33,7 @@ export function createServer() {
   app.use(`${baseURI}/api/notifikasi`, notifikasiRoutes);
   app.use(`${baseURI}/api/penilaian`, penilaianRoutes);
   app.use(`${baseURI}/api/pml`, pmlRoutes); 
+  app.use(`${baseURI}/api/alamat`, alamatRoutes);
 
   return app;
 }

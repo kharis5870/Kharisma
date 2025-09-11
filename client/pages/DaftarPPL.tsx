@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectPortal } from "@/components/ui/select";
 import {
   Pagination,
   PaginationContent,
@@ -39,9 +39,12 @@ import {
   Activity
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { PPLAdminData, PPLMaster } from "@shared/api";
+import { PPLAdminData, PPLMaster, Kecamatan, Desa } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/apiClient";
+
+const fetchKecamatan = async (): Promise<Kecamatan[]> => apiClient.get('/alamat/kecamatan');
+const fetchDesa = async (kecamatanId: string): Promise<Desa[]> => apiClient.get(`/alamat/desa?kecamatanId=${kecamatanId}`);
 
 const fetchPPLs = async (): Promise<PPLAdminData[]> => {
     return apiClient.get<PPLAdminData[]>('/admin/ppl');
@@ -102,20 +105,21 @@ const PPLInfoModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, onClose: 
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="alamat" className="text-right">Alamat</Label>
-                        <Input id="alamat" value={pplData.alamat} readOnly className="col-span-3" />
+                        <Input id="alamat" value={pplData.alamat || '-'} readOnly className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="telepon" className="text-right">Telepon</Label>
-                        <Input id="telepon" value={pplData.noTelepon} readOnly className="col-span-3" />
+                        <Input id="telepon" value={pplData.noTelepon || '-'} readOnly className="col-span-3" />
                     </div>
-                    {/* Placeholder untuk data mendatang */}
+                    
+                    {/* ✔️ TAMPILKAN DATA KECAMATAN & DESA */}
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="kecamatan" className="text-right text-gray-400">Kecamatan</Label>
-                        <Input id="kecamatan" value="(data belum tersedia)" readOnly className="col-span-3 bg-gray-100" />
+                        <Label htmlFor="kecamatan" className="text-right">Kecamatan</Label>
+                        <Input id="kecamatan" value={pplData.namaKecamatan || 'Belum diatur'} readOnly className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="desa" className="text-right text-gray-400">Desa</Label>
-                        <Input id="desa" value="(data belum tersedia)" readOnly className="col-span-3 bg-gray-100" />
+                        <Label htmlFor="desa" className="text-right">Desa</Label>
+                        <Input id="desa" value={pplData.namaDesa || 'Belum diatur'} readOnly className="col-span-3" />
                     </div>
                 </div>
                 <DialogFooter>
@@ -127,43 +131,61 @@ const PPLInfoModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, onClose: 
 };
 
 export default function DaftarPPL() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { setSelectedPPLsForActivity } = usePPL();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { setSelectedPPLsForActivity } = usePPL();
 
-  const sourcePage = location.state?.from || 'daftar-ppl'; 
-  const sourceTahap = location.state?.tahap || 'persiapan';
-  const kegiatanId = location.state?.kegiatanId;
-  const existingPplIds = location.state?.existingPplIds || [];
+    const sourcePage = location.state?.from || 'daftar-ppl'; 
+    const sourceTahap = location.state?.tahap || 'persiapan';
+    const kegiatanId = location.state?.kegiatanId;
+    const existingPplIds = location.state?.existingPplIds || [];
 
-  const { data: pplList = [], isLoading } = useQuery({ queryKey: ['pplAdmin'], queryFn: fetchPPLs });
-  
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successModalConfig, setSuccessModalConfig] = useState({ title: "", description: "", actionLabel: "", onAction: () => {} });
-  
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortConfig, setSortConfig] = useState<{ key: keyof PPLAdminData | 'status'; direction: 'asc' | 'desc'; } | null>(null);
-  const [selectedPPLs, setSelectedPPLs] = useState<string[]>([]);
-  const [selectionMode, setSelectionMode] = useState(sourcePage !== 'daftar-ppl');
+    const { data: pplList = [], isLoading } = useQuery({ queryKey: ['pplAdmin'], queryFn: fetchPPLs });
+    
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [successModalConfig, setSuccessModalConfig] = useState({ title: "", description: "", actionLabel: "", onAction: () => {} });
 
-  const [showSelectedPPLsModal, setShowSelectedPPLsModal] = useState(false);
-  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
-  
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedPplDetails, setSelectedPplDetails] = useState<PPLAdminData | null>(null);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [sortConfig, setSortConfig] = useState<{ key: keyof PPLAdminData | 'status'; direction: 'asc' | 'desc'; } | null>(null);
+    const [selectedPPLs, setSelectedPPLs] = useState<string[]>([]);
+    const [selectionMode, setSelectionMode] = useState(sourcePage !== 'daftar-ppl');
 
-  const [posisiFilter, setPosisiFilter] = useState<string>("Semua");
-  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-  const [selectedPplForInfo, setSelectedPplForInfo] = useState<PPLAdminData | null>(null);
+    const [showSelectedPPLsModal, setShowSelectedPPLsModal] = useState(false);
+    const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [selectedPplDetails, setSelectedPplDetails] = useState<PPLAdminData | null>(null);
 
-  useEffect(() => {
-    if (location.state?.from) {
-      setSelectionMode(true);
-    }
-  }, [location.state]);
+    const [posisiFilter, setPosisiFilter] = useState<string>("Semua");
+    const [selectedKecamatan, setSelectedKecamatan] = useState('all');
+    const [selectedDesa, setSelectedDesa] = useState('all');
+    const [desaOptions, setDesaOptions] = useState<Desa[]>([]);
+
+    const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+    const [selectedPplForInfo, setSelectedPplForInfo] = useState<PPLAdminData | null>(null);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+
+    const { data: kecamatanList = [] } = useQuery({ queryKey: ['kecamatan'], queryFn: fetchKecamatan });
+
+
+    useEffect(() => {
+        if (location.state?.from) {
+        setSelectionMode(true);
+        }
+    }, [location.state]);
+
+    useEffect(() => {
+        // Reset pilihan desa dan opsi jika kecamatan berubah
+        setSelectedDesa('all');
+        setDesaOptions([]);
+
+        if (selectedKecamatan !== 'all') {
+            // Ambil data desa untuk kecamatan yang dipilih
+            fetchDesa(selectedKecamatan).then(setDesaOptions);
+        }
+    }, [selectedKecamatan]);
 
   const filteredAndSortedData = useMemo(() => {
     let data = [...pplList];
@@ -172,6 +194,16 @@ export default function DaftarPPL() {
             data = data.filter(ppl => ppl.posisi === posisiFilter);
         }
         
+    // ✔️ Filter berdasarkan Kecamatan
+    if (selectedKecamatan !== 'all') {
+        data = data.filter(ppl => String(ppl.kecamatanId) === selectedKecamatan);
+    }
+
+    // ✔️ Filter berdasarkan Desa
+    if (selectedDesa !== 'all') {
+        data = data.filter(ppl => String(ppl.desaId) === selectedDesa);
+    }
+
     // ✔️ PERBAIKAN UTAMA: Filter berdasarkan posisi HANYA jika dalam mode pemilihan
     if (selectionMode) {
         data = data.filter(ppl => {
@@ -212,7 +244,7 @@ export default function DaftarPPL() {
     }
 
     return data;
-}, [pplList, searchTerm, sortConfig, selectionMode, sourceTahap, posisiFilter]);
+}, [pplList, searchTerm, sortConfig, selectionMode, sourceTahap, posisiFilter, selectedKecamatan, selectedDesa]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * rowsPerPage;
@@ -369,20 +401,46 @@ export default function DaftarPPL() {
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle>Daftar PPL</CardTitle>
-              <Select value={posisiFilter} onValueChange={setPosisiFilter}>
-            <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter Posisi..." />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="Semua">Semua Posisi</SelectItem>
-                <SelectItem value="Pendataan">Pendataan</SelectItem>
-                <SelectItem value="Pengolahan">Pengolahan</SelectItem>
-                <SelectItem value="Pendataan/Pengolahan">Pendataan/Pengolahan</SelectItem>
-            </SelectContent>
-        </Select>
-              <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/></div></div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={posisiFilter} onValueChange={setPosisiFilter}>
+                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter Posisi..." /></SelectTrigger>
+                    <SelectPortal>
+                    <SelectContent position="popper" className="max-h-56">
+                        <SelectItem value="Semua">Semua Posisi</SelectItem>
+                        <SelectItem value="Pendataan">Pendataan</SelectItem>
+                        <SelectItem value="Pengolahan">Pengolahan</SelectItem>
+                        <SelectItem value="Pendataan/Pengolahan">Pendataan/Pengolahan</SelectItem>
+                    </SelectContent>
+                    </SelectPortal>
+                </Select>
+
+                <Select value={selectedKecamatan} onValueChange={setSelectedKecamatan}>
+                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter Kecamatan..." /></SelectTrigger>
+                    <SelectPortal>
+                    <SelectContent position="popper" className="max-h-56">
+                        <SelectItem value="all">Semua Kecamatan</SelectItem>
+                        {kecamatanList.map(kec => <SelectItem key={kec.id} value={String(kec.id)}>{kec.nama}</SelectItem>)}
+                    </SelectContent>
+                    </SelectPortal>
+                </Select>
+
+                <Select value={selectedDesa} onValueChange={setSelectedDesa} disabled={selectedKecamatan === 'all'}>
+                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter Desa..." /></SelectTrigger>
+                    <SelectPortal>
+                    <SelectContent position="popper" className="max-h-56">
+                        <SelectItem value="all">Semua Desa</SelectItem>
+                        {desaOptions.map(desa => <SelectItem key={desa.id} value={String(desa.id)}>{desa.nama}</SelectItem>)}
+                    </SelectContent>
+                    </SelectPortal>
+                </Select>
+
+                <div className="relative sm:w-auto flex-grow">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input type="text" placeholder="Cari ID/Nama..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/>
+                </div>
             </div>
-          </CardHeader>
+        </div>
+    </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
