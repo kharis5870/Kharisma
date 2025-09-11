@@ -52,11 +52,15 @@ export interface HonorariumSettingsMap {
 export interface PPLMaster {
   id: string;
   namaPPL: string;
+  posisi: 'Pendataan' | 'Pengolahan' | 'Pendataan/Pengolahan';
+  alamat: string;     // <-- TAMBAHKAN INI
+  noTelepon: string;  // <-- TAMBAHKAN INI
 }
 
 export interface PMLAdminData {
     id: string;
     namaPML: string;
+    posisi: 'Pendataan' | 'Pengolahan' | 'Pendataan/Pengolahan';
     totalKegiatan: number;
     kegiatanDetails: {
         nama: string;
@@ -135,10 +139,15 @@ export interface KetuaTimData {
 export interface PPLAdminData {
     id: string;
     namaPPL: string;
+    posisi: 'Pendataan' | 'Pengolahan' | 'Pendataan/Pengolahan';
     totalKegiatan: number;
     alamat: string;
     noTelepon: string;
-    kegiatanNames: string[];
+    kegiatanDetails: {
+        nama: string;
+        tahap: string;
+        sub_tahap?: 'listing' | 'updating' | null; 
+    }[];
 }
 
 export interface DocumentNotification {

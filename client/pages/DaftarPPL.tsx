@@ -8,11 +8,12 @@ import ConfirmationModal from "@/components/ConfirmationModal";
 import { usePPL } from "@/contexts/PPLContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Pagination,
@@ -34,7 +35,8 @@ import {
   ChevronLeft,
   ChevronRight,
   XCircle,
-  CheckSquare
+  CheckSquare,
+  Activity
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLAdminData, PPLMaster } from "@shared/api";
@@ -58,12 +60,18 @@ const ActivityDetailModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, on
                     </DialogDescription>
                 </DialogHeader>
                 <div className="mt-4 max-h-80 overflow-y-auto">
-                    {pplData.kegiatanNames && pplData.kegiatanNames.length > 0 ? (
+                    {/* ✔️ PERBAIKAN: Gunakan 'kegiatanDetails' */}
+                    {pplData.kegiatanDetails && pplData.kegiatanDetails.length > 0 ? (
                         <ul className="space-y-2">
-                            {pplData.kegiatanNames.map((kegiatan, index) => (
+                            {pplData.kegiatanDetails.map((keg, index) => (
                                 <li key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-md">
                                     <List className="w-4 h-4 text-bps-blue-500 mt-1 flex-shrink-0" />
-                                    <span>{kegiatan}</span>
+                                    <span>
+                                        {keg.nama}
+                                        <span className="text-slate-500 font-normal ml-1 capitalize">
+                                            ({keg.tahap?.replace('-', ' ')})
+                                        </span>
+                                    </span>
                                 </li>
                             ))}
                         </ul>
@@ -79,6 +87,44 @@ const ActivityDetailModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, on
     );
 };
 
+const PPLInfoModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, onClose: () => void, pplData: PPLAdminData | null }) => {
+    if (!pplData) return null;
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Informasi Detail: {pplData.namaPPL}</DialogTitle>
+                    <DialogDescription>
+                        Detail kontak dan alamat untuk PPL yang dipilih.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="alamat" className="text-right">Alamat</Label>
+                        <Input id="alamat" value={pplData.alamat} readOnly className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="telepon" className="text-right">Telepon</Label>
+                        <Input id="telepon" value={pplData.noTelepon} readOnly className="col-span-3" />
+                    </div>
+                    {/* Placeholder untuk data mendatang */}
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="kecamatan" className="text-right text-gray-400">Kecamatan</Label>
+                        <Input id="kecamatan" value="(data belum tersedia)" readOnly className="col-span-3 bg-gray-100" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="desa" className="text-right text-gray-400">Desa</Label>
+                        <Input id="desa" value="(data belum tersedia)" readOnly className="col-span-3 bg-gray-100" />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button onClick={onClose}>Tutup</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
 
 export default function DaftarPPL() {
   const location = useLocation();
@@ -106,6 +152,10 @@ export default function DaftarPPL() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedPplDetails, setSelectedPplDetails] = useState<PPLAdminData | null>(null);
 
+  const [posisiFilter, setPosisiFilter] = useState<string>("Semua");
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [selectedPplForInfo, setSelectedPplForInfo] = useState<PPLAdminData | null>(null);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -116,12 +166,34 @@ export default function DaftarPPL() {
   }, [location.state]);
 
   const filteredAndSortedData = useMemo(() => {
-    let data = [...pplList].filter(ppl => 
-        ppl.namaPPL.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ppl.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ppl.alamat.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ppl.noTelepon.includes(searchTerm)
-    );
+    let data = [...pplList];
+
+    if (posisiFilter !== "Semua") {
+            data = data.filter(ppl => ppl.posisi === posisiFilter);
+        }
+        
+    // ✔️ PERBAIKAN UTAMA: Filter berdasarkan posisi HANYA jika dalam mode pemilihan
+    if (selectionMode) {
+        data = data.filter(ppl => {
+            if (sourceTahap === 'listing' || sourceTahap === 'pencacahan') {
+                return ppl.posisi === 'Pendataan' || ppl.posisi === 'Pendataan/Pengolahan';
+            }
+            if (sourceTahap === 'pengolahan-analisis') {
+                return ppl.posisi === 'Pengolahan' || ppl.posisi === 'Pendataan/Pengolahan';
+            }
+            return false; // Seharusnya tidak terjadi untuk tahap lain
+        });
+    }
+
+    // Filter pencarian yang sudah ada, dijalankan setelah filter posisi
+    if (searchTerm) {
+        data = data.filter(ppl => 
+            ppl.namaPPL.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ppl.id.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }
+    
+    // Logika sorting tidak berubah
     if (sortConfig) {
         data.sort((a, b) => {
             let aValue, bValue;
@@ -138,8 +210,9 @@ export default function DaftarPPL() {
             return 0;
         });
     }
+
     return data;
-  }, [pplList, searchTerm, sortConfig]);
+}, [pplList, searchTerm, sortConfig, selectionMode, sourceTahap, posisiFilter]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * rowsPerPage;
@@ -154,10 +227,21 @@ export default function DaftarPPL() {
     setSelectedPPLs(prev => prev.includes(pplId) ? prev.filter(id => id !== pplId) : [...prev, pplId]);
   };
   
+  const handleOpenInfoModal = (ppl: PPLAdminData) => {
+        setSelectedPplForInfo(ppl);
+        setIsInfoModalOpen(true);
+    };
+
   const handleBulkAddToActivity = () => {
     const selectedPPLObjects: PPLMaster[] = pplList
         .filter(ppl => selectedPPLs.includes(ppl.id))
-        .map(p => ({ id: p.id, namaPPL: p.namaPPL }));
+        .map(p => ({ 
+            id: p.id, 
+            namaPPL: p.namaPPL, 
+            posisi: p.posisi,
+            alamat: p.alamat, // <-- Tambahkan ini
+            noTelepon: p.noTelepon // <-- Tambahkan ini
+        })); 
 
     if (sourcePage === 'daftar-ppl' && kegiatanId) {
       setShowSuccessModal(true);
@@ -207,11 +291,16 @@ export default function DaftarPPL() {
     setIsDetailModalOpen(true);
   };
 
-  const stats = useMemo(() => ({
-    totalPPL: pplList.length,
-    activePPL: pplList.filter(p => p.totalKegiatan > 0).length,
-    inactivePPL: pplList.filter(p => p.totalKegiatan === 0).length,
-  }), [pplList]);
+  const stats = useMemo(() => {
+        const totalPPL = pplList.length;
+        const activePPL = pplList.filter(p => p.totalKegiatan > 0).length;
+        return {
+            totalPPL,
+            activePPL,
+            inactivePPL: totalPPL - activePPL,
+            persentaseAktif: totalPPL > 0 ? (activePPL / totalPPL) * 100 : 0,
+        };
+    }, [pplList]);
 
   const handleCancelSelection = () => {
     if (selectedPPLs.length > 0) {
@@ -270,98 +359,116 @@ export default function DaftarPPL() {
             )}
         </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total PPL</p><p className="text-2xl font-bold text-gray-900">{stats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
             <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">PPL Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.activePPL}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
             <Card className="border-l-4 border-l-gray-400"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">PPL Non Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.inactivePPL}</p></div><UserX className="w-8 h-8 text-gray-400" /></div></CardContent></Card>
+            <Card className="border-l-4 border-l-bps-orange-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Persentase Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.persentaseAktif.toFixed(1)}%</p></div><Activity className="w-8 h-8 text-bps-orange-500" /></div></CardContent></Card>
         </div>
         <Card>
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle>Daftar PPL</CardTitle>
+              <Select value={posisiFilter} onValueChange={setPosisiFilter}>
+            <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter Posisi..." />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="Semua">Semua Posisi</SelectItem>
+                <SelectItem value="Pendataan">Pendataan</SelectItem>
+                <SelectItem value="Pengolahan">Pengolahan</SelectItem>
+                <SelectItem value="Pendataan/Pengolahan">Pendataan/Pengolahan</SelectItem>
+            </SelectContent>
+        </Select>
               <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/></div></div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <Table className="table-fixed w-full">
-                <TableHeader>
-                  <TableRow>
-                    {selectionMode && <TableHead className="w-12"></TableHead>}
-                    <TableHead className="w-24"><button onClick={() => handleSort('id')} className="flex items-center gap-1">ID{getSortIcon('id')}</button></TableHead>
-                    <TableHead className="w-48"><button onClick={() => handleSort('namaPPL')} className="flex items-center gap-1">Nama{getSortIcon('namaPPL')}</button></TableHead>
-                    <TableHead className="w-32"><button onClick={() => handleSort('totalKegiatan')} className="flex items-center gap-1">Kegiatan{getSortIcon('totalKegiatan')}</button></TableHead>
-                    <TableHead className="w-64"><button onClick={() => handleSort('alamat')} className="flex items-center gap-1">Alamat{getSortIcon('alamat')}</button></TableHead>
-                    <TableHead className="w-40"><button onClick={() => handleSort('noTelepon')} className="flex items-center gap-1">Telepon{getSortIcon('noTelepon')}</button></TableHead>
-                    <TableHead className="w-28"><button onClick={() => handleSort('status')} className="flex items-center gap-1">Status{getSortIcon('status')}</button></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (<TableRow><TableCell colSpan={7} className="text-center">Memuat...</TableCell></TableRow>) : 
-                  paginatedData.length === 0 ? (
-                      <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-500">Tidak ada data PPL</TableCell></TableRow>
-                  ) : (
-                      paginatedData.map((ppl) => {
-                          const isActive = ppl.totalKegiatan > 0;
-                          const isAlreadyAdded = existingPplIds.includes(ppl.id);
-                          const isSelected = selectedPPLs.includes(ppl.id);
-                          return (
-                            <TableRow 
-                                key={ppl.id} 
-                                data-state={isSelected && "selected"}
-                                className={cn(
-                                    isAlreadyAdded && "bg-gray-100 text-gray-400 cursor-not-allowed",
-                                    selectionMode && !isAlreadyAdded && "cursor-pointer"
-                                )}
-                                onClick={() => handleSelectPPL(ppl.id)}
-                            >
-                                {selectionMode && (
-                                    <TableCell className="w-12">
-                                        <Checkbox 
-                                            checked={isSelected}
-                                            disabled={isAlreadyAdded}
-                                        />
-                                    </TableCell>
-                                )}
-                                <TableCell className="font-medium truncate">{ppl.id}</TableCell>
-                                <TableCell className="font-medium truncate">{ppl.namaPPL}</TableCell>
-                                <TableCell>
-                                  <Button variant="link" className="p-0 h-auto text-blue-600" onClick={(e) => { e.stopPropagation(); handleOpenDetailModal(ppl); }}>
-                                      {ppl.totalKegiatan} Kegiatan
-                                  </Button>
-                                </TableCell>
-                                <TableCell>
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="flex items-center gap-2 truncate">
-                                          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                          <span className="truncate">{ppl.alamat}</span>
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>{ppl.alamat}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2 truncate">
-                                    <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                    <span className="truncate">{ppl.noTelepon}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="default" className={isActive ? "bg-bps-green-600" : "bg-gray-400 text-gray-800"}>
-                                        {isActive ? "Aktif" : "Non Aktif"}
-                                    </Badge>
-                                </TableCell>
-                            </TableRow>
-                          );
-                      })
-                  )}
-                </TableBody>
-              </Table>
+              <Table>
+    <TableHeader>
+        <TableRow>
+            {selectionMode && <TableHead className="w-[50px]"></TableHead>}
+            {/* ✔️ No. dibuat lebih kecil */}
+            <TableHead className="w-[50px]">No</TableHead> 
+            <TableHead className="w-[120px]">
+                <div onClick={() => handleSort('id')} className="flex items-center gap-1 cursor-pointer">ID{getSortIcon('id')}</div>
+            </TableHead>
+            {/* ✔️ Kolom Nama dibiarkan fleksibel */}
+            <TableHead> 
+                <div onClick={() => handleSort('namaPPL')} className="flex items-center gap-1 cursor-pointer">Nama{getSortIcon('namaPPL')}</div>
+            </TableHead>
+            <TableHead className="w-[200px]">
+                <div onClick={() => handleSort('posisi')} className="flex items-center gap-1 cursor-pointer">Posisi{getSortIcon('posisi')}</div>
+            </TableHead>
+            {/* ✔️ Kolom berikut dibuat terpusat (center-aligned) */}
+            <TableHead className="w-[140px] text-center">
+                <div onClick={() => handleSort('totalKegiatan')} className="flex items-center justify-center gap-1 cursor-pointer">Kegiatan{getSortIcon('totalKegiatan')}</div>
+            </TableHead>
+            <TableHead className="w-[160px] text-center">Informasi Detail</TableHead>
+            <TableHead className="w-[120px] text-center">
+                <div onClick={() => handleSort('status')} className="flex items-center justify-center gap-1 cursor-pointer">Status{getSortIcon('status')}</div>
+            </TableHead>
+        </TableRow>
+    </TableHeader>
+    <TableBody>
+        {isLoading ? ( <TableRow><TableCell colSpan={8} className="text-center">Memuat...</TableCell></TableRow> ) : 
+        paginatedData.length === 0 ? (
+            <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-500">Tidak ada data PPL</TableCell></TableRow>
+        ) : (
+            paginatedData.map((ppl, index) => {
+                const isActive = ppl.totalKegiatan > 0;
+                const isAlreadyAdded = existingPplIds.includes(ppl.id);
+                const isSelected = selectedPPLs.includes(ppl.id);
+                return (
+                    <TableRow 
+                        key={ppl.id} 
+                        data-state={isSelected && "selected"}
+                        className={cn(
+                            isAlreadyAdded && "bg-gray-100 text-gray-400 cursor-not-allowed",
+                            selectionMode && !isAlreadyAdded && "cursor-pointer"
+                        )}
+                        onClick={() => handleSelectPPL(ppl.id)}
+                    >
+                        {selectionMode && (
+                            <TableCell><Checkbox checked={isSelected} disabled={isAlreadyAdded} /></TableCell>
+                        )}
+                        {/* ✔️ No. juga dibuat terpusat */}
+                        <TableCell className="text-center">{(currentPage - 1) * rowsPerPage + index + 1}</TableCell>
+                        <TableCell className="font-mono">{ppl.id}</TableCell>
+                        <TableCell className="font-medium">{ppl.namaPPL}</TableCell>
+                        <TableCell>
+                <Badge className={cn(
+                    "font-semibold",
+                    ppl.posisi === 'Pendataan' && 'bg-blue-100 text-blue-700 hover:bg-blue-100',
+                    ppl.posisi === 'Pengolahan' && 'bg-orange-100 text-orange-700 hover:bg-orange-100',
+                    ppl.posisi === 'Pendataan/Pengolahan' && 'bg-green-100 text-green-700 hover:bg-green-100'
+                )}>
+                    {ppl.posisi}
+                </Badge>
+            </TableCell>
+                        {/* ✔️ Kolom berikut dibuat terpusat (center-aligned) */}
+                        <TableCell className="text-center">
+                            <Button variant="link" className="p-0 h-auto text-blue-600" onClick={(e) => { e.stopPropagation(); handleOpenDetailModal(ppl); }}>
+                                {ppl.totalKegiatan} Kegiatan
+                            </Button>
+                        </TableCell>
+                        <TableCell className="text-center">
+                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenInfoModal(ppl); }}>
+                                Lihat Info
+                            </Button>
+                        </TableCell>
+                        <TableCell className="text-center">
+                            <Badge variant="default" className={isActive ? "bg-bps-green-600" : "bg-gray-400 text-gray-800"}>
+                                {isActive ? "Aktif" : "Non Aktif"}
+                            </Badge>
+                        </TableCell>
+                    </TableRow>
+                );
+            })
+        )}
+    </TableBody>
+</Table>
             </div>
             <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-600">
@@ -443,6 +550,11 @@ export default function DaftarPPL() {
             description={`Anda akan menghapus ${selectedPPLs.length} PPL yang telah dipilih. Lanjutkan?`}
             confirmLabel="Ya, Batalkan"
             variant="danger"
+        />
+        <PPLInfoModal 
+            isOpen={isInfoModalOpen}
+            onClose={() => setIsInfoModalOpen(false)}
+            pplData={selectedPplForInfo}
         />
       </div>
     </Layout>

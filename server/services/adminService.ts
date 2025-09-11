@@ -4,6 +4,7 @@ import { RowDataPacket, OkPacket } from 'mysql2';
 import db from '../db';
 import { UserData, KetuaTimData, PPLAdminData } from '@shared/api';
 import bcrypt from 'bcryptjs'; 
+import * as pplService from './pplService';
 
 const SALT_ROUNDS = 10;
 
@@ -67,49 +68,17 @@ export const deleteKetuaTim = async (id: string): Promise<boolean> => {
 // START OF MODIFICATION: Fungsi getAllPPLAdmin diperbarui
 // =================================================================
 export const getAllPPLAdmin = async (): Promise<PPLAdminData[]> => {
-    const query = `
-        SELECT 
-            pm.id, 
-            pm.namaPPL, 
-            pm.alamat, 
-            pm.noTelepon,
-            COUNT(DISTINCT CONCAT(p.kegiatanId, '-', p.tahap)) AS totalKegiatan,
-            GROUP_CONCAT(DISTINCT 
-                CASE 
-                    WHEN p.tahap = 'listing' THEN CONCAT(k.namaKegiatan, ' (Listing)')
-                    WHEN p.tahap = 'pencacahan' THEN CONCAT(k.namaKegiatan, ' (Pencacahan)')
-                    WHEN p.tahap = 'pengolahan-analisis' THEN CONCAT(k.namaKegiatan, ' (Pengolahan)')
-                    ELSE k.namaKegiatan 
-                END 
-            SEPARATOR ';;') as kegiatanNames
-        FROM ppl_master pm
-        LEFT JOIN ppl p ON pm.id = p.ppl_master_id
-        LEFT JOIN kegiatan k ON p.kegiatanId = k.id
-        GROUP BY pm.id, pm.namaPPL, pm.alamat, pm.noTelepon
-        ORDER BY pm.namaPPL ASC
-    `;
-    const [rows] = await db.query<RowDataPacket[]>(query);
-    return rows.map(row => ({
-        ...row,
-        kegiatanNames: row.kegiatanNames ? row.kegiatanNames.split(';;') : []
-    })) as PPLAdminData[];
+    return pplService.getPplAdminData();
 };
-// =================================================================
-// END OF MODIFICATION: Fungsi getAllPPLAdmin
-// =================================================================
 
-// --- PPL Master Management (Tidak ada perubahan) ---
 export const createPPLAdmin = async (data: PPLAdminData): Promise<PPLAdminData> => {
-    const { id, namaPPL, alamat, noTelepon } = data;
-    await db.execute('INSERT INTO ppl_master (id, namaPPL, alamat, noTelepon) VALUES (?, ?, ?, ?)', [id, namaPPL, alamat, noTelepon]);
-    return data;
+    return pplService.createMasterPPL(data);
 };
+
 export const updatePPLAdmin = async (id: string, data: PPLAdminData): Promise<PPLAdminData> => {
-    const { namaPPL, alamat, noTelepon } = data;
-    await db.execute('UPDATE ppl_master SET namaPPL = ?, alamat = ?, noTelepon = ? WHERE id = ?', [namaPPL, alamat, noTelepon, id]);
-    return data;
+    return pplService.updateMasterPPL(id, data);
 };
+
 export const deletePPLAdmin = async (id: string): Promise<boolean> => {
-    const [result] = await db.execute<OkPacket>('DELETE FROM ppl_master WHERE id = ?', [id]);
-    return result.affectedRows > 0;
+    return pplService.deleteMasterPPL(id);
 };

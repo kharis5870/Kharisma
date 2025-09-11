@@ -96,10 +96,11 @@ export default function ManajemenAdmin() {
   const [newPPLData, setNewPPLData] = useState<PPLAdminData>({
     id: "",
     namaPPL: "",
+    posisi: "Pendataan",
     totalKegiatan: 0,
     alamat: "",
     noTelepon: "",
-    kegiatanNames: []
+    kegiatanDetails: []
   });
   const [editPPLData, setEditPPLData] = useState<PPLAdminData | null>(null);
   const [deletePPLId, setDeletePPLId] = useState("");
@@ -227,7 +228,15 @@ export default function ManajemenAdmin() {
       alamat: alamat.trim(),
       noTelepon: noTelepon.trim()
     });
-    setNewPPLData({ id: "", namaPPL: "", totalKegiatan: 0, alamat: "", noTelepon: "", kegiatanNames: [] });
+    setNewPPLData({ 
+        id: "", 
+        namaPPL: "", 
+        posisi: "Pendataan", 
+        totalKegiatan: 0, 
+        alamat: "", 
+        noTelepon: "", 
+        kegiatanDetails: [] 
+    });
     setShowAddPPLModal(false);
     setSuccessMessage(`PPL "${namaPPL}" berhasil ditambahkan!`);
     setShowSuccessModal(true);
@@ -472,6 +481,7 @@ export default function ManajemenAdmin() {
                                 <TableRow>
                                     <TableHead className="w-[15%]"><button onClick={() => handlePPLSort('id')} className="flex items-center gap-1">ID{getSortIcon('id', pplSortConfig)}</button></TableHead>
                                     <TableHead className="w-[25%]"><button onClick={() => handlePPLSort('namaPPL')} className="flex items-center gap-1">Nama{getSortIcon('namaPPL', pplSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[20%]"><button onClick={() => handlePPLSort('posisi')} className="flex items-center gap-1">Posisi{getSortIcon('posisi', pplSortConfig)}</button></TableHead>
                                     <TableHead className="w-[30%]"><button onClick={() => handlePPLSort('alamat')} className="flex items-center gap-1">Alamat{getSortIcon('alamat', pplSortConfig)}</button></TableHead>
                                     <TableHead className="w-[20%]"><button onClick={() => handlePPLSort('noTelepon')} className="flex items-center gap-1">Telepon{getSortIcon('noTelepon', pplSortConfig)}</button></TableHead>
                                     <TableHead className="w-[10%]">Aksi</TableHead>
@@ -482,6 +492,13 @@ export default function ManajemenAdmin() {
                                     <TableRow key={ppl.id}>
                                         <TableCell className="font-medium truncate">{ppl.id}</TableCell>
                                         <TableCell className="font-medium truncate">{ppl.namaPPL}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={
+                                                ppl.posisi === 'Pendataan' ? 'default' :
+                                                ppl.posisi === 'Pengolahan' ? 'secondary' :
+                                                'outline'
+                                            }>{ppl.posisi}</Badge>
+                                        </TableCell>
                                         <TableCell className="truncate">{ppl.alamat}</TableCell>
                                         <TableCell className="truncate">{ppl.noTelepon}</TableCell>
                                         <TableCell className="flex gap-2">
@@ -523,7 +540,36 @@ export default function ManajemenAdmin() {
   />
 </div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddUserModal(false)}>Batal</Button><Button onClick={handleAddUser} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
         {showAddKetuaTimModal && <Dialog open={showAddKetuaTimModal} onOpenChange={setShowAddKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Tambah Ketua Tim Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newKetuaTimId">ID Ketua Tim *</Label><Input id="newKetuaTimId" value={newKetuaTimData.id} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID Ketua Tim (contoh: KT001)"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNama">Nama *</Label><Input id="newKetuaTimNama" value={newKetuaTimData.nama} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nama: e.target.value }))} placeholder="Masukkan nama ketua tim"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNip">NIP *</Label><Input id="newKetuaTimNip" value={newKetuaTimData.nip} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nip: e.target.value }))} placeholder="Masukkan NIP (minimal 10 karakter)"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddKetuaTimModal(false)}>Batal</Button><Button onClick={handleAddKetuaTim} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
-        {showAddPPLModal && <Dialog open={showAddPPLModal} onOpenChange={setShowAddPPLModal}><DialogContent><DialogHeader><DialogTitle>Tambah PPL Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newPPLId">ID PPL *</Label><Input id="newPPLId" value={newPPLData.id} onChange={(e) => setNewPPLData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID PPL (contoh: PPL001)"/></div><div className="space-y-2"><Label htmlFor="newPPLNama">Nama PPL *</Label><Input id="newPPLNama" value={newPPLData.namaPPL} onChange={(e) => setNewPPLData(prev => ({ ...prev, namaPPL: e.target.value }))} placeholder="Masukkan nama PPL"/></div><div className="space-y-2"><Label htmlFor="newPPLAlamat">Alamat *</Label><Input id="newPPLAlamat" value={newPPLData.alamat} onChange={(e) => setNewPPLData(prev => ({ ...prev, alamat: e.target.value }))} placeholder="Masukkan alamat"/></div><div className="space-y-2"><Label htmlFor="newPPLTelepon">No. Telepon *</Label><Input id="newPPLTelepon" value={newPPLData.noTelepon} onChange={(e) => setNewPPLData(prev => ({ ...prev, noTelepon: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="Masukkan no. telepon"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddPPLModal(false)}>Batal</Button><Button onClick={handleAddPPL} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+        {showAddPPLModal && <Dialog open={showAddPPLModal} onOpenChange={setShowAddPPLModal}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Tambah PPL Baru</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <FormError message={formError} />
+              <div className="space-y-2">
+                <Label htmlFor="newPPLId">ID PPL *</Label>
+                <Input id="newPPLId" value={newPPLData.id} onChange={(e) => setNewPPLData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID PPL (contoh: PPL001)"/>
+              </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="newPPLNama">Nama PPL *</Label>
+                  <Input id="newPPLNama" value={newPPLData.namaPPL} onChange={(e) => setNewPPLData(prev => ({ ...prev, namaPPL: e.target.value }))} placeholder="Masukkan nama PPL"/>
+                </div>
+                <div className="space-y-2">
+                <Label htmlFor="newPPLPosisi">Posisi *</Label>
+                <Select value={newPPLData.posisi} onValueChange={(value: PPLAdminData['posisi']) => setNewPPLData(prev => ({ ...prev, posisi: value }))}>
+                    <SelectTrigger id="newPPLPosisi">
+                        <SelectValue placeholder="Pilih posisi PPL" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Pendataan">Pendataan</SelectItem>
+                        <SelectItem value="Pengolahan">Pengolahan</SelectItem>
+                        <SelectItem value="Pendataan/Pengolahan">Pendataan/Pengolahan</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="newPPLAlamat">Alamat *</Label>
+                    <Input id="newPPLAlamat" value={newPPLData.alamat} onChange={(e) => setNewPPLData(prev => ({ ...prev, alamat: e.target.value }))} placeholder="Masukkan alamat"/></div><div className="space-y-2"><Label htmlFor="newPPLTelepon">No. Telepon *</Label><Input id="newPPLTelepon" value={newPPLData.noTelepon} onChange={(e) => setNewPPLData(prev => ({ ...prev, noTelepon: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="Masukkan no. telepon"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddPPLModal(false)}>Batal</Button><Button onClick={handleAddPPL} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
         
         {editUserData && <Dialog open={showEditUserModal} onOpenChange={setShowEditUserModal}><DialogContent><DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editUsername">Username *</Label><Input id="editUsername" value={editUserData.username} onChange={e => setEditUserData({...editUserData, username: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editNamaLengkap">Nama Lengkap *</Label><Input id="editNamaLengkap" value={editUserData.namaLengkap} onChange={e => setEditUserData({...editUserData, namaLengkap: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPassword">Password (kosongkan jika tidak diubah)</Label><Input id="editPassword" type="password" onChange={e => setEditUserData({...editUserData, password: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editRole">Role *</Label><Select value={editUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setEditUserData({...editUserData, role: value})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
   <div className="space-y-0.5">
@@ -537,7 +583,33 @@ export default function ManajemenAdmin() {
   />
 </div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditUserModal(false)}>Batal</Button><Button onClick={handleEditUser}>Simpan</Button></div></div></DialogContent></Dialog>}
         {editKetuaTimData && <Dialog open={showEditKetuaTimModal} onOpenChange={setShowEditKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Edit Ketua Tim</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editKtNama">Nama *</Label><Input id="editKtNama" value={editKetuaTimData.nama} onChange={e => setEditKetuaTimData({...editKetuaTimData, nama: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editKtNip">NIP *</Label><Input id="editKtNip" value={editKetuaTimData.nip} onChange={e => setEditKetuaTimData({...editKetuaTimData, nip: e.target.value})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditKetuaTimModal(false)}>Batal</Button><Button onClick={handleEditKetuaTim}>Simpan</Button></div></div></DialogContent></Dialog>}
-        {editPPLData && <Dialog open={showEditPPLModal} onOpenChange={setShowEditPPLModal}><DialogContent><DialogHeader><DialogTitle>Edit PPL</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editPplNama">Nama PPL *</Label><Input id="editPplNama" value={editPPLData.namaPPL} onChange={e => setEditPPLData({...editPPLData, namaPPL: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPplAlamat">Alamat *</Label><Input id="editPplAlamat" value={editPPLData.alamat} onChange={e => setEditPPLData({...editPPLData, alamat: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPplTelepon">No. Telepon *</Label><Input id="editPplTelepon" value={editPPLData.noTelepon} onChange={e => setEditPPLData({...editPPLData, noTelepon: e.target.value.replace(/[^0-9]/g, '')})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditPPLModal(false)}>Batal</Button><Button onClick={handleEditPPL}>Simpan</Button></div></div></DialogContent></Dialog>}
+        {editPPLData && <Dialog open={showEditPPLModal} onOpenChange={setShowEditPPLModal}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit PPL</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4"><FormError message={formError} />
+            <div className="space-y-2">
+              <Label htmlFor="editPplNama">Nama PPL *</Label>
+              <Input id="editPplNama" value={editPPLData.namaPPL} onChange={e => setEditPPLData({...editPPLData, namaPPL: e.target.value})} /></div>
+              <div className="space-y-2"><Label htmlFor="editPplAlamat">Alamat *</Label>
+              <Input id="editPplAlamat" value={editPPLData.alamat} onChange={e => setEditPPLData({...editPPLData, alamat: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editPPLPosisi">Posisi *</Label>
+                <Select 
+                    value={editPPLData.posisi} 
+                    onValueChange={(value: PPLAdminData['posisi']) => setEditPPLData({...editPPLData, posisi: value})}
+                >
+                    <SelectTrigger id="editPPLPosisi">
+                        <SelectValue placeholder="Pilih posisi PPL" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Pendataan">Pendataan</SelectItem>
+                        <SelectItem value="Pengolahan">Pengolahan</SelectItem>
+                        <SelectItem value="Pendataan/Pengolahan">Pendataan/Pengolahan</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+              <div className="space-y-2"><Label htmlFor="editPplTelepon">No. Telepon *</Label><Input id="editPplTelepon" value={editPPLData.noTelepon} onChange={e => setEditPPLData({...editPPLData, noTelepon: e.target.value.replace(/[^0-9]/g, '')})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditPPLModal(false)}>Batal</Button><Button onClick={handleEditPPL}>Simpan</Button></div></div></DialogContent></Dialog>}
       </div>
     </Layout>
   );

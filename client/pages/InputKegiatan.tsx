@@ -64,7 +64,7 @@ const fetchPMLs = async (): Promise<UserData[]> => {
     return apiClient.get<UserData[]>('/admin/pml');
 };
 
-const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, store, existingPplIds }: any) => {
+const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, store, existingPplIds, tahap }: any) => {
     const { updatePPL, updatePPLBebanKerja } = store.getState();
     const [openPPL, setOpenPPL] = useState(false);
     const [openPML, setOpenPML] = useState(false);
@@ -86,9 +86,24 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, 
     const selectedPML = pmlList.find((pml: UserData) => pml.namaLengkap === ppl.namaPML);
     const selectedPPL = pplList.find((p: PPLMaster) => String(p.id) === ppl.ppl_master_id);
     
-    const availablePplList = pplList.filter(
-        (p: PPLMaster) => !existingPplIds.includes(String(p.id)) || p.id === selectedPPL?.id
-    );
+    const availablePplList = useMemo(() => {
+        return pplList.filter((p: PPLMaster) => {
+            // Logika 1: Jangan tampilkan PPL yang sudah dialokasikan di tahap ini
+            const isAlreadySelected = existingPplIds.includes(String(p.id));
+            if (isAlreadySelected && p.id !== selectedPPL?.id) {
+                return false;
+            }
+
+            // ✔️ LOGIKA FILTER UTAMA BERDASARKAN POSISI
+            if (tahap === 'listing' || tahap === 'pencacahan') {
+                return p.posisi === 'Pendataan' || p.posisi === 'Pendataan/Pengolahan';
+            }
+            if (tahap === 'pengolahan-analisis') {
+                return p.posisi === 'Pengolahan' || p.posisi === 'Pendataan/Pengolahan';
+            }
+            return false; // Tahap tidak valid, sembunyikan semua
+        });
+    }, [pplList, existingPplIds, selectedPPL, tahap]);
 
     const getBebanKerjaLabel = () => {
         switch(jenisPekerjaan) {
@@ -145,38 +160,38 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, 
                     </div>
                     <div className="space-y-2">
                          <Label>Nama PML *</Label>
-                         <Popover open={openPML} onOpenChange={setOpenPML}>
-                             <PopoverTrigger asChild>
-                                  <Button variant="outline" role="combobox" aria-expanded={openPML} className="w-full justify-between">
-                                      {selectedPML ? `${selectedPML.namaLengkap}` : "Pilih PML..."}
-                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                             </PopoverTrigger>
-                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                  <Command>
-                                      <CommandInput placeholder="Cari PML..." />
-                                      <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
-                                      <CommandGroup>
-                                         <CommandList>
-                                             {pmlList.map((pml: UserData) => (
-                                                 <CommandItem key={pml.id} value={`${pml.id} ${pml.namaLengkap}`} onSelect={() => {
-                                                     updatePPL(ppl.id, 'namaPML', pml.namaLengkap);
-                                                     setOpenPML(false);
-                                                 }}>
-                                                     <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
-                                                     <div className="flex flex-col">
-                                                         <span>{pml.namaLengkap}</span>
-                                                         <span className="text-xs text-gray-500">ID: {pml.id}</span>
-                                                     </div>
-                                                 </CommandItem>
-                                             ))}
-                                         </CommandList>
-                                      </CommandGroup>
-                                   </Command>
-                             </PopoverContent>
-                           </Popover>
+                            <Popover open={openPML} onOpenChange={setOpenPML}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" role="combobox" aria-expanded={openPML} className="w-full justify-between">
+                                        {selectedPML ? `${selectedPML.namaLengkap}` : "Pilih PML..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="Cari PML..." />
+                                        <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
+                                        <CommandGroup>
+                                            <CommandList>
+                                                {pmlList.map((pml: UserData) => (
+                                                    <CommandItem key={pml.id} value={`${pml.id} ${pml.namaLengkap}`} onSelect={() => {
+                                                        updatePPL(ppl.id, 'namaPML', pml.namaLengkap);
+                                                        setOpenPML(false);
+                                                    }}>
+                                                        <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
+                                                        <div className="flex flex-col">
+                                                            <span>{pml.namaLengkap}</span>
+                                                            <span className="text-xs text-gray-500">ID: {pml.id}</span>
+                                                        </div>
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandList>
+                                        </CommandGroup>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
-                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
                     <div className="space-y-2">
@@ -391,6 +406,7 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
                        return (
                            <PPLAllocationItem 
                                key={ppl.id} 
+                               tahap={tahap}
                                ppl={ppl} 
                                index={index} 
                                onRemove={() => storeActions.removePPL(ppl.id)} 

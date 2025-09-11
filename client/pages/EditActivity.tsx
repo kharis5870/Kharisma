@@ -100,7 +100,7 @@ const updateActivity = async (kegiatan: Partial<FormState> & {id: number}): Prom
 };
 
 // --- Sub-Components ---
-const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList, pmlList, honorariumSettings, existingPplIds, setAlertModal }: any) => {
+const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList, pmlList, honorariumSettings, existingPplIds, setAlertModal, tahap }: any) => {
     const [openPPL, setOpenPPL] = useState(false);
     const [openPML, setOpenPML] = useState(false);
     
@@ -165,9 +165,24 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
     const selectedPML = pmlList.find((p: UserData) => p.namaLengkap === ppl.namaPML);
     const selectedPPL = pplList.find((p: PPLMaster) => String(p.id) === String(ppl.ppl_master_id));
     
-    const availablePplList = pplList.filter(
-        (p: PPLMaster) => !existingPplIds.includes(String(p.id)) || p.id === selectedPPL?.id
-    );
+    const availablePplList = useMemo(() => {
+        return pplList.filter((p: PPLMaster) => {
+            // Logika 1: Jangan tampilkan PPL yang sudah dialokasikan di tahap ini
+            const isAlreadySelected = existingPplIds.includes(String(p.id));
+            if (isAlreadySelected && p.id !== selectedPPL?.id) {
+                return false;
+            }
+
+            // ✔️ LOGIKA FILTER UTAMA BERDASARKAN POSISI
+            if (tahap === 'listing' || tahap === 'pencacahan') {
+                return p.posisi === 'Pendataan' || p.posisi === 'Pendataan/Pengolahan';
+            }
+            if (tahap === 'pengolahan-analisis') {
+                return p.posisi === 'Pengolahan' || p.posisi === 'Pendataan/Pengolahan';
+            }
+            return false; // Tahap tidak valid, sembunyikan semua
+        });
+    }, [pplList, existingPplIds, selectedPPL, tahap]);
 
     const getBebanKerjaLabel = () => {
         switch(jenisPekerjaan) {
@@ -859,6 +874,7 @@ const handleSaveNote = () => {
                             return (
                                 <PPLAllocationItem 
                                     key={ppl.clientId}
+                                    tahap={tahap}
                                     ppl={ppl}
                                     index={index}
                                     onRemove={removePPL}
