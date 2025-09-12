@@ -9,18 +9,40 @@ import db from '../db';
  * Mengambil daftar gabungan PPL dari sebuah kegiatan beserta data penilaiannya (jika ada).
  */
 export const getPenilaianList = async (tahun?: number, triwulan?: number) => {
-    let whereClauses = [];
-    let params = [];
+    let whereClauses: string[] = [];
+    let params: (string | number)[] = [];
 
-    if (tahun && triwulan) {
+    // Jika parameter tahun dan triwulan diberikan, buat klausa WHERE yang dinamis
+    if (tahun && triwulan && triwulan > 0) {
         const bulanMulai = (triwulan - 1) * 3 + 1;
         const bulanSelesai = triwulan * 3;
-        whereClauses.push('YEAR(pn.tanggal_penilaian) = ? AND MONTH(pn.tanggal_penilaian) BETWEEN ? AND ?');
-        params.push(tahun, bulanMulai, bulanSelesai);
+
+        // Logika CASE untuk memilih kolom bulan_honor yang relevan berdasarkan tahap PPL
+        const dynamicMonthFilter = `
+            (
+                CAST(SUBSTRING_INDEX(
+                    CASE
+                        WHEN p.tahap = 'listing' THEN k.bulanHonorListing
+                        WHEN p.tahap = 'pencacahan' THEN k.bulanHonorPencacahan
+                        WHEN p.tahap = 'pengolahan-analisis' THEN k.bulanHonorPengolahan
+                    END,
+                '-', 1) AS UNSIGNED) BETWEEN ? AND ?
+            ) AND (
+                CAST(SUBSTRING_INDEX(
+                    CASE
+                        WHEN p.tahap = 'listing' THEN k.bulanHonorListing
+                        WHEN p.tahap = 'pencacahan' THEN k.bulanHonorPencacahan
+                        WHEN p.tahap = 'pengolahan-analisis' THEN k.bulanHonorPengolahan
+                    END,
+                '-', -1) AS UNSIGNED) = ?
+            )
+        `;
+        whereClauses.push(dynamicMonthFilter);
+        params.push(bulanMulai, bulanSelesai, tahun);
     }
     
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-    
+
     const query = `
         SELECT
             p.id AS id,
@@ -48,6 +70,8 @@ export const getPenilaianList = async (tahun?: number, triwulan?: number) => {
     `;
 
     const [rows] = await db.query<RowDataPacket[]>(query, params);
+
+    // Konversi tipe data 'rataRata' menjadi angka (sudah benar)
     return rows.map(row => ({
         ...row,
         sudahDinilai: Boolean(row.sudahDinilai),
@@ -96,7 +120,6 @@ export const saveOrUpdatePenilaian = async (data: PenilaianRequest) => {
 };
 
 export const getRekapPenilaian = async (tahun: number, triwulan: number): Promise<RekapPenilaian[]> => {
-    // Tentukan rentang bulan berdasarkan triwulan
     const bulanMulai = (triwulan - 1) * 3 + 1;
     const bulanSelesai = triwulan * 3;
 
@@ -104,20 +127,39 @@ export const getRekapPenilaian = async (tahun: number, triwulan: number): Promis
         SELECT
             p.ppl_master_id AS pplId,
             pm.namaPPL,
-            COUNT(pn.id) AS totalKegiatan,
-            AVG(pn.rata_rata) AS rataRataNilai,
-            (AVG(pn.rata_rata) + (0.01 * COUNT(pn.id))) AS nilaiAkhir
+            COUNT(DISTINCT CONCAT(p.kegiatanId, '-', p.tahap)) AS totalKegiatan,
+            ROUND(AVG(pn.rata_rata), 2) AS rataRataNilai,
+            (ROUND(AVG(pn.rata_rata), 2) + (0.1 * COUNT(DISTINCT CONCAT(p.kegiatanId, '-', p.tahap)))) AS nilaiAkhir
         FROM
-            penilaian_mitra pn
-        JOIN ppl p ON pn.pplId = p.id
+            ppl p -- Mulai dari tabel PPL untuk mencakup semua yang bekerja
+        JOIN kegiatan k ON p.kegiatanId = k.id
         JOIN ppl_master pm ON p.ppl_master_id = pm.id
+        LEFT JOIN penilaian_mitra pn ON p.id = pn.pplId -- Gunakan LEFT JOIN agar yang belum dinilai tetap terhitung
         WHERE
-            YEAR(pn.tanggal_penilaian) = ?
-            AND MONTH(pn.tanggal_penilaian) BETWEEN ? AND ?
+            -- ✔️ GANTI LOGIKA FILTER DENGAN YANG INI
+            (
+                CAST(SUBSTRING_INDEX(
+                    CASE
+                        WHEN p.tahap = 'listing' THEN k.bulanHonorListing
+                        WHEN p.tahap = 'pencacahan' THEN k.bulanHonorPencacahan
+                        WHEN p.tahap = 'pengolahan-analisis' THEN k.bulanHonorPengolahan
+                    END,
+                '-', -1) AS UNSIGNED) = ?
+            )
+            AND
+            (
+                CAST(SUBSTRING_INDEX(
+                    CASE
+                        WHEN p.tahap = 'listing' THEN k.bulanHonorListing
+                        WHEN p.tahap = 'pencacahan' THEN k.bulanHonorPencacahan
+                        WHEN p.tahap = 'pengolahan-analisis' THEN k.bulanHonorPengolahan
+                    END,
+                '-', 1) AS UNSIGNED) BETWEEN ? AND ?
+            )
         GROUP BY
             p.ppl_master_id, pm.namaPPL
         ORDER BY
-            nilaiAkhir DESC;
+            nilaiAkhir DESC, pm.namaPPL ASC;
     `;
 
     const [rows] = await db.query<RowDataPacket[]>(query, [tahun, bulanMulai, bulanSelesai]);

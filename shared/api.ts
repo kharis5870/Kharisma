@@ -29,6 +29,7 @@ export interface PPL {
   id?: number;
   kegiatanId?: number;
   ppl_master_id: string;
+  pml_id?: string | null;
   namaPPL?: string;
   namaPML: string;
   bebanKerja: string; 
