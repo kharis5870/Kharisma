@@ -382,20 +382,21 @@ export default function Dashboard() {
         </div>
     );
 
-    const PPLUpdateCard = ({ ppl, handleUpdatePPL }: { ppl: PPLWithProgress, handleUpdatePPL: (pplId: number, field: EditableProgressKey, value: string) => void }) => {
-        // 1. Tambahkan state lokal untuk menampung nilai input sementara
+    const PPLUpdateCard = ({ ppl, handleUpdatePPL, user }: { 
+        ppl: PPLWithProgress, 
+        handleUpdatePPL: (pplId: number, field: EditableProgressKey, value: string) => void,
+        user: any
+    }) => {
         const [localProgress, setLocalProgress] = useState(ppl.progress);
 
-        // Sinkronkan state lokal jika data dari luar (props) berubah
         useEffect(() => {
             setLocalProgress(ppl.progress);
         }, [ppl.progress]);
-
+        const isAuthorized = user?.role === 'admin' || String(user?.id) === String(ppl.pml_id);
         const isPendataan = ppl.tahap === 'listing' || ppl.tahap === 'pencacahan';
         const honorDetail = ppl.honorarium?.[0];
         const targetBebanKerja = honorDetail?.bebanKerja || '0';
 
-        // 2. Buat handler untuk onChange (hanya mengubah state lokal)
         const handleLocalChange = (field: EditableProgressKey, value: string) => {
             const numValue = parseInt(value, 10);
             setLocalProgress(prev => ({
@@ -415,7 +416,6 @@ export default function Dashboard() {
                 return (
                     <div className="grid grid-cols-4 gap-3">
                         <div><Label className="text-xs text-slate-600">Open</Label><Input type="number" value={localProgress.open ?? 0} disabled className="mt-1 text-center bg-slate-100"/></div>
-                        {/* 4. Perbarui props pada komponen <Input> */}
                         {stages.map(field => (
                             <div key={field}>
                                 <Label className="text-xs text-slate-600 capitalize">{field}</Label>
@@ -425,6 +425,8 @@ export default function Dashboard() {
                                     value={localProgress[field] ?? 0} 
                                     onChange={e => handleLocalChange(field, e.target.value)} 
                                     onBlur={() => handleBlur(field)}
+                                    disabled={!isAuthorized}
+                                    title={!isAuthorized ? "Hanya PML yang bersangkutan atau Admin yang dapat mengubah progress" : ""}
                                     className="mt-1 text-center" />
                             </div>
                         ))}
@@ -445,6 +447,8 @@ export default function Dashboard() {
                                 value={localProgress[field] ?? 0} 
                                 onChange={e => handleLocalChange(field, e.target.value)} 
                                 onBlur={() => handleBlur(field)} 
+                                disabled={!isAuthorized}
+                                title={!isAuthorized ? "Hanya PML yang bersangkutan atau Admin yang dapat mengubah progress" : ""}
                                 className="mt-1 text-center" />
                         </div>
                     ))}
@@ -490,7 +494,7 @@ export default function Dashboard() {
     const renderPPLUpdate = (pplList: PPLWithProgress[], search: string) => (
         <div className="space-y-4">
             {pplList.filter(p => (p.namaPPL || '').toLowerCase().includes(search.toLowerCase())).map(ppl => (
-                <PPLUpdateCard key={ppl.id} ppl={ppl} handleUpdatePPL={handleUpdatePPL} />
+                <PPLUpdateCard key={ppl.id} ppl={ppl} handleUpdatePPL={handleUpdatePPL} user={user} />
             ))}
             {pplList.filter(p => (p.namaPPL || '').toLowerCase().includes(search.toLowerCase())).length === 0 && (
                 <p className="text-center text-gray-500 py-4">
