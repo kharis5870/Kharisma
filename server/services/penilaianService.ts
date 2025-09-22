@@ -2,7 +2,7 @@
 
 import { RowDataPacket } from 'mysql2';
 import pool from '../db';
-import { RekapPenilaian, PenilaianRequest } from '../../shared/api'; // Kita akan definisikan tipe ini nanti
+import { RekapPenilaian, PenilaianRequest } from '../../shared/api';
 import db from '../db';
 
 /**
@@ -129,7 +129,7 @@ export const getRekapPenilaian = async (tahun: number, triwulan: number): Promis
             pm.namaPPL,
             COUNT(DISTINCT CONCAT(p.kegiatanId, '-', p.tahap)) AS totalKegiatan,
             ROUND(AVG(pn.rata_rata), 2) AS rataRataNilai,
-            (ROUND(AVG(pn.rata_rata), 2) + (0.1 * COUNT(DISTINCT CONCAT(p.kegiatanId, '-', p.tahap)))) AS nilaiAkhir
+            (ROUND(AVG(pn.rata_rata), 2) + (0.01 * COUNT(DISTINCT CONCAT(p.kegiatanId, '-', p.tahap)))) AS nilaiAkhir
         FROM
             ppl p -- Mulai dari tabel PPL untuk mencakup semua yang bekerja
         JOIN kegiatan k ON p.kegiatanId = k.id

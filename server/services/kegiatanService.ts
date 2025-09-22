@@ -219,7 +219,8 @@ export const createKegiatan = async (data: any, bypassHonorLimit = false): Promi
             tanggalMulaiDiseminasiEvaluasi, tanggalSelesaiDiseminasiEvaluasi,
             ppl: pplAllocations,
             documents, username,
-            honorariumSettings
+            honorariumSettings,
+            createdBy_userId
         } = data;
 
         if (!bypassHonorLimit) {
@@ -253,7 +254,7 @@ export const createKegiatan = async (data: any, bypassHonorLimit = false): Promi
         // Perbarui query INSERT
         const kegiatanQuery = `
             INSERT INTO kegiatan
-            (namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing, isFasih, 
+            (namaKegiatan, ketua_tim_id, createdBy_userId, deskripsiKegiatan, adaListing, isFasih, 
             bulanHonorListing, bulanHonorPencacahan, bulanHonorPengolahan,
             tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
             tanggalMulaiPengumpulanData, tanggalSelesaiPengumpulanData,
@@ -264,10 +265,10 @@ export const createKegiatan = async (data: any, bypassHonorLimit = false): Promi
             progressPendataanSubmit, progressPengolahanSubmit,
             progressListingApproved, progressListingSubmit,
             progressPencacahanApproved, progressPencacahanSubmit)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Persiapan', ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         `;
         const [kegiatanResult] = await connection.execute<OkPacket>(kegiatanQuery, [
-            namaKegiatan, ketua_tim_id, deskripsiKegiatan, adaListing || false, isFasih || false,
+            namaKegiatan, ketua_tim_id, createdBy_userId, deskripsiKegiatan, adaListing || false, isFasih || false,
             // Masukkan tiga bulan honor baru
             bulanHonorListing || null, bulanHonorPencacahan || null, bulanHonorPengolahan || null,
             formatDateForDb(tanggalMulaiPersiapan),

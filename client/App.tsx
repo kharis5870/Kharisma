@@ -26,7 +26,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <PPLProvider>
-          <AdminProvider> {/* <-- Bungkus dengan AdminProvider */}
+          <AdminProvider> 
             <BrowserRouter>
               <Toaster />
               <Routes>

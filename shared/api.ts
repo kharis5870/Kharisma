@@ -86,6 +86,7 @@ export interface Kegiatan {
   id: number;
   namaKegiatan: string;
   ketua_tim_id: string;
+  createdBy_userId?: string | null;
   namaKetua?: string;
   deskripsiKegiatan: string;
   adaListing: boolean;

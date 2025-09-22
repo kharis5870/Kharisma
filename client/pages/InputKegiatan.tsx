@@ -608,6 +608,7 @@ export default function InputKegiatan() {
         const dataToSubmit = {
           namaKegiatan: store.namaKegiatan,
           ketua_tim_id: store.ketua_tim_id,
+          createdBy_userId: user?.id,
           deskripsiKegiatan: store.deskripsiKegiatan,
           adaListing: store.adaListing,
           isFasih: store.isFasih,

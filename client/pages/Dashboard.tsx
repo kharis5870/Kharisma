@@ -601,7 +601,7 @@ export default function Dashboard() {
                             const { status, color, warnings } = activity.dynamicStatus;
                             const canEdit = user?.role === 'admin' || 
                                 String(user?.id) === String(activity.ketua_tim_id) || 
-                                user?.username === activity.lastEditedBy;
+                                String(user?.id) === String(activity.createdBy_userId);
 
                             let progressValue = 0;
                             let progressLabel = "";
