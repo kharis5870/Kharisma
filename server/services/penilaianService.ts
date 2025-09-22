@@ -51,7 +51,7 @@ export const getPenilaianList = async (tahun?: number, triwulan?: number) => {
             p.id AS pplId,
             p.tahap AS tahap,
             pm.namaPPL AS namaPPL,
-            p.namaPML AS namaPML,
+            u.nama_lengkap AS namaPML,
             p.pml_id AS pmlId,
             pn.sikap_perilaku AS sikapPelikaku,
             pn.kualitas_pekerjaan AS kualitasPekerjaan,

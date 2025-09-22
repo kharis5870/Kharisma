@@ -176,9 +176,10 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, 
                                                 {pmlList.map((pml: UserData) => (
                                                     <CommandItem key={pml.id} value={`${pml.id} ${pml.namaLengkap}`} onSelect={() => {
                                                         updatePPL(ppl.id, 'namaPML', pml.namaLengkap);
+                                                        updatePPL(ppl.id, 'pml_id', pml.id);  
                                                         setOpenPML(false);
                                                     }}>
-                                                        <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
+                                                        <Check className={cn("mr-2 h-4 w-4", String(ppl.pml_id) === String(pml.id) ? "opacity-100" : "opacity-0")} />
                                                         <div className="flex flex-col">
                                                             <span>{pml.namaLengkap}</span>
                                                             <span className="text-xs text-gray-500">ID: {pml.id}</span>

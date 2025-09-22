@@ -31,7 +31,7 @@ export interface PPL {
   ppl_master_id: string;
   pml_id?: string | null;
   namaPPL?: string;
-  namaPML: string;
+  namaPML?: string;
   bebanKerja: string; 
   besaranHonor: string; 
   tahap: 'listing' | 'pencacahan' | 'pengolahan-analisis';

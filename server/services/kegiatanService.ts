@@ -128,7 +128,8 @@ const getKegiatanWithRelations = async (whereClause: string, params: any[]): Pro
    });
 
     const [dokumenRows] = await db.query<RowDataPacket[]>('SELECT * FROM dokumen WHERE kegiatanId IN (' + placeholders + ')', kegiatanIds);
-    const [pplRows] = await db.query<PPLPacket[]>('SELECT p.*, pm.namaPPL FROM ppl p LEFT JOIN ppl_master pm ON p.ppl_master_id = pm.id WHERE p.kegiatanId IN (' + placeholders + ')', kegiatanIds);
+    const [pplRows] = await db.query<PPLPacket[]>(
+        'SELECT p.*, pm.namaPPL, u.nama_lengkap AS namaPML FROM ppl p LEFT JOIN ppl_master pm ON p.ppl_master_id = pm.id LEFT JOIN users u ON p.pml_id = u.id WHERE p.kegiatanId IN (' + placeholders + ')', kegiatanIds);
     
     if (pplRows.length > 0) {
         const pplIds = pplRows.map(p => p.id).filter(id => id !== undefined) as number[];
@@ -294,9 +295,14 @@ export const createKegiatan = async (data: any, bypassHonorLimit = false): Promi
                 const totalHonor = ppl.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.besaranHonor || '0')), 0) || 0;
                 const totalBeban = ppl.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.bebanKerja || '0')), 0) || 0;
 
-                const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, besaranHonor, tahap) VALUES (?, ?, ?, ?, ?, ?)';
+                const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, pml_id, bebanKerja, besaranHonor, tahap) VALUES (?, ?, ?, ?, ?, ?)';
                 const [pplResult] = await connection.execute<OkPacket>(pplQuery, [
-                   kegiatanId, ppl.ppl_master_id, ppl.namaPML, totalBeban, totalHonor, ppl.tahap
+                   kegiatanId, 
+                   ppl.ppl_master_id, 
+                   ppl.pml_id || null,
+                   totalBeban, 
+                   totalHonor, 
+                   ppl.tahap
                 ]);
                 const pplId = pplResult.insertId;
 
@@ -494,9 +500,9 @@ export const updateKegiatan = async (id: number, data: any, bypassHonorLimit = f
                 const totalHonor = p.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.besaranHonor || '0')), 0) || 0;
                 const totalBeban = p.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + (parseInt(h.bebanKerja || '0')), 0) || 0;
 
-                const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, namaPML, bebanKerja, besaranHonor, tahap) VALUES (?, ?, ?, ?, ?, ?)';
+                const pplQuery = 'INSERT INTO ppl (kegiatanId, ppl_master_id, pml_id, bebanKerja, besaranHonor, tahap) VALUES (?, ?, ?, ?, ?, ?)';
                 const [pplResult] = await connection.execute<OkPacket>(pplQuery, [
-                   id, p.ppl_master_id, p.namaPML, totalBeban, totalHonor, p.tahap
+                   id, p.ppl_master_id, p.pml_id || null, totalBeban, totalHonor, p.tahap
                 ]);
                 const pplId = pplResult.insertId;
 

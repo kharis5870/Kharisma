@@ -162,7 +162,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
     };
     
     const totalHonorPPL = ppl.honorarium?.reduce((sum: number, h: any) => sum + parseInt(h.besaranHonor || '0'), 0) || 0;
-    const selectedPML = pmlList.find((p: UserData) => p.namaLengkap === ppl.namaPML);
+    const selectedPML = pmlList.find((p: UserData) => String(p.id) === String(ppl.pml_id));
     const selectedPPL = pplList.find((p: PPLMaster) => String(p.id) === String(ppl.ppl_master_id));
     
     const availablePplList = useMemo(() => {
@@ -250,11 +250,13 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
                                             <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
                                             <CommandGroup>
                                                 {pmlList.map((pml: UserData) => (
-                                                    <CommandItem key={pml.id} value={`${pml.id} ${pml.namaLengkap}`} onSelect={() => {
-                                                        onUpdate(ppl.clientId, 'namaPML', pml.namaLengkap);
+                                                    <CommandItem key={pml.id} 
+                                                    value={`${pml.id} ${pml.namaLengkap}`} 
+                                                    onSelect={() => {
+                                                        onUpdate(ppl.clientId, 'pml_id', pml.id);
                                                         setOpenPML(false);
                                                     }}>
-                                                        <Check className={cn("mr-2 h-4 w-4", ppl.namaPML === pml.namaLengkap ? "opacity-100" : "opacity-0")} />
+                                                        <Check className={cn("mr-2 h-4 w-4", String(ppl.pml_id) === String(pml.id) ? "opacity-100" : "opacity-0")} />
                                                         <div className="flex flex-col">
                                                             <span>{pml.namaLengkap}</span>
                                                             <span className="text-xs text-gray-500">ID: {pml.id}</span>
@@ -666,6 +668,7 @@ export default function EditActivity() {
             bypassHonorLimit: bypassHonorLimit
         };
         
+        console.log('DATA DIKIRIM:', dataToSubmit.ppl);
         mutation.mutate(dataToSubmit as Partial<FormState> & {id: number});
     };
 

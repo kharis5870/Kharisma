@@ -595,6 +595,9 @@ export default function Dashboard() {
                     ) : (
                         filteredActivities.map((activity) => {
                             const { status, color, warnings } = activity.dynamicStatus;
+                            const canEdit = user?.role === 'admin' || 
+                                String(user?.id) === String(activity.ketua_tim_id) || 
+                                user?.username === activity.lastEditedBy;
 
                             let progressValue = 0;
                             let progressLabel = "";
@@ -685,7 +688,17 @@ export default function Dashboard() {
                                         </div>
                                         <div className="grid grid-cols-2 gap-2 pt-4 border-t mt-4">
                                             <Button variant="outline" size="sm" onClick={() => { setSelectedActivity(activity); setPplSearchView(""); }}><Eye className="w-4 h-4 mr-1" />Lihat</Button>
-                                            <Button variant="outline" size="sm" asChild><Link to={`/edit-activity/${activity.id}`}><Edit className="w-4 h-4 mr-1" />Edit</Link></Button>
+                                            {canEdit ? (
+                                                <Button variant="outline" size="sm" asChild>
+                                                    <Link to={`/edit-activity/${activity.id}`}>
+                                                        <Edit className="w-4 h-4 mr-1" />Edit
+                                                    </Link>
+                                                </Button>
+                                            ) : (
+                                                <Button variant="outline" size="sm" disabled title="Hanya Admin, Ketua Tim, atau pembuat yang bisa mengedit">
+                                                    <Edit className="w-4 h-4 mr-1" />Edit
+                                                </Button>
+                                            )}
                                             <Button variant="outline" size="sm" onClick={() => { handleOpenUpdateModal(activity); setPplSearchUpdate(""); }}><RefreshCw className="w-4 h-4 mr-1" />Update</Button>
                                             <Button variant="outline" size="sm" asChild><Link to={`/view-documents/${activity.id}`}><FileText className="w-4 h-4 mr-1" />View Docs</Link></Button>
                                             {user?.role === 'admin' && (

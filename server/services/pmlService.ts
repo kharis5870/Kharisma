@@ -9,13 +9,11 @@ export const getPmlAdminData = async (): Promise<PMLAdminData[]> => {
         SELECT
             u.id,
             u.nama_lengkap AS namaPML,
-            -- ✔️ Ambil 'posisi' dari tabel PPL Master yang terkait
-            -- Kita ambil posisi PPL pertama yang ditemukan untuk PML ini sebagai representasi
-            (SELECT pm.posisi FROM ppl p JOIN ppl_master pm ON p.ppl_master_id = pm.id WHERE p.pml_id = u.id LIMIT 1) AS posisi,
             COUNT(DISTINCT CONCAT(p.kegiatanId, '-', p.tahap)) AS totalKegiatan,
             GROUP_CONCAT(DISTINCT CONCAT(k.namaKegiatan, ';;', p.tahap) SEPARATOR '||') AS kegiatanDetails
         FROM
             users u
+        -- ✔️ PERBAIKAN UTAMA: JOIN tabel ppl menggunakan ID
         LEFT JOIN ppl p ON u.id = p.pml_id
         LEFT JOIN kegiatan k ON p.kegiatanId = k.id
         WHERE
@@ -31,8 +29,6 @@ export const getPmlAdminData = async (): Promise<PMLAdminData[]> => {
     return rows.map(row => ({
         id: row.id,
         namaPML: row.namaPML,
-        // ✔️ Tambahkan 'posisi' ke objek yang dikirim
-        posisi: row.posisi || 'Pendataan', // Default ke 'Pendataan' jika PML belum punya PPL
         totalKegiatan: row.totalKegiatan || 0,
         kegiatanDetails: row.kegiatanDetails
             ? row.kegiatanDetails.split('||').map((detail: string) => {
@@ -40,5 +36,6 @@ export const getPmlAdminData = async (): Promise<PMLAdminData[]> => {
                   return { nama, tahap };
               })
             : [],
+        posisi: 'Pendataan/Pengolahan' 
     }));
 };
