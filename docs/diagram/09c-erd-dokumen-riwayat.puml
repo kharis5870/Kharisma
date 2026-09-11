@@ -1,0 +1,58 @@
+@startuml erd-dokumen-riwayat
+' ERD bagian 3/4: repositori dokumen kegiatan dan jejak audit.
+!include _gaya.iuml
+hide circle
+hide methods
+
+entity "kegiatan" as kegiatan {
+  * id : int <<PK>>
+  --
+  namaKegiatan : varchar(255)
+  status : enum
+}
+
+entity "dokumen" as dokumen {
+  * id : int <<PK>>
+  --
+  kegiatanId : int <<FK>>
+  nama : varchar(255)
+  tipe : enum (tahap)
+  jenis : enum
+  link : varchar(512)
+  isWajib : tinyint(1)
+  penanggungJawab : enum
+  status : enum
+  rejectionNote : text
+  rejectedAt / resubmittedAt : datetime
+  lastApproved / lastApprovedBy
+  pengingatDikirimPada / Oleh
+  diunggahOleh_userId : varchar(50)
+  uploadedAt / updatedAt : timestamp
+}
+
+entity "riwayat_kegiatan" as riwayat_kegiatan {
+  * id : bigint <<PK>>
+  --
+  kegiatanId : int <<FK>>
+  aksi : varchar(40)
+  entitas : enum
+  entitasId : int
+  jumlah : smallint
+  aktorUserId : varchar(50)
+  aktorNama : varchar(255)
+  ringkasan : varchar(255)
+  terjadiPada : datetime
+}
+
+entity "users" as users {
+  * id : varchar(50) <<PK>>
+  --
+  username : varchar(50)
+  nama_lengkap : varchar(255)
+}
+
+kegiatan ||--o{ dokumen : memiliki
+kegiatan ||--o{ riwayat_kegiatan : dicatat
+users |o..o{ riwayat_kegiatan : pelaku
+
+@enduml

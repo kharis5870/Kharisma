@@ -2,12 +2,13 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserData } from '@shared/api';
-import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { simpanToken, hapusToken, ambilToken } from '@/lib/tokenSesi';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: UserData | null;
-  login: (userData: UserData) => void;
+  login: (userData: UserData, token: string) => void;
   logout: () => void;
   checkAuth: () => boolean;
 }
@@ -27,6 +28,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const queryClient = useQueryClient();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
 
@@ -35,7 +37,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const authStatus = localStorage.getItem('isAuthenticated');
     const storedUser = localStorage.getItem('user');
     
-    if (authStatus === 'true' && storedUser) {
+    // Token wajib ikut ada: tanpa itu setiap permintaan akan dibalas 401,
+    // dan aplikasi akan tampak masuk padahal tidak bisa melakukan apa pun.
+    if (authStatus === 'true' && storedUser && ambilToken()) {
       setIsAuthenticated(true);
       setUser(JSON.parse(storedUser));
       return true;
@@ -51,7 +55,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [checkAuth]);
 
   // PERBAIKAN: Bungkus login dengan useCallback
-  const login = useCallback((userData: UserData) => {
+  const login = useCallback((userData: UserData, token: string) => {
+    simpanToken(token);
     localStorage.setItem('isAuthenticated', 'true');
     localStorage.setItem('user', JSON.stringify(userData));
     setIsAuthenticated(true);
@@ -60,11 +65,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // PERBAIKAN: Bungkus logout dengan useCallback
   const logout = useCallback(() => {
+    hapusToken();
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('user');
     setIsAuthenticated(false);
     setUser(null);
-  }, []);
+    // Buang seluruh cache React Query. Login memakai navigate() tanpa memuat
+    // ulang halaman, jadi tanpa ini data sesi pengguna sebelumnya (daftar
+    // kegiatan, dokumen, notifikasi) terbawa ke sesi pengguna berikutnya.
+    queryClient.clear();
+  }, [queryClient]);
 
   const value: AuthContextType = {
     isAuthenticated,

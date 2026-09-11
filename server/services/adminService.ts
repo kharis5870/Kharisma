@@ -45,17 +45,21 @@ export const getAllPMLs = async (): Promise<UserData[]> => {
 
 // --- Ketua Tim Management (Tidak ada perubahan) ---
 export const getAllKetuaTim = async (): Promise<KetuaTimData[]> => {
-    const [rows] = await db.query<RowDataPacket[]>('SELECT id, nama_ketua AS nama, nip FROM ketua_tim ORDER BY nama_ketua ASC');
+    const [rows] = await db.query<RowDataPacket[]>(`SELECT kt.id, kt.nama_ketua AS nama, kt.nip, kt.tim, kt.user_id AS userId,
+                 u.nama_lengkap AS namaUser
+            FROM ketua_tim kt
+            LEFT JOIN users u ON u.id = kt.user_id
+           ORDER BY kt.nama_ketua ASC`);
     return rows as KetuaTimData[];
 };
 export const createKetuaTim = async (data: KetuaTimData): Promise<KetuaTimData> => {
-    const { id, nama, nip } = data;
-    await db.execute('INSERT INTO ketua_tim (id, nama_ketua, nip) VALUES (?, ?, ?)', [id, nama, nip]);
+    const { id, nama, nip, tim, userId } = data;
+    await db.execute('INSERT INTO ketua_tim (id, nama_ketua, nip, tim, user_id) VALUES (?, ?, ?, ?, ?)', [id, nama, nip, tim || null, userId || null]);
     return data;
 };
 export const updateKetuaTim = async (id: string, data: KetuaTimData): Promise<KetuaTimData> => {
-    const { nama, nip } = data;
-    await db.execute('UPDATE ketua_tim SET nama_ketua = ?, nip = ? WHERE id = ?', [nama, nip, id]);
+    const { nama, nip, tim, userId } = data;
+    await db.execute('UPDATE ketua_tim SET nama_ketua = ?, nip = ?, tim = ?, user_id = ? WHERE id = ?', [nama, nip, tim || null, userId || null, id]);
     return data;
 };
 export const deleteKetuaTim = async (id: string): Promise<boolean> => {

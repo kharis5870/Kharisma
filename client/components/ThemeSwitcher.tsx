@@ -1,22 +1,28 @@
 // client/components/ThemeSwitcher.tsx
 
-import { Button } from "@/components/ui/button";
 import { Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSidebarStore } from "@/stores/useSidebarStore";
 
 interface ThemeSwitcherProps {
   isExpanded: boolean;
-  theme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark') => void;
 }
 
-export function ThemeSwitcher({ isExpanded, theme, setTheme }: ThemeSwitcherProps) {
+/**
+ * Komponen ini membaca store sendiri, bukan menerima `theme`/`setTheme` sebagai
+ * prop. Dia satu-satunya pemakai `setTheme`, jadi setelah perubahan ini `theme`
+ * keluar sepenuhnya dari pohon komponen Sidebar — warnanya sekarang diurus
+ * class `dark` di <html> dan token --sidebar-*, bukan ternary manual.
+ */
+export function ThemeSwitcher({ isExpanded }: ThemeSwitcherProps) {
+  const { theme, setTheme } = useSidebarStore();
+
   return (
     <button
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
       className={cn(
-          "flex items-center p-3 w-full rounded-lg text-left",
-          theme === 'light' ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-200 hover:bg-gray-700'
+        "flex items-center p-3 w-full rounded-lg text-left transition-colors",
+        "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
       )}
     >
       {theme === "dark" ? (
@@ -25,10 +31,10 @@ export function ThemeSwitcher({ isExpanded, theme, setTheme }: ThemeSwitcherProp
         <Moon className="w-6 h-6 flex-shrink-0" />
       )}
       <span className={cn(
-          "ml-4 overflow-hidden whitespace-nowrap transition-all duration-300",
-          isExpanded ? 'w-full opacity-100' : 'w-0 opacity-0'
+        "ml-4 overflow-hidden whitespace-nowrap transition-all duration-300",
+        isExpanded ? 'w-full opacity-100' : 'w-0 opacity-0'
       )}>
-        {theme === "dark" ? "Light Mode" : "Dark Mode"}
+        {theme === "dark" ? "Mode Terang" : "Mode Gelap"}
       </span>
     </button>
   );

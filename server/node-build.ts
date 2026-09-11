@@ -23,7 +23,7 @@ app.get(`${baseURI}/*`, (req, res, next) => {
 });
 
 // Redirect dari root path ('/') ke base URI aplikasi ('/kharisma')
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.redirect(baseURI);
 });
 

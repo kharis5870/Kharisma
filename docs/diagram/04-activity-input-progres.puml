@@ -1,0 +1,37 @@
+@startuml activity-input-progres
+' Rincian use case "Menginput Progres Mitra".
+' Hak akses: bolehMemperbaruiProgress (PML mitra tersebut, ditambah admin).
+!include _gaya.iuml
+
+|PML|
+start
+:Membuka Dashboard dan
+memilih kegiatan;
+:Memilih mitra yang diawasi;
+
+|Sistem|
+if (Pengguna adalah PML mitra\ntersebut atau admin?) then (tidak)
+  :Menampilkan pesan: progres hanya
+  dapat diperbarui oleh PML-nya;
+  stop
+else (ya)
+endif
+
+repeat
+  |PML|
+  :Mengisi jumlah dokumen per status:
+  Listing/Pencacahan: submit, diperiksa, approved
+  Pengolahan: sudah entry, validasi, clean;
+  |Sistem|
+  :Menghitung sisa (open / belum entry) sebagai
+  beban kerja dikurangi jumlah status lain;
+repeat while (Total progres > beban kerja?) is (ya: tampilkan galat) not (tidak)
+
+:Menyimpan progres mitra;
+:Memperbarui persentase progres kegiatan;
+:Mencatat riwayat kegiatan;
+:Memperbarui grafik dan
+tabel dashboard monitoring;
+stop
+
+@enduml

@@ -5,8 +5,13 @@ import {
   updateMasterPPL,
   deleteMasterPPL,
 } from '../services/pplService';
+import { wajibAdmin } from '../auth/middleware';
 
 const router = Router();
+
+// Master PPL diubah lewat halaman Manajemen Admin (/admin/ppl); route ini
+// hanya dibaca Input & Edit Kegiatan. Mutasinya dikunci admin.
+
 
 // GET all master PPL
 router.get('/', async (_req, res) => {
@@ -19,7 +24,7 @@ router.get('/', async (_req, res) => {
 });
 
 // POST new master PPL
-router.post('/', async (req, res) => {
+router.post('/', wajibAdmin, async (req, res) => {
   try {
     const newPPL = await createMasterPPL(req.body);
     res.status(201).json(newPPL);
@@ -30,7 +35,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update master PPL
-router.put('/:id', async (req, res) => {
+router.put('/:id', wajibAdmin, async (req, res) => {
     try {
         const updatedPPL = await updateMasterPPL(req.params.id, req.body);
         res.json(updatedPPL);
@@ -41,7 +46,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE master PPL
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', wajibAdmin, async (req, res) => {
     try {
         const success = await deleteMasterPPL(req.params.id);
         if (success) {

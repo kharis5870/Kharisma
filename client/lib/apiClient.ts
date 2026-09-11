@@ -3,6 +3,8 @@
  * Di produksi: semua endpoint ada di bawah /kharisma/api
  * Di lokal dev: bisa override lewat VITE_API_URL di .env.development
  */
+import { ambilToken, hapusToken } from "./tokenSesi";
+
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "/kharisma/api";
 
@@ -13,12 +15,38 @@ async function request(endpoint: string, options: RequestInit = {}) {
   // Gabungkan base URL dengan endpoint API
   const fullUrl = `${API_BASE_URL}${endpoint}`;
 
-  const headers = {
+  // Token login dilampirkan di SATU tempat ini, sehingga setiap permintaan
+  // membawa bukti identitas tanpa perlu diingat di tiap pemanggil. Server
+  // memakainya menggantikan `username` yang dulu dikirim di badan permintaan.
+  const token = ambilToken();
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...options.headers,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers as Record<string, string> | undefined),
   };
 
   const response = await fetch(fullUrl, { ...options, headers });
+
+  // Sesi habis atau token tidak sah. Dibersihkan lalu halaman dimuat ulang ke
+  // Login — kalau tidak, aplikasi tampak masih masuk padahal setiap permintaan
+  // berikutnya akan gagal, dan pengguna hanya melihat galat beruntun.
+  //
+  // Endpoint login DIKECUALIKAN. Ia membalas 401 untuk password yang salah,
+  // dan memperlakukannya sebagai "sesi berakhir" membuat kesalahan ketik
+  // password tampil sebagai pesan yang menakutkan dan menyesatkan — seolah ada
+  // masalah sesi, padahal pengguna memang belum masuk. Biarkan pesan asli dari
+  // server ("Username atau password salah") yang sampai ke layar.
+  const endpointLogin = endpoint.startsWith("/auth/login");
+
+  if (response.status === 401 && !endpointLogin) {
+    hapusToken();
+    localStorage.removeItem("isAuthenticated");
+    localStorage.removeItem("user");
+    if (!window.location.pathname.endsWith("/login")) {
+      window.location.assign(`${import.meta.env.BASE_URL}login`);
+    }
+    throw new Error("Sesi Anda sudah berakhir. Silakan login kembali.");
+  }
 
   if (!response.ok) {
     // 1. Ambil seluruh data JSON dari respons error (termasuk 'details')

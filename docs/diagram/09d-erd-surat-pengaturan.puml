@@ -1,0 +1,72 @@
+@startuml erd-surat-pengaturan
+' ERD bagian 4/4: Surat Perjanjian Kerja, BAST, dan pengaturan sistem.
+' riwayat_surat dan system_settings memang berdiri sendiri (tanpa relasi).
+!include _gaya.iuml
+hide circle
+hide methods
+
+entity "ppl_master" as ppl_master {
+  * id : varchar(50) <<PK>>
+  --
+  namaPPL : varchar(255)
+}
+
+entity "kontrak_mitra" as kontrak_mitra {
+  * id : int <<PK>>
+  --
+  ppl_master_id : varchar(50) <<FK>>
+  template_id : int <<FK>>
+  periode_mulai : date
+  periode_selesai : date
+  nomor_urut : int
+  nomor_surat : varchar(255)
+  tanggal_surat : date
+  nomor_bast : varchar(255)
+  tanggal_bast : date
+  total_honor : bigint
+  generatedAt / generatedBy
+  bastGeneratedAt / bastGeneratedBy
+  ..
+  UQ (ppl_master_id, periode_mulai, periode_selesai)
+}
+
+entity "template_surat" as template_surat {
+  * id : int <<PK>>
+  --
+  nama_template : varchar(255)
+  format_nomor : varchar(255)
+  format_nomor_bast : varchar(255)
+  ppk_nama / ppk_nip / ppk_jabatan
+  satker_nama : varchar(255)
+  satker_alamat : text
+  kota : varchar(100)
+  pengadilan_negeri : varchar(255)
+  isi_pasal : longtext
+  is_aktif : tinyint(1)
+}
+
+entity "riwayat_surat" as riwayat_surat {
+  * id : bigint <<PK>>
+  --
+  aksi : varchar(50)
+  periode_mulai : date
+  periode_selesai : date
+  jumlah / jumlah_bast : int
+  nomor_surat : text
+  nomor_bast : text
+  aktorNama : varchar(50)
+  terjadiPada : timestamp
+}
+
+entity "system_settings" as system_settings {
+  * id : int <<PK>>
+  --
+  setting_key : varchar(255) <<UQ>>
+  setting_value : varchar(255)
+  description : text
+}
+
+ppl_master ||--o{ kontrak_mitra : dikontrak
+template_surat |o--o{ kontrak_mitra : format
+
+@enduml

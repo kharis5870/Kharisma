@@ -87,10 +87,13 @@
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    /* Card & popover WAJIB lebih terang dari --background. Sebelumnya nilainya
+       sama persis (222.2 84% 4.9%), sehingga setiap <Card> lenyap menyatu
+       dengan halaman — dan aplikasi ini isinya nyaris seluruhnya Card. */
+    --card: 222.2 47% 8.5%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 222.2 47% 11%;
     --popover-foreground: 210 40% 98%;
 
     --primary: 208 100% 60%;
@@ -119,6 +122,45 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 208 100% 60%;
+
+    /* Palet BPS versi gelap.
+       Tanpa blok ini, ke-30 variabel --bps-* tetap memakai nilai mode terang,
+       sehingga panel seperti bg-bps-blue-50 (kecerahan 97%) tampil putih di
+       bawah teks --foreground yang juga putih.
+       Step 50-200 dibalik jadi permukaan gelap; step 500-700 tetap pekat agar
+       kombinasinya dengan text-white tetap terbaca (mis. bg-bps-green-600). */
+    --bps-blue-50: 208 60% 13%;
+    --bps-blue-100: 208 55% 17%;
+    --bps-blue-200: 208 50% 23%;
+    --bps-blue-300: 208 65% 40%;
+    --bps-blue-400: 208 80% 52%;
+    --bps-blue-500: 208 95% 60%;
+    --bps-blue-600: 208 90% 55%;
+    --bps-blue-700: 208 90% 46%;
+    --bps-blue-800: 208 90% 36%;
+    --bps-blue-900: 208 90% 28%;
+
+    --bps-green-50: 142 40% 12%;
+    --bps-green-100: 142 38% 16%;
+    --bps-green-200: 142 36% 22%;
+    --bps-green-300: 142 50% 34%;
+    --bps-green-400: 142 60% 40%;
+    --bps-green-500: 142 65% 42%;
+    --bps-green-600: 142 62% 38%;
+    --bps-green-700: 142 62% 31%;
+    --bps-green-800: 142 62% 24%;
+    --bps-green-900: 142 62% 18%;
+
+    --bps-orange-50: 25 50% 13%;
+    --bps-orange-100: 25 48% 17%;
+    --bps-orange-200: 25 46% 23%;
+    --bps-orange-300: 25 70% 38%;
+    --bps-orange-400: 25 85% 46%;
+    --bps-orange-500: 25 90% 50%;
+    --bps-orange-600: 25 88% 45%;
+    --bps-orange-700: 25 88% 37%;
+    --bps-orange-800: 25 88% 29%;
+    --bps-orange-900: 25 88% 22%;
   }
 }
 

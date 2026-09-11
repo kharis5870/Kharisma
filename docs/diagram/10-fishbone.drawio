@@ -1,0 +1,142 @@
+<mxfile host="Electron" type="device">
+  <diagram name="Fishbone" id="fishbone-optima">
+    <mxGraphModel dx="1240" dy="620" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1240" pageHeight="620" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Kepala ikan: masalah utama -->
+        <mxCell id="head" value="Tata kelola administrasi dan monitoring kegiatan mitra statistik belum optimal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF4FB;strokeColor=#2F4F75;strokeWidth=2;fontStyle=1;fontSize=13;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="245" width="210" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- Tulang punggung -->
+        <mxCell id="spine" style="endArrow=block;endFill=1;html=1;strokeWidth=3;strokeColor=#333333;" edge="1" parent="1" target="head">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="300" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Kategori 4M -->
+        <mxCell id="cat_man" value="Manusia (Man)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF6D9;strokeColor=#8A6D00;fontStyle=1;fontSize=12;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="150" y="30" width="160" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="cat_method" value="Metode (Method)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF6D9;strokeColor=#8A6D00;fontStyle=1;fontSize=12;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="530" y="30" width="160" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="cat_machine" value="Teknologi (Machine)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF6D9;strokeColor=#8A6D00;fontStyle=1;fontSize=12;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="150" y="534" width="160" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="cat_material" value="Data/Dokumen (Material)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF6D9;strokeColor=#8A6D00;fontStyle=1;fontSize=12;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="530" y="534" width="160" height="36" as="geometry" />
+        </mxCell>
+
+        <!-- Tulang kategori (miring menuju tulang punggung) -->
+        <mxCell id="bone_man" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#333333;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="230" y="66" as="sourcePoint" />
+            <mxPoint x="400" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bone_method" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#333333;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="610" y="66" as="sourcePoint" />
+            <mxPoint x="780" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bone_machine" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#333333;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="230" y="534" as="sourcePoint" />
+            <mxPoint x="400" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bone_material" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#333333;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="610" y="534" as="sourcePoint" />
+            <mxPoint x="780" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== Manusia (Man) ===== -->
+        <mxCell id="m1_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="81" y="136" as="sourcePoint" /><mxPoint x="281" y="136" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m1" value="Beban kerja administratif tinggi bagi Ketua Tim dan Tim Keuangan" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="81" y="100" width="172" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="m2_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="124" y="195" as="sourcePoint" /><mxPoint x="324" y="195" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m2" value="Kurangnya visibilitas informasi lintas tim kerja" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="124" y="159" width="172" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="m3_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="166" y="253" as="sourcePoint" /><mxPoint x="366" y="253" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m3" value="Ketergantungan pada komunikasi informal/personal" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="166" y="217" width="172" height="34" as="geometry" />
+        </mxCell>
+
+        <!-- ===== Metode (Method) ===== -->
+        <mxCell id="d1_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="461" y="136" as="sourcePoint" /><mxPoint x="661" y="136" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="d1" value="Rekapitulasi progres kerja dilakukan berulang secara manual" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="461" y="100" width="172" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="d2_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="504" y="195" as="sourcePoint" /><mxPoint x="704" y="195" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="d2" value="Pengecekan batas SBM dilakukan manual antar-spreadsheet" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="504" y="159" width="172" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="d3_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="546" y="253" as="sourcePoint" /><mxPoint x="746" y="253" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="d3" value="Pemeringkatan kinerja mitra dihitung manual" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="546" y="217" width="172" height="34" as="geometry" />
+        </mxCell>
+
+        <!-- ===== Teknologi (Machine) ===== -->
+        <mxCell id="t1_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="166" y="347" as="sourcePoint" /><mxPoint x="366" y="347" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="t1" value="Penggunaan spreadsheet terpisah (silo data)" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="166" y="311" width="172" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="t2_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="124" y="405" as="sourcePoint" /><mxPoint x="324" y="405" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="t2" value="Tidak ada sistem terintegrasi dan basis data terpusat" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="124" y="369" width="172" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="t3_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="81" y="464" as="sourcePoint" /><mxPoint x="281" y="464" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="t3" value="Monitoring kegiatan FASIH dan Non-FASIH terpisah" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="81" y="428" width="172" height="34" as="geometry" />
+        </mxCell>
+
+        <!-- ===== Data/Dokumen (Material) ===== -->
+        <mxCell id="a1_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="546" y="347" as="sourcePoint" /><mxPoint x="746" y="347" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="a1" value="Berkas SK, ST, dan BAST rentan hilang/tercecer" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="546" y="311" width="172" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="a2_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="504" y="405" as="sourcePoint" /><mxPoint x="704" y="405" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="a2" value="Redundansi dan inkonsistensi versi data mitra" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="504" y="369" width="172" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="a3_line" style="endArrow=none;html=1;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="461" y="464" as="sourcePoint" /><mxPoint x="661" y="464" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="a3" value="Format laporan lapangan berbeda-beda" style="text;html=1;whiteSpace=wrap;align=right;verticalAlign=bottom;fontSize=11;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="461" y="428" width="172" height="34" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

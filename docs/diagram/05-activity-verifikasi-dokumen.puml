@@ -1,0 +1,58 @@
+@startuml activity-verifikasi-dokumen
+' Rincian use case "Mengelola Dokumen Kegiatan", "Memverifikasi Dokumen",
+' "Menolak Dokumen dengan Catatan", dan "Mengirim Pengingat Dokumen".
+' Dokumen disimpan sebagai TAUTAN (maks. 512 karakter), bukan berkas di server.
+!include _gaya.iuml
+
+|Tim Keuangan|
+start
+:Membuka halaman dokumen kegiatan;
+
+if (Tautan dokumen masih kosong?) then (ya)
+  if (Penanggung jawab\nTim Keuangan?) then (ya)
+    :Mengisi sendiri tautan dokumen;
+  else (tidak)
+    :Menekan Kirim Pengingat;
+    |Sistem|
+    :Menampilkan notifikasi pengingat
+    kepada Ketua Tim dan pembuat kegiatan;
+    |Ketua Tim|
+    :Mengisi tautan dokumen;
+  endif
+else (tidak)
+endif
+
+|Sistem|
+:Memeriksa format dan panjang tautan;
+:Menandai dokumen berstatus Pending
+dan memberi notifikasi menunggu persetujuan;
+
+repeat
+  |Tim Keuangan|
+  :Memeriksa kelengkapan dan
+  keabsahan dokumen;
+  if (Dokumen valid?) then (ya)
+    :Menyetujui per dokumen atau
+    sekaligus satu tahap;
+    |Sistem|
+    :Mengubah status menjadi Approved
+    dan mencatat penyetuju;
+  else (tidak)
+    |Tim Keuangan|
+    :Menolak dan menulis catatan revisi;
+    |Sistem|
+    :Mengubah status menjadi Rejected
+    dan memberi notifikasi ke Ketua Tim;
+    |Ketua Tim|
+    :Memperbaiki tautan dokumen;
+    |Sistem|
+    :Mengembalikan status ke Pending dan memberi
+    notifikasi dokumen diunggah ulang;
+  endif
+  |Sistem|
+repeat while (Dokumen ditolak?) is (ya, periksa ulang) not (tidak)
+
+:Mencatat seluruh aksi ke riwayat kegiatan;
+stop
+
+@enduml

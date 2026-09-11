@@ -5,7 +5,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import { usePPL } from "@/contexts/PPLContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +19,6 @@ import {
   PaginationContent,
   PaginationItem
 } from "@/components/ui/pagination";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Users,
   UserCheck,
@@ -28,20 +26,19 @@ import {
   ChevronUp,
   ChevronDown,
   UserPlus,
-  MapPin,
-  Phone,
   List,
   UserX,
   ChevronLeft,
   ChevronRight,
   XCircle,
-  CheckSquare,
   Activity
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLAdminData, PPLMaster, Kecamatan, Desa } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/apiClient";
+import { useHalamanAman } from "@/hooks/useHalamanAman";
+import { GAYA_POSISI_PPL, NADA_STATUS } from "@/lib/statusStyles";
 
 const fetchKecamatan = async (): Promise<Kecamatan[]> => apiClient.get('/alamat/kecamatan');
 const fetchDesa = async (kecamatanId: string): Promise<Desa[]> => apiClient.get(`/alamat/desa?kecamatanId=${kecamatanId}`);
@@ -67,11 +64,11 @@ const ActivityDetailModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, on
                     {pplData.kegiatanDetails && pplData.kegiatanDetails.length > 0 ? (
                         <ul className="space-y-2">
                             {pplData.kegiatanDetails.map((keg, index) => (
-                                <li key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-md">
+                                <li key={index} className="flex items-start gap-3 p-3 bg-muted rounded-md">
                                     <List className="w-4 h-4 text-bps-blue-500 mt-1 flex-shrink-0" />
                                     <span>
                                         {keg.nama}
-                                        <span className="text-slate-500 font-normal ml-1 capitalize">
+                                        <span className="text-muted-foreground font-normal ml-1 capitalize">
                                             ({keg.tahap?.replace('-', ' ')})
                                         </span>
                                     </span>
@@ -79,7 +76,7 @@ const ActivityDetailModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, on
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-gray-500 text-center py-4">Tidak ada kegiatan tercatat.</p>
+                        <p className="text-muted-foreground text-center py-4">Tidak ada kegiatan tercatat.</p>
                     )}
                 </div>
                 <div className="mt-6 flex justify-end">
@@ -133,7 +130,6 @@ const PPLInfoModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, onClose: 
 export default function DaftarPPL() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { setSelectedPPLsForActivity } = usePPL();
 
     const sourcePage = location.state?.from || 'daftar-ppl'; 
     const sourceTahap = location.state?.tahap || 'persiapan';
@@ -253,6 +249,7 @@ export default function DaftarPPL() {
   }, [filteredAndSortedData, currentPage, rowsPerPage]);
 
   const totalPages = Math.ceil(filteredAndSortedData.length / rowsPerPage);
+  useHalamanAman(currentPage, totalPages, setCurrentPage);
 
   const handleSelectPPL = (pplId: string) => {
     if (!selectionMode || existingPplIds.includes(pplId)) return;
@@ -314,8 +311,8 @@ export default function DaftarPPL() {
   };
   
   const getSortIcon = (columnKey: string) => {
-    if (!sortConfig || sortConfig.key !== columnKey) return <ChevronUp className="w-4 h-4 text-gray-300" />;
-    return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />;
+    if (!sortConfig || sortConfig.key !== columnKey) return <ChevronUp className="w-4 h-4 text-border" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-300" /> : <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-300" />;
   };
 
   const handleOpenDetailModal = (ppl: PPLAdminData) => {
@@ -364,10 +361,10 @@ export default function DaftarPPL() {
       <div className="space-y-8">
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Daftar PPL</h1>
-            <p className="text-gray-600 mt-1">{selectionMode ? "Pilih PPL untuk ditambahkan ke kegiatan" : "Lihat dan kelola daftar PPL"}</p>
+            <h1 className="text-3xl font-bold text-foreground">Daftar PPL</h1>
+            <p className="text-muted-foreground mt-1">{selectionMode ? "Pilih PPL untuk ditambahkan ke kegiatan" : "Lihat dan kelola daftar PPL"}</p>
             {selectionMode && selectedPPLs.length > 0 && (
-                 <button onClick={() => setShowSelectedPPLsModal(true)} className="text-sm text-blue-600 mt-1 hover:underline">
+                 <button onClick={() => setShowSelectedPPLsModal(true)} className="text-sm text-blue-600 dark:text-blue-300 mt-1 hover:underline">
                     {selectedPPLs.length} PPL dipilih
                 </button>
             )}
@@ -392,10 +389,10 @@ export default function DaftarPPL() {
         </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total PPL</p><p className="text-2xl font-bold text-gray-900">{stats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
-            <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">PPL Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.activePPL}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
-            <Card className="border-l-4 border-l-gray-400"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">PPL Non Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.inactivePPL}</p></div><UserX className="w-8 h-8 text-gray-400" /></div></CardContent></Card>
-            <Card className="border-l-4 border-l-bps-orange-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Persentase Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.persentaseAktif.toFixed(1)}%</p></div><Activity className="w-8 h-8 text-bps-orange-500" /></div></CardContent></Card>
+            <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Total PPL</p><p className="text-2xl font-bold text-foreground">{stats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
+            <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">PPL Aktif</p><p className="text-2xl font-bold text-foreground">{stats.activePPL}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
+            <Card className="border-l-4 border-l-gray-400"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">PPL Non Aktif</p><p className="text-2xl font-bold text-foreground">{stats.inactivePPL}</p></div><UserX className="w-8 h-8 text-muted-foreground" /></div></CardContent></Card>
+            <Card className="border-l-4 border-l-bps-orange-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Persentase Aktif</p><p className="text-2xl font-bold text-foreground">{stats.persentaseAktif.toFixed(1)}%</p></div><Activity className="w-8 h-8 text-bps-orange-500" /></div></CardContent></Card>
         </div>
         <Card>
           <CardHeader>
@@ -435,7 +432,7 @@ export default function DaftarPPL() {
                 </Select>
 
                 <div className="relative sm:w-auto flex-grow">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                     <Input type="text" placeholder="Cari ID/Nama..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/>
                 </div>
             </div>
@@ -472,7 +469,7 @@ export default function DaftarPPL() {
     <TableBody>
         {isLoading ? ( <TableRow><TableCell colSpan={8} className="text-center">Memuat...</TableCell></TableRow> ) : 
         paginatedData.length === 0 ? (
-            <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-500">Tidak ada data PPL</TableCell></TableRow>
+            <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Tidak ada data PPL</TableCell></TableRow>
         ) : (
             paginatedData.map((ppl, index) => {
                 const isActive = ppl.totalKegiatan > 0;
@@ -483,7 +480,7 @@ export default function DaftarPPL() {
                         key={ppl.id} 
                         data-state={isSelected && "selected"}
                         className={cn(
-                            isAlreadyAdded && "bg-gray-100 text-gray-400 cursor-not-allowed",
+                            isAlreadyAdded && "bg-muted text-muted-foreground cursor-not-allowed",
                             selectionMode && !isAlreadyAdded && "cursor-pointer"
                         )}
                         onClick={() => handleSelectPPL(ppl.id)}
@@ -496,18 +493,13 @@ export default function DaftarPPL() {
                         <TableCell className="font-mono">{ppl.id}</TableCell>
                         <TableCell className="font-medium">{ppl.namaPPL}</TableCell>
                         <TableCell>
-                <Badge className={cn(
-                    "font-semibold",
-                    ppl.posisi === 'Pendataan' && 'bg-blue-100 text-blue-700 hover:bg-blue-100',
-                    ppl.posisi === 'Pengolahan' && 'bg-orange-100 text-orange-700 hover:bg-orange-100',
-                    ppl.posisi === 'Pendataan/Pengolahan' && 'bg-green-100 text-green-700 hover:bg-green-100'
-                )}>
+                <Badge className={cn("font-semibold", GAYA_POSISI_PPL[ppl.posisi] ?? NADA_STATUS.netral)}>
                     {ppl.posisi}
                 </Badge>
             </TableCell>
                         {/* ✔️ Kolom berikut dibuat terpusat (center-aligned) */}
                         <TableCell className="text-center">
-                            <Button variant="link" className="p-0 h-auto text-blue-600" onClick={(e) => { e.stopPropagation(); handleOpenDetailModal(ppl); }}>
+                            <Button variant="link" className="p-0 h-auto text-blue-600 dark:text-blue-300" onClick={(e) => { e.stopPropagation(); handleOpenDetailModal(ppl); }}>
                                 {ppl.totalKegiatan} Kegiatan
                             </Button>
                         </TableCell>
@@ -517,7 +509,7 @@ export default function DaftarPPL() {
                             </Button>
                         </TableCell>
                         <TableCell className="text-center">
-                            <Badge variant="default" className={isActive ? "bg-bps-green-600" : "bg-gray-400 text-gray-800"}>
+                            <Badge variant="default" className={isActive ? "bg-bps-green-600" : "bg-muted text-muted-foreground"}>
                                 {isActive ? "Aktif" : "Non Aktif"}
                             </Badge>
                         </TableCell>
@@ -529,7 +521,7 @@ export default function DaftarPPL() {
 </Table>
             </div>
             <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-muted-foreground">
                     Menampilkan <strong>{paginatedData.length}</strong> dari <strong>{filteredAndSortedData.length}</strong> data
                 </div>
                 <div className="flex items-center gap-4">
@@ -588,14 +580,14 @@ export default function DaftarPPL() {
                     {selectedPPLObjects.length > 0 ? (
                         <ul className="space-y-2">
                             {selectedPPLObjects.map((ppl) => (
-                                <li key={ppl.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
+                                <li key={ppl.id} className="flex items-center justify-between p-2 bg-muted rounded-md">
                                     <span>{ppl.namaPPL}</span>
-                                    <span className="text-xs text-gray-500">ID: {ppl.id}</span>
+                                    <span className="text-xs text-muted-foreground">ID: {ppl.id}</span>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-gray-500 text-center py-4">Belum ada PPL yang dipilih.</p>
+                        <p className="text-muted-foreground text-center py-4">Belum ada PPL yang dipilih.</p>
                     )}
                 </div>
             </DialogContent>

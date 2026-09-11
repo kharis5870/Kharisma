@@ -1,6 +1,8 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { NADA_IKON } from "@/lib/statusStyles";
 
 interface AlertModalProps {
   isOpen: boolean;
@@ -17,23 +19,21 @@ export default function AlertModal({
 }: AlertModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      {/* showCloseButton={false}: sudah ada tombol "Tutup" di bawah. */}
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <div className="flex flex-col items-center text-center space-y-4 py-6">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-100">
-            <AlertTriangle className="w-8 h-8 text-red-600" />
+          <div className={cn("w-16 h-16 rounded-full flex items-center justify-center", NADA_IKON.merah)}>
+            <AlertTriangle className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-          {description && (
-            <p className="text-gray-600 text-center max-w-sm text-sm">
+          <DialogTitle className="text-xl font-bold text-foreground">{title}</DialogTitle>
+          {description ? (
+            <DialogDescription className="text-muted-foreground text-center max-w-sm text-sm">
               {description}
-            </p>
+            </DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">{title}</DialogDescription>
           )}
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="w-full mt-4"
-          >
-            <X className="w-4 h-4 mr-2" />
+          <Button variant="outline" onClick={onClose} className="w-full mt-4">
             Tutup
           </Button>
         </div>

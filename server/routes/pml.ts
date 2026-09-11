@@ -5,7 +5,7 @@ import { getPmlAdminData } from '../services/pmlService';
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
+router.get('/', async (_req, res) => {
     try {
         const pmlList = await getPmlAdminData();
         res.json(pmlList);

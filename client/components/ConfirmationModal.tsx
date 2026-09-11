@@ -1,9 +1,10 @@
 // client/components/ConfirmationModal.tsx
 
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NADA_IKON } from "@/lib/statusStyles";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -32,29 +33,12 @@ export default function ConfirmationModal({
   const getVariantStyles = () => {
     switch (variant) {
       case 'danger':
-        return {
-          iconBg: 'bg-red-100',
-          iconColor: 'text-red-600',
-          confirmButton: 'bg-red-600 hover:bg-red-700'
-        };
-      case 'warning':
-        return {
-          iconBg: 'bg-yellow-100',
-          iconColor: 'text-yellow-600',
-          confirmButton: 'bg-yellow-600 hover:bg-yellow-700'
-        };
+        return { icon: NADA_IKON.merah, confirmButton: 'bg-red-600 hover:bg-red-700 text-white' };
       case 'info':
-        return {
-          iconBg: 'bg-blue-100',
-          iconColor: 'text-blue-600',
-          confirmButton: 'bg-blue-600 hover:bg-blue-700'
-        };
+        return { icon: NADA_IKON.biru, confirmButton: 'bg-blue-600 hover:bg-blue-700 text-white' };
+      case 'warning':
       default:
-        return {
-          iconBg: 'bg-yellow-100',
-          iconColor: 'text-yellow-600',
-          confirmButton: 'bg-yellow-600 hover:bg-yellow-700'
-        };
+        return { icon: NADA_IKON.kuning, confirmButton: 'bg-yellow-600 hover:bg-yellow-700 text-white' };
     }
   };
 
@@ -63,31 +47,29 @@ export default function ConfirmationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      {/* showCloseButton={false}: sudah ada tombol batal di bawah. */}
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <div className="flex flex-col items-center text-center space-y-4 py-6">
           {/* Icon */}
-          <div className={cn("w-16 h-16 rounded-full flex items-center justify-center", styles.iconBg)}>
-            <div className={styles.iconColor}>
-              {icon || defaultIcon}
-            </div>
+          <div className={cn("w-16 h-16 rounded-full flex items-center justify-center", styles.icon)}>
+            {icon || defaultIcon}
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+          <DialogTitle className="text-xl font-bold text-foreground">{title}</DialogTitle>
 
           {/* Description */}
-          {description && (
-            <p className="text-gray-600 text-center max-w-sm text-sm">{description}</p>
+          {description ? (
+            <DialogDescription className="text-muted-foreground text-center max-w-sm text-sm">
+              {description}
+            </DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">{title}</DialogDescription>
           )}
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 w-full mt-6">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-            >
-              <X className="w-4 h-4 mr-2" />
+            <Button variant="outline" onClick={onClose} className="flex-1">
               {cancelLabel}
             </Button>
 

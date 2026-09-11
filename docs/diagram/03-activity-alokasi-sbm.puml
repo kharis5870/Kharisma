@@ -1,0 +1,56 @@
+@startuml activity-alokasi-sbm
+' Rincian use case "Membuat/Menyunting Kegiatan & Alokasi Mitra"
+' beserta "Validasi Batas Honor (SBM)".
+'
+' Sesuai kode (kegiatanService.siapkanPembebanan): pelanggaran batas TIDAK
+' ditolak mutlak. Server menjawab 409 HONOR_LIMIT_EXCEEDED, layar menampilkan
+' peringatan, dan pengguna boleh melanjutkan (bypassHonorLimit).
+!include _gaya.iuml
+
+|Ketua Tim|
+start
+:Membuka halaman Kegiatan Baru
+atau Edit Kegiatan;
+:Mengisi informasi kegiatan, jadwal tahap,
+serta menandai tahap Listing, Pengolahan,
+dan Diseminasi yang dipakai;
+:Mengisi satuan beban kerja dan
+harga satuan per jenis pekerjaan;
+
+repeat
+  |Ketua Tim|
+  :Memilih mitra, PML, dan beban kerja
+  untuk setiap tahap;
+  :Memilih metode pembebanan honor
+  (bulan tertentu / prorata / luber);
+  :Menekan tombol Simpan;
+  |Sistem|
+  :Menghitung honor = beban kerja × harga satuan;
+  :Membagi honor ke bulan pembebanan
+  sesuai metode yang dipilih;
+  :Menjumlahkan honor mitra pada bulan yang sama
+  dari seluruh kegiatan lain;
+  if (Total honor bulanan > batas SBM?) then (ya)
+    :Menampilkan peringatan: nama mitra,
+    bulan, total honor, dan batas;
+    |Ketua Tim|
+    if (Tetap lanjutkan?) then (ya)
+      :Mengonfirmasi penyimpanan
+      melebihi batas;
+    else (tidak)
+      :Merevisi alokasi atau
+      metode pembebanan;
+    endif
+  else (tidak)
+  endif
+  |Sistem|
+repeat while (Ketua Tim merevisi alokasi?) is (ya) not (tidak)
+
+:Menyimpan kegiatan, alokasi mitra, rincian honor,
+dan pembebanan honor per bulan dalam satu transaksi;
+:Membuat daftar dokumen wajib setiap tahap;
+:Mencatat riwayat kegiatan;
+:Menampilkan pesan berhasil;
+stop
+
+@enduml

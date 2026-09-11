@@ -1,0 +1,358 @@
+// =====================================================================
+// ERD lengkap Sistem Informasi OPTIMA (database kharisma_db) — 18 tabel.
+//
+// Cara pakai: buka https://dbdiagram.io/d , hapus contoh bawaannya, tempel
+// seluruh isi berkas ini. Tabel bisa digeser untuk merapikan tata letak,
+// lalu Export > PNG / PDF.
+//
+// Disusun dari struktur database yang sedang berjalan (mysqldump --no-data),
+// bukan dari rancangan lama. Relasi bertanda "logis" tidak memiliki FOREIGN
+// KEY di database, tetapi secara makna memang merujuk ke tabel tersebut.
+// =====================================================================
+
+Project OPTIMA {
+  database_type: 'MySQL'
+  Note: 'Sistem Informasi Tata Kelola Administrasi dan Monitoring Kegiatan Mitra Statistik'
+}
+
+// ---------------------------------------------------------------- Enum
+Enum role_pengguna {
+  admin
+  user [note: 'Pegawai: Ketua Tim / PML']
+  supervisor [note: 'Tim Keuangan']
+}
+Enum posisi_mitra {
+  Pendataan
+  Pengolahan
+  "Pendataan/Pengolahan"
+}
+Enum status_kegiatan {
+  Persiapan
+  "Pengumpulan Data"
+  "Pengolahan & Analisis"
+  "Diseminasi & Evaluasi"
+  Selesai
+}
+Enum tipe_kegiatan {
+  survei
+  sensus
+}
+Enum tahap_alokasi {
+  listing
+  pencacahan
+  "pengolahan-analisis"
+}
+Enum metode_pembebanan {
+  bulan_tertentu
+  prorata
+  luber
+}
+Enum jenis_pekerjaan {
+  listing
+  pencacahan
+  pengolahan
+}
+Enum status_progres {
+  open
+  submit
+  diperiksa
+  approved
+  belum_entry
+  sudah_entry
+  validasi
+  clean
+}
+Enum status_dokumen {
+  Pending
+  Reviewed
+  Approved
+  Rejected
+}
+Enum penanggung_jawab {
+  ketua_tim
+  keuangan
+}
+Enum jenis_dokumen {
+  file
+  link
+  catatan
+}
+Enum tipe_dokumen {
+  persiapan
+  "pengumpulan-data"
+  "pengolahan-analisis"
+  "diseminasi-evaluasi"
+}
+Enum entitas_riwayat {
+  kegiatan
+  dokumen
+  ppl
+  progress
+  honor
+  penilaian
+}
+
+// ------------------------------------------------- Pengguna & wilayah
+Table users {
+  id varchar(50) [pk]
+  username varchar(50) [not null, unique]
+  password varchar(255) [not null, note: 'hash bcrypt']
+  nama_lengkap varchar(255) [not null]
+  role role_pengguna [not null, default: 'user']
+  isPML tinyint(1) [not null, default: 0]
+}
+
+Table ketua_tim {
+  id varchar(50) [pk]
+  user_id varchar(50) [ref: > users.id, note: 'akun pengguna ketua tim']
+  nama_ketua varchar(255) [not null]
+  nip varchar(50)
+  tim varchar(100)
+}
+
+Table kecamatan {
+  id int [pk, increment]
+  nama varchar(255) [not null]
+}
+
+Table desa {
+  id int [pk, increment]
+  kecamatan_id int [not null, ref: > kecamatan.id]
+  nama varchar(255) [not null]
+}
+
+Table ppl_master {
+  id varchar(50) [pk, note: 'ID mitra statistik']
+  namaPPL varchar(255) [not null]
+  posisi posisi_mitra [not null, default: 'Pendataan']
+  kecamatan_id int [ref: > kecamatan.id]
+  desa_id int [ref: > desa.id]
+  alamat text
+  noTelepon varchar(20)
+}
+
+// ------------------------------------------------------------ Kegiatan
+Table kegiatan {
+  id int [pk, increment]
+  namaKegiatan varchar(255) [not null]
+  ketua_tim_id varchar(50) [ref: > ketua_tim.id]
+  createdBy_userId varchar(50) [ref: > users.id]
+  deskripsiKegiatan text
+  tipe_kegiatan tipe_kegiatan [not null, default: 'survei']
+  isFasih tinyint(1) [default: 0]
+  adaListing tinyint(1) [not null, default: 0]
+  adaPengolahan tinyint(1) [not null, default: 1]
+  adaDiseminasi tinyint(1) [not null, default: 1]
+  tanggalMulaiPersiapan date
+  tanggalSelesaiPersiapan date
+  tanggalMulaiPengumpulanData date
+  tanggalSelesaiPengumpulanData date
+  tanggalMulaiPengolahanAnalisis date
+  tanggalSelesaiPengolahanAnalisis date
+  tanggalMulaiDiseminasiEvaluasi date
+  tanggalSelesaiDiseminasiEvaluasi date
+  progressKeseluruhan tinyint
+  progressListingSubmit tinyint
+  progressListingApproved tinyint
+  progressPencacahanSubmit tinyint
+  progressPencacahanApproved tinyint
+  progressPendataanSubmit tinyint
+  progressPendataanApproved tinyint
+  progressPengolahanSubmit tinyint
+  progressPengolahanApproved tinyint
+  status status_kegiatan [default: 'Persiapan']
+  bulanHonorListing varchar(7) [note: 'MM-YYYY']
+  tanggalMulaiHonorListing date
+  tanggalSelesaiHonorListing date
+  bulanHonorPencacahan varchar(7)
+  tanggalMulaiHonorPencacahan date
+  tanggalSelesaiHonorPencacahan date
+  bulanHonorPengolahan varchar(7)
+  tanggalMulaiHonorPengolahan date
+  tanggalSelesaiHonorPengolahan date
+  isArsip tinyint(1) [not null, default: 0]
+  arsipAt datetime
+  arsipBy varchar(50)
+  lastUpdated timestamp
+  lastUpdatedBy varchar(50)
+  lastEdited datetime
+  lastEditedBy varchar(255)
+}
+
+Table honorarium_kegiatan {
+  id int [pk, increment]
+  kegiatanId int [not null, ref: > kegiatan.id]
+  jenis_pekerjaan jenis_pekerjaan [not null]
+  satuan_beban_kerja varchar(255)
+  harga_satuan varchar(255)
+  uraian_tugas varchar(255) [note: 'untuk SPK']
+  kode_anggaran varchar(100) [note: 'kode MAK untuk SPK']
+}
+
+// ------------------------------------------- Alokasi, honor, progres
+Table ppl {
+  id int [pk, increment, note: 'satu alokasi mitra pada satu tahap kegiatan']
+  kegiatanId int [not null, ref: > kegiatan.id]
+  tahap tahap_alokasi [not null, default: 'listing']
+  ppl_master_id varchar(50) [ref: > ppl_master.id]
+  pml_id varchar(50) [note: 'users.id PML (relasi logis)']
+  bebanKerja int [default: 0]
+  besaranHonor int [default: 0]
+  metodePembebanan metode_pembebanan [not null, default: 'bulan_tertentu']
+  bulanPembebananDipilih varchar(7)
+}
+
+Table ppl_honorarium {
+  id int [pk, increment]
+  ppl_id int [not null, ref: > ppl.id]
+  jenis_pekerjaan jenis_pekerjaan [not null]
+  bebanKerja int
+  satuanBebanKerja varchar(50)
+  hargaSatuan int
+  besaranHonor int
+  indexes {
+    (ppl_id, jenis_pekerjaan) [unique]
+  }
+}
+
+Table ppl_honor_bulan {
+  id int [pk, increment]
+  ppl_id int [not null, ref: > ppl.id]
+  bulan varchar(7) [not null, note: 'MM-YYYY']
+  jumlah int [not null, default: 0, note: 'honor yang dibebankan ke bulan ini']
+  indexes {
+    (ppl_id, bulan) [unique]
+  }
+}
+
+Table ppl_progress {
+  id int [pk, increment]
+  ppl_id int [not null, ref: > ppl.id]
+  progress_type status_progres [not null]
+  value int [not null, default: 0]
+  indexes {
+    (ppl_id, progress_type) [unique]
+  }
+}
+
+Table penilaian_mitra {
+  id int [pk, increment]
+  pplId int [ref: > ppl.id, note: 'SET NULL bila alokasi terhapus']
+  kegiatanId int [not null, ref: > kegiatan.id]
+  pmlId varchar(50)
+  sikap_perilaku int [note: '1-10']
+  kualitas_pekerjaan int [note: '1-10']
+  ketepatan_waktu int [note: '1-10']
+  rata_rata decimal(4,2)
+  dinilai_oleh_userId varchar(50) [note: 'users.id penilai (relasi logis)']
+  tanggal_penilaian timestamp
+  indexes {
+    (pplId, kegiatanId) [unique]
+  }
+}
+
+// ----------------------------------------------- Dokumen & jejak audit
+Table dokumen {
+  id int [pk, increment]
+  kegiatanId int [not null, ref: > kegiatan.id]
+  nama varchar(255) [not null]
+  tipe tipe_dokumen [not null, default: 'persiapan', note: 'tahap kegiatan']
+  jenis jenis_dokumen [not null, default: 'link']
+  link varchar(512)
+  isWajib tinyint(1) [not null, default: 0]
+  penanggungJawab penanggung_jawab [not null, default: 'ketua_tim']
+  penanggungJawabDiubahOleh varchar(50)
+  penanggungJawabDiubahPada datetime
+  status status_dokumen [not null, default: 'Pending']
+  rejectionNote text
+  rejectedAt datetime
+  rejectedBy varchar(50)
+  resubmittedAt datetime
+  lastApproved datetime
+  lastApprovedBy varchar(255)
+  pengingatDikirimPada datetime
+  pengingatDikirimOleh varchar(50)
+  diunggahOleh_userId varchar(50) [note: 'berisi username']
+  lastEditedBy_userId varchar(50) [note: 'berisi username']
+  uploadedAt timestamp
+  updatedAt timestamp
+}
+
+Table riwayat_kegiatan {
+  id bigint [pk, increment]
+  kegiatanId int [not null, ref: > kegiatan.id]
+  aksi varchar(40) [not null]
+  entitas entitas_riwayat [not null]
+  entitasId int
+  jumlah smallint [not null, default: 1]
+  aktorUserId varchar(50) [note: 'users.id pelaku (relasi logis)']
+  aktorNama varchar(255)
+  ringkasan varchar(255)
+  terjadiPada datetime [not null]
+}
+
+// ------------------------------------------------------ Surat & kontrak
+Table template_surat {
+  id int [pk, increment]
+  nama_template varchar(255) [not null]
+  format_nomor varchar(255) [not null, note: 'pola nomor SPK']
+  format_nomor_bast varchar(255) [not null, note: 'pola nomor BAST']
+  ppk_nama varchar(255) [not null]
+  ppk_nip varchar(50) [not null]
+  ppk_jabatan varchar(255) [not null]
+  satker_nama varchar(255) [not null]
+  satker_alamat text
+  kota varchar(100)
+  pengadilan_negeri varchar(255)
+  isi_pasal longtext [note: 'JSON daftar pasal']
+  is_aktif tinyint(1) [not null, default: 1]
+  updatedAt timestamp
+  updatedBy varchar(50)
+}
+
+Table kontrak_mitra {
+  id int [pk, increment]
+  ppl_master_id varchar(50) [not null, ref: > ppl_master.id]
+  periode_mulai date [not null]
+  periode_selesai date [not null]
+  nomor_urut int [not null]
+  nomor_surat varchar(255) [not null]
+  tanggal_surat date [not null]
+  nomor_bast varchar(255)
+  tanggal_bast date
+  total_honor bigint [not null, default: 0]
+  template_id int [ref: > template_surat.id]
+  generatedAt timestamp
+  generatedBy varchar(50)
+  bastGeneratedAt timestamp
+  bastGeneratedBy varchar(50)
+  indexes {
+    (ppl_master_id, periode_mulai, periode_selesai) [unique]
+  }
+}
+
+Table riwayat_surat {
+  id bigint [pk, increment]
+  aksi varchar(50) [not null]
+  periode_mulai date [not null]
+  periode_selesai date [not null]
+  jumlah int [not null, default: 0]
+  jumlah_bast int [not null, default: 0]
+  nomor_surat text
+  nomor_bast text
+  aktorNama varchar(50)
+  terjadiPada timestamp [not null]
+  Note: 'Sengaja tanpa foreign key: mencatat nomor surat yang SUDAH dihapus.'
+}
+
+Table system_settings {
+  id int [pk, increment]
+  setting_key varchar(255) [not null, unique, note: 'mis. HONOR_LIMIT']
+  setting_value varchar(255) [not null]
+  description text
+}
+
+// -------------------------------------------- Relasi logis (tanpa FK)
+Ref: ppl.pml_id > users.id
+Ref: penilaian_mitra.dinilai_oleh_userId > users.id
+Ref: riwayat_kegiatan.aktorUserId > users.id

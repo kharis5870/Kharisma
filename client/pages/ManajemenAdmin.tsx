@@ -5,7 +5,7 @@ import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useAdmin } from "@/contexts/AdminContext";
-import { UserData, KetuaTimData, PPLAdminData, Kecamatan, Desa } from "@shared/api";
+import { UserData, KetuaTimData, PPLAdminData, Kecamatan, Desa, DAFTAR_TIM } from "@shared/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,13 +35,16 @@ import {
   Crown,
   Eye,
   EyeOff,
-  Activity,
   AlertCircle,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query"; 
 import { apiClient } from "@/lib/apiClient";
+import { nextId } from "@/lib/idOtomatis";
+import { useHalamanAman } from "@/hooks/useHalamanAman";
+import { GAYA_POSISI_PPL, NADA_STATUS } from "@/lib/statusStyles";
+import { cn } from "@/lib/utils";
 
 const fetchKecamatan = async (): Promise<Kecamatan[]> => apiClient.get('/alamat/kecamatan');
 const fetchDesa = async (kecamatanId: string): Promise<Desa[]> => apiClient.get(`/alamat/desa?kecamatanId=${kecamatanId}`);
@@ -64,7 +67,8 @@ export default function ManajemenAdmin() {
   
   const { data: kecamatanList = [] } = useQuery({ queryKey: ['kecamatan'], queryFn: fetchKecamatan });
   const [desaOptions, setDesaOptions] = useState<Desa[]>([]);
-  const [activeTab, setActiveTab] = useState("users");
+  // Nilainya tidak pernah dibaca; setter-nya dipakai <Tabs onValueChange>.
+  const [, setActiveTab] = useState("users");
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
@@ -94,7 +98,8 @@ export default function ManajemenAdmin() {
   const [newKetuaTimData, setNewKetuaTimData] = useState<KetuaTimData>({
     id: "",
     nama: "",
-    nip: ""
+    nip: "",
+    tim: ""
   });
   const [editKetuaTimData, setEditKetuaTimData] = useState<KetuaTimData | null>(null);
   const [deleteKetuaTimId, setDeleteKetuaTimId] = useState("");
@@ -121,8 +126,7 @@ export default function ManajemenAdmin() {
   const [pplSortConfig, setPplSortConfig] = useState<{ key: keyof PPLAdminData; direction: 'asc' | 'desc'; } | null>(null);
   
   const [showPassword, setShowPassword] = useState(false);
-  const [setShowEditPassword] = useState(false);
-  
+
   // PERBAIKAN: State paginasi untuk setiap tab
   const [pagination, setPagination] = useState({
       users: { currentPage: 1, rowsPerPage: 10 },
@@ -192,15 +196,15 @@ export default function ManajemenAdmin() {
   
   const handleAddKetuaTim = () => {
     setFormError(null);
-    const { id, nama, nip } = newKetuaTimData;
+    const { id, nama, nip, tim } = newKetuaTimData;
     if (!isValidUserId(id)) { setFormError("ID Ketua Tim harus diisi!"); return; }
     if (!isValidNamaLengkap(nama)) { setFormError("Nama harus minimal 2 karakter!"); return; }
     if (!isValidNip(nip)) { setFormError("NIP harus minimal 10 karakter!"); return; }
     if (isDuplicateKetuaTimId(id)) { setFormError("ID Ketua Tim sudah ada!"); return; }
     if (isDuplicateNip(nip)) { setFormError("NIP sudah ada!"); return; }
-    
-    addKetuaTim({ id: id.trim(), nama: nama.trim(), nip: nip.trim() });
-    setNewKetuaTimData({ id: "", nama: "", nip: "" });
+
+    addKetuaTim({ id: id.trim(), nama: nama.trim(), nip: nip.trim(), tim: tim || null });
+    setNewKetuaTimData({ id: "", nama: "", nip: "", tim: "" });
     setShowAddKetuaTimModal(false);
     setSuccessMessage(`Ketua Tim "${nama}" berhasil ditambahkan!`);
     setShowSuccessModal(true);
@@ -283,13 +287,27 @@ export default function ManajemenAdmin() {
     setShowSuccessModal(true);
   };
 
-  const openAddUserModal = () => { setFormError(null); setShowAddUserModal(true); };
+  // ID dibuat otomatis, mengisi nomor bekas penghapusan lebih dulu. ID di sini
+  // murni pembeda, jadi tidak ada gunanya membebani admin mengarangnya sendiri.
+  const openAddUserModal = () => {
+    setFormError(null);
+    setNewUserData(prev => ({ ...prev, id: nextId(userList.map(u => u.id), 'USR') }));
+    setShowAddUserModal(true);
+  };
   const openEditUserModal = (user: UserData) => { setFormError(null); setEditUserData({...user, password: ''}); setShowEditUserModal(true); };
   const openDeleteUserModal = (user: UserData) => { setDeleteUserId(user.id); setDeleteUserName(user.username); setShowDeleteUserModal(true); };
-  const openAddKetuaTimModal = () => { setFormError(null); setShowAddKetuaTimModal(true); };
+  const openAddKetuaTimModal = () => {
+    setFormError(null);
+    setNewKetuaTimData(prev => ({ ...prev, id: nextId(ketuaTimList.map(kt => kt.id), 'KT') }));
+    setShowAddKetuaTimModal(true);
+  };
   const openEditKetuaTimModal = (ketuaTim: KetuaTimData) => { setFormError(null); setEditKetuaTimData(ketuaTim); setShowEditKetuaTimModal(true); };
   const openDeleteKetuaTimModal = (ketuaTim: KetuaTimData) => { setDeleteKetuaTimId(ketuaTim.id); setDeleteKetuaTimName(ketuaTim.nama); setShowDeleteKetuaTimModal(true); };
-  const openAddPPLModal = () => { setFormError(null); setShowAddPPLModal(true); };
+  const openAddPPLModal = () => {
+    setFormError(null);
+    setNewPPLData(prev => ({ ...prev, id: nextId(pplAdminList.map(p => p.id), 'PPL') }));
+    setShowAddPPLModal(true);
+  };
   const openEditPPLModal = (ppl: PPLAdminData) => { setFormError(null); setEditPPLData(ppl); setShowEditPPLModal(true); };
   const openDeletePPLModal = (ppl: PPLAdminData) => { setDeletePPLId(ppl.id); setDeletePPLName(ppl.namaPPL); setShowDeletePPLModal(true); };
 
@@ -298,19 +316,25 @@ export default function ManajemenAdmin() {
   const handlePPLSort = (key: keyof PPLAdminData) => { let direction: 'asc' | 'desc' = 'asc'; if (pplSortConfig?.key === key && pplSortConfig.direction === 'asc') { direction = 'desc'; } setPplSortConfig({ key, direction }); };
   
   const getSortIcon = (columnKey: string, sortConfig: any) => {
-    if (!sortConfig || sortConfig.key !== columnKey) { return <ChevronUp className="w-4 h-4 text-gray-300" />; }
-    return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />;
+    if (!sortConfig || sortConfig.key !== columnKey) { return <ChevronUp className="w-4 h-4 text-border" />; }
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-300" /> : <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-300" />;
   };
   
   const filteredAndSortedUsers = useMemo(() => userList.filter(user => user.username.toLowerCase().includes(userSearchTerm.toLowerCase()) || user.namaLengkap.toLowerCase().includes(userSearchTerm.toLowerCase())).sort((a, b) => { if (!userSortConfig) return 0; const { key, direction } = userSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [userList, userSearchTerm, userSortConfig]);
   const filteredAndSortedKetuaTim = useMemo(() => ketuaTimList.filter(kt => kt.nama.toLowerCase().includes(ketuaTimSearchTerm.toLowerCase()) || kt.nip.includes(ketuaTimSearchTerm)).sort((a, b) => { if (!ketuaTimSortConfig) return 0; const { key, direction } = ketuaTimSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [ketuaTimList, ketuaTimSearchTerm, ketuaTimSortConfig]);
   const filteredAndSortedPPL = useMemo(() => pplAdminList.filter(ppl => ppl.namaPPL.toLowerCase().includes(pplSearchTerm.toLowerCase()) || ppl.id.toLowerCase().includes(pplSearchTerm.toLowerCase()) || ppl.alamat.toLowerCase().includes(pplSearchTerm.toLowerCase()) || ppl.noTelepon.includes(pplSearchTerm)).sort((a, b) => { if (!pplSortConfig) return 0; const { key, direction } = pplSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [pplAdminList, pplSearchTerm, pplSortConfig]);
 
-  const getRoleBadgeColor = (role: string) => { switch (role) { case 'admin': return 'bg-red-600'; case 'supervisor': return 'bg-blue-600'; case 'user': return 'bg-green-600'; default: return 'bg-gray-600'; } };
+  const getRoleBadgeColor = (role: string) => { switch (role) { case 'admin': return 'bg-red-600'; case 'supervisor': return 'bg-blue-600'; case 'user': return 'bg-green-600'; default: return 'bg-muted-foreground'; } };
   const getRoleIcon = (role: string) => { switch (role) { case 'admin': return <Shield className="w-3 h-3" />; case 'supervisor': return <Crown className="w-3 h-3" />; default: return <Users className="w-3 h-3" />; } };
   
   const userStats = useMemo(() => ({ totalUsers: userList.length, adminUsers: userList.filter(u => u.role === 'admin').length, supervisorUsers: userList.filter(u => u.role === 'supervisor').length, regularUsers: userList.filter(u => u.role === 'user').length }), [userList]);
-  const ketuaTimStats = useMemo(() => ({ totalKetuaTim: ketuaTimList.length }), [ketuaTimList]);
+  // "Ketua Tim Aktif" dihapus: tidak ada kolom status di tabel ketua_tim, kartu
+  // lamanya hanya menampilkan angka yang sama persis dengan Total Ketua Tim.
+  // Diganti jumlah tim berbeda yang benar-benar terbaca dari data.
+  const ketuaTimStats = useMemo(() => ({
+    totalKetuaTim: ketuaTimList.length,
+    totalTim: new Set(ketuaTimList.map(kt => kt.tim).filter(Boolean)).size,
+  }), [ketuaTimList]);
   const pplStats = useMemo(() => ({ totalPPL: pplAdminList.length }), [pplAdminList]);
 
 
@@ -336,6 +360,14 @@ export default function ManajemenAdmin() {
   }, [filteredAndSortedPPL, pagination.ppl]);
   const totalPPLPages = Math.ceil(filteredAndSortedPPL.length / pagination.ppl.rowsPerPage);
 
+  // Ketiga tab punya paginasi sendiri, jadi masing-masing perlu dijaga.
+  useHalamanAman(pagination.users.currentPage, totalUserPages,
+    n => setPagination(prev => ({ ...prev, users: { ...prev.users, currentPage: n } })));
+  useHalamanAman(pagination.ketuaTim.currentPage, totalKetuaTimPages,
+    n => setPagination(prev => ({ ...prev, ketuaTim: { ...prev.ketuaTim, currentPage: n } })));
+  useHalamanAman(pagination.ppl.currentPage, totalPPLPages,
+    n => setPagination(prev => ({ ...prev, ppl: { ...prev.ppl, currentPage: n } })));
+
   const handlePageChange = (tab: 'users' | 'ketuaTim' | 'ppl', newPage: number) => {
     setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], currentPage: newPage } }));
   };
@@ -347,9 +379,9 @@ export default function ManajemenAdmin() {
   const FormError = ({ message }: { message: string | null }) => {
     if (!message) return null;
     return (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
-            <AlertCircle className="w-4 h-4 text-red-600" />
-            <p className="text-sm text-red-700">{message}</p>
+        <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-md">
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-300" />
+            <p className="text-sm text-red-700 dark:text-red-300">{message}</p>
         </div>
     );
   };
@@ -358,8 +390,8 @@ export default function ManajemenAdmin() {
     <Layout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Manajemen Admin</h1>
-          <p className="text-gray-600 mt-1">Kelola pengguna sistem, ketua tim, dan PPL</p>
+          <h1 className="text-3xl font-bold text-foreground">Manajemen Admin</h1>
+          <p className="text-muted-foreground mt-1">Kelola pengguna sistem, ketua tim, dan PPL</p>
         </div>
 
         <Tabs defaultValue="users" onValueChange={setActiveTab} className="space-y-6">
@@ -371,17 +403,17 @@ export default function ManajemenAdmin() {
 
           <TabsContent value="users" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total Users</p><p className="text-2xl font-bold text-gray-900">{userStats.totalUsers}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
-              <Card className="border-l-4 border-l-red-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Admin</p><p className="text-2xl font-bold text-gray-900">{userStats.adminUsers}</p></div><Shield className="w-8 h-8 text-red-500" /></div></CardContent></Card>
-              <Card className="border-l-4 border-l-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Supervisor</p><p className="text-2xl font-bold text-gray-900">{userStats.supervisorUsers}</p></div><Crown className="w-8 h-8 text-blue-500" /></div></CardContent></Card>
-              <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">User Biasa</p><p className="text-2xl font-bold text-gray-900">{userStats.regularUsers}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
+              <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Total Users</p><p className="text-2xl font-bold text-foreground">{userStats.totalUsers}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
+              <Card className="border-l-4 border-l-red-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Admin</p><p className="text-2xl font-bold text-foreground">{userStats.adminUsers}</p></div><Shield className="w-8 h-8 text-red-500 dark:text-red-400" /></div></CardContent></Card>
+              <Card className="border-l-4 border-l-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Supervisor</p><p className="text-2xl font-bold text-foreground">{userStats.supervisorUsers}</p></div><Crown className="w-8 h-8 text-blue-500 dark:text-blue-400" /></div></CardContent></Card>
+              <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">User Biasa</p><p className="text-2xl font-bold text-foreground">{userStats.regularUsers}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
             </div>
             <Card>
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <CardTitle>Daftar Users</CardTitle>
                   <div className="flex gap-4">
-                    <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari username atau nama..." value={userSearchTerm} onChange={(e) => setUserSearchTerm(e.target.value)} className="pl-10"/></div></div>
+                    <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" /><Input type="text" placeholder="Cari username atau nama..." value={userSearchTerm} onChange={(e) => setUserSearchTerm(e.target.value)} className="pl-10"/></div></div>
                     <Button onClick={openAddUserModal} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2" />Tambah User</Button>
                   </div>
                 </div>
@@ -391,16 +423,16 @@ export default function ManajemenAdmin() {
                   <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[15%]"><button onClick={() => handleUserSort('id')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">ID User{getSortIcon('id', userSortConfig)}</button></TableHead>
-                        <TableHead className="w-[20%]"><button onClick={() => handleUserSort('username')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Username{getSortIcon('username', userSortConfig)}</button></TableHead>
-                        <TableHead className="w-[30%]"><button onClick={() => handleUserSort('namaLengkap')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama Lengkap{getSortIcon('namaLengkap', userSortConfig)}</button></TableHead>
-                        <TableHead className="w-[20%]"><button onClick={() => handleUserSort('role')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Role{getSortIcon('role', userSortConfig)}</button></TableHead>
+                        <TableHead className="w-[15%]"><button onClick={() => handleUserSort('id')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">ID User{getSortIcon('id', userSortConfig)}</button></TableHead>
+                        <TableHead className="w-[20%]"><button onClick={() => handleUserSort('username')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">Username{getSortIcon('username', userSortConfig)}</button></TableHead>
+                        <TableHead className="w-[30%]"><button onClick={() => handleUserSort('namaLengkap')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">Nama Lengkap{getSortIcon('namaLengkap', userSortConfig)}</button></TableHead>
+                        <TableHead className="w-[20%]"><button onClick={() => handleUserSort('role')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">Role{getSortIcon('role', userSortConfig)}</button></TableHead>
                         <TableHead className="w-[10%]"><button onClick={() => handleUserSort('isPML')} className="flex items-center gap-1">PML{getSortIcon('isPML', userSortConfig)}</button></TableHead>
                         <TableHead className="w-[15%]">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedUsers.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{userSearchTerm ? `Tidak ada user yang cocok dengan "${userSearchTerm}"` : 'Belum ada data user'}</TableCell></TableRow>) : (paginatedUsers.map((user) => (
+                      {paginatedUsers.length === 0 ? (<TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{userSearchTerm ? `Tidak ada user yang cocok dengan "${userSearchTerm}"` : 'Belum ada data user'}</TableCell></TableRow>) : (paginatedUsers.map((user) => (
                           <TableRow key={user.id}>
                             <TableCell className="font-medium truncate">{user.id}</TableCell>
                             <TableCell className="font-medium truncate">{user.username}</TableCell>
@@ -409,7 +441,7 @@ export default function ManajemenAdmin() {
                             <TableCell> 
         {user.isPML ? <Badge>Ya</Badge> : <Badge variant="secondary">Tidak</Badge>}
       </TableCell>
-                            <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEditUserModal(user)} className="text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4" /></Button><Button variant="outline" size="sm" onClick={() => openDeleteUserModal(user)} className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4" /></Button></div></TableCell>
+                            <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEditUserModal(user)} className="text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:text-blue-300"><Edit className="w-4 h-4" /></Button><Button variant="outline" size="sm" onClick={() => openDeleteUserModal(user)} className="text-red-600 dark:text-red-300 hover:text-red-700 dark:text-red-300"><Trash2 className="w-4 h-4" /></Button></div></TableCell>
                           </TableRow>
                         ))
                       )}
@@ -417,7 +449,7 @@ export default function ManajemenAdmin() {
                   </Table>
                 </div>
                 <div className="flex items-center justify-between mt-4">
-                    <div className="text-sm text-gray-600">Menampilkan <strong>{paginatedUsers.length}</strong> dari <strong>{filteredAndSortedUsers.length}</strong> data</div>
+                    <div className="text-sm text-muted-foreground">Menampilkan <strong>{paginatedUsers.length}</strong> dari <strong>{filteredAndSortedUsers.length}</strong> data</div>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2"><span className="text-sm">Baris per halaman:</span><Select value={String(pagination.users.rowsPerPage)} onValueChange={value => handleRowsPerPageChange('users', Number(value))}><SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger><SelectContent>{[10, 25, 50, 100].map(size => (<SelectItem key={size} value={String(size)}>{size}</SelectItem>))}</SelectContent></Select></div>
                         <Pagination><PaginationContent><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('users', pagination.users.currentPage - 1)} disabled={pagination.users.currentPage === 1}><ChevronLeft className="w-4 h-4" /></Button></PaginationItem><PaginationItem className="text-sm font-medium px-3">{pagination.users.currentPage} / {totalUserPages}</PaginationItem><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('users', pagination.users.currentPage + 1)} disabled={pagination.users.currentPage === totalUserPages}><ChevronRight className="w-4 h-4" /></Button></PaginationItem></PaginationContent></Pagination>
@@ -429,15 +461,15 @@ export default function ManajemenAdmin() {
 
           <TabsContent value="ketua-tim" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total Ketua Tim</p><p className="text-2xl font-bold text-gray-900">{ketuaTimStats.totalKetuaTim}</p></div><Crown className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
-                <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Ketua Tim Aktif</p><p className="text-2xl font-bold text-gray-900">{ketuaTimStats.totalKetuaTim}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
+                <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Total Ketua Tim</p><p className="text-2xl font-bold text-foreground">{ketuaTimStats.totalKetuaTim}</p></div><Crown className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
+                <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Tim Terdaftar</p><p className="text-2xl font-bold text-foreground">{ketuaTimStats.totalTim}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
             </div>
             <Card>
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <CardTitle>Daftar Ketua Tim</CardTitle>
                         <div className="flex gap-4">
-                            <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari nama atau NIP..." value={ketuaTimSearchTerm} onChange={(e) => setKetuaTimSearchTerm(e.target.value)} className="pl-10"/></div></div>
+                            <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" /><Input type="text" placeholder="Cari nama atau NIP..." value={ketuaTimSearchTerm} onChange={(e) => setKetuaTimSearchTerm(e.target.value)} className="pl-10"/></div></div>
                             <Button onClick={openAddKetuaTimModal} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah Ketua Tim</Button>
                         </div>
                     </div>
@@ -447,28 +479,29 @@ export default function ManajemenAdmin() {
                         <Table className="table-fixed w-full">
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[15%]"><button onClick={() => handleKetuaTimSort('id')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">ID{getSortIcon('id', ketuaTimSortConfig)}</button></TableHead>
-                                    <TableHead className="w-[35%]"><button onClick={() => handleKetuaTimSort('nama')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">Nama{getSortIcon('nama', ketuaTimSortConfig)}</button></TableHead>
-                                    <TableHead className="w-[25%]"><button onClick={() => handleKetuaTimSort('nip')} className="flex items-center gap-1 hover:bg-gray-100 p-1 rounded -ml-1">NIP{getSortIcon('nip', ketuaTimSortConfig)}</button></TableHead>
-                                    <TableHead className="w-[15%]">Status</TableHead>
-                                    <TableHead className="w-[10%]">Aksi</TableHead>
+                                    <TableHead className="w-[15%]"><button onClick={() => handleKetuaTimSort('id')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">ID{getSortIcon('id', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[35%]"><button onClick={() => handleKetuaTimSort('nama')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">Nama{getSortIcon('nama', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[20%]"><button onClick={() => handleKetuaTimSort('nip')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">NIP{getSortIcon('nip', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[20%]"><button onClick={() => handleKetuaTimSort('tim')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">Tim{getSortIcon('tim', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[20%]">Akun</TableHead>
+                                    <TableHead className="w-[15%]">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {paginatedKetuaTim.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">{ketuaTimSearchTerm ? `Tidak ada ketua tim yang cocok dengan "${ketuaTimSearchTerm}"` : 'Belum ada data ketua tim'}</TableCell></TableRow>) : (paginatedKetuaTim.map((ketuaTim) => (
+                                {paginatedKetuaTim.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">{ketuaTimSearchTerm ? `Tidak ada ketua tim yang cocok dengan "${ketuaTimSearchTerm}"` : 'Belum ada data ketua tim'}</TableCell></TableRow>) : (paginatedKetuaTim.map((ketuaTim) => (
                                     <TableRow key={ketuaTim.id}>
                                         <TableCell className="font-medium truncate">{ketuaTim.id}</TableCell>
                                         <TableCell className="font-medium truncate">{ketuaTim.nama}</TableCell>
                                         <TableCell className="truncate">{ketuaTim.nip}</TableCell>
-                                        <TableCell><Badge variant="default" className="bg-bps-green-600">Aktif</Badge></TableCell>
-                                        <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEditKetuaTimModal(ketuaTim)} className="text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4"/></Button><Button variant="outline" size="sm" onClick={() => openDeleteKetuaTimModal(ketuaTim)} className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4"/></Button></div></TableCell>
+                                        <TableCell className="truncate">{ketuaTim.tim ? <Badge variant="outline">{ketuaTim.tim}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell><TableCell className="truncate">{ketuaTim.namaUser ? <span className="text-sm">{ketuaTim.namaUser}</span> : <Badge variant="outline" className="text-muted-foreground">Belum ditautkan</Badge>}</TableCell>
+                                        <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEditKetuaTimModal(ketuaTim)} className="text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:text-blue-300"><Edit className="w-4 h-4"/></Button><Button variant="outline" size="sm" onClick={() => openDeleteKetuaTimModal(ketuaTim)} className="text-red-600 dark:text-red-300 hover:text-red-700 dark:text-red-300"><Trash2 className="w-4 h-4"/></Button></div></TableCell>
                                     </TableRow>
                                 )))}
                             </TableBody>
                         </Table>
                     </div>
                     <div className="flex items-center justify-between mt-4">
-                        <div className="text-sm text-gray-600">Menampilkan <strong>{paginatedKetuaTim.length}</strong> dari <strong>{filteredAndSortedKetuaTim.length}</strong> data</div>
+                        <div className="text-sm text-muted-foreground">Menampilkan <strong>{paginatedKetuaTim.length}</strong> dari <strong>{filteredAndSortedKetuaTim.length}</strong> data</div>
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2"><span className="text-sm">Baris per halaman:</span><Select value={String(pagination.ketuaTim.rowsPerPage)} onValueChange={value => handleRowsPerPageChange('ketuaTim', Number(value))}><SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger><SelectContent>{[10, 25, 50, 100].map(size => (<SelectItem key={size} value={String(size)}>{size}</SelectItem>))}</SelectContent></Select></div>
                             <Pagination><PaginationContent><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('ketuaTim', pagination.ketuaTim.currentPage - 1)} disabled={pagination.ketuaTim.currentPage === 1}><ChevronLeft className="w-4 h-4" /></Button></PaginationItem><PaginationItem className="text-sm font-medium px-3">{pagination.ketuaTim.currentPage} / {totalKetuaTimPages}</PaginationItem><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('ketuaTim', pagination.ketuaTim.currentPage + 1)} disabled={pagination.ketuaTim.currentPage === totalKetuaTimPages}><ChevronRight className="w-4 h-4" /></Button></PaginationItem></PaginationContent></Pagination>
@@ -480,14 +513,14 @@ export default function ManajemenAdmin() {
           
            <TabsContent value="ppl" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-6">
-                <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total PPL</p><p className="text-2xl font-bold text-gray-900">{pplStats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
+                <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Total PPL</p><p className="text-2xl font-bold text-foreground">{pplStats.totalPPL}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
             </div>
             <Card>
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <CardTitle>Daftar PPL</CardTitle>
                         <div className="flex gap-4">
-                            <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><Input type="text" placeholder="Cari PPL..." value={pplSearchTerm} onChange={(e) => setPplSearchTerm(e.target.value)} className="pl-10"/></div></div>
+                            <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" /><Input type="text" placeholder="Cari PPL..." value={pplSearchTerm} onChange={(e) => setPplSearchTerm(e.target.value)} className="pl-10"/></div></div>
                             <Button onClick={openAddPPLModal} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah PPL</Button>
                         </div>
                     </div>
@@ -511,17 +544,13 @@ export default function ManajemenAdmin() {
                                         <TableCell className="font-medium truncate">{ppl.id}</TableCell>
                                         <TableCell className="font-medium truncate">{ppl.namaPPL}</TableCell>
                                         <TableCell>
-                                            <Badge variant={
-                                                ppl.posisi === 'Pendataan' ? 'default' :
-                                                ppl.posisi === 'Pengolahan' ? 'secondary' :
-                                                'outline'
-                                            }>{ppl.posisi}</Badge>
+                                            <Badge className={cn("font-semibold", GAYA_POSISI_PPL[ppl.posisi] ?? NADA_STATUS.netral)}>{ppl.posisi}</Badge>
                                         </TableCell>
                                         <TableCell className="truncate">{ppl.alamat}</TableCell>
                                         <TableCell className="truncate">{ppl.noTelepon}</TableCell>
                                         <TableCell className="flex gap-2">
-                                            <Button variant="outline" size="sm" onClick={() => openEditPPLModal(ppl)} className="text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4"/></Button>
-                                            <Button variant="outline" size="sm" onClick={() => openDeletePPLModal(ppl)} className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4"/></Button>
+                                            <Button variant="outline" size="sm" onClick={() => openEditPPLModal(ppl)} className="text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:text-blue-300"><Edit className="w-4 h-4"/></Button>
+                                            <Button variant="outline" size="sm" onClick={() => openDeletePPLModal(ppl)} className="text-red-600 dark:text-red-300 hover:text-red-700 dark:text-red-300"><Trash2 className="w-4 h-4"/></Button>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -529,7 +558,7 @@ export default function ManajemenAdmin() {
                         </Table>
                     </div>
                      <div className="flex items-center justify-between mt-4">
-                        <div className="text-sm text-gray-600">Menampilkan <strong>{paginatedPPL.length}</strong> dari <strong>{filteredAndSortedPPL.length}</strong> data</div>
+                        <div className="text-sm text-muted-foreground">Menampilkan <strong>{paginatedPPL.length}</strong> dari <strong>{filteredAndSortedPPL.length}</strong> data</div>
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2"><span className="text-sm">Baris per halaman:</span><Select value={String(pagination.ppl.rowsPerPage)} onValueChange={value => handleRowsPerPageChange('ppl', Number(value))}><SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger><SelectContent>{[10, 25, 50, 100].map(size => (<SelectItem key={size} value={String(size)}>{size}</SelectItem>))}</SelectContent></Select></div>
                             <Pagination><PaginationContent><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('ppl', pagination.ppl.currentPage - 1)} disabled={pagination.ppl.currentPage === 1}><ChevronLeft className="w-4 h-4" /></Button></PaginationItem><PaginationItem className="text-sm font-medium px-3">{pagination.ppl.currentPage} / {totalPPLPages}</PaginationItem><PaginationItem><Button variant="outline" size="sm" onClick={() => handlePageChange('ppl', pagination.ppl.currentPage + 1)} disabled={pagination.ppl.currentPage === totalPPLPages}><ChevronRight className="w-4 h-4" /></Button></PaginationItem></PaginationContent></Pagination>
@@ -541,12 +570,12 @@ export default function ManajemenAdmin() {
 
         </Tabs>
         
-        <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} title="Berhasil!" description={successMessage} actionLabel="OK" onAction={() => setShowSuccessModal(false)} />
+        <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} title="Berhasil!" description={successMessage} onAction={() => setShowSuccessModal(false)} />
         <ConfirmationModal isOpen={showDeleteUserModal} onClose={() => setShowDeleteUserModal(false)} onConfirm={handleDeleteUser} title="Konfirmasi Hapus User" description={`Apakah Anda yakin ingin menghapus user "${deleteUserName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         <ConfirmationModal isOpen={showDeleteKetuaTimModal} onClose={() => setShowDeleteKetuaTimModal(false)} onConfirm={handleDeleteKetuaTim} title="Konfirmasi Hapus Ketua Tim" description={`Apakah Anda yakin ingin menghapus ketua tim "${deleteKetuaTimName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         <ConfirmationModal isOpen={showDeletePPLModal} onClose={() => setShowDeletePPLModal(false)} onConfirm={handleDeletePPL} title="Konfirmasi Hapus PPL" description={`Apakah Anda yakin ingin menghapus PPL "${deletePPLName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         
-        {showAddUserModal && <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Tambah User Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newUserId">ID User *</Label><Input id="newUserId" value={newUserData.id} onChange={(e) => setNewUserData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID User (contoh: USR001)"/></div><div className="space-y-2"><Label htmlFor="newUsername">Username *</Label><Input id="newUsername" value={newUserData.username} onChange={(e) => setNewUserData(prev => ({ ...prev, username: e.target.value }))} placeholder="Masukkan username"/></div><div className="space-y-2"><Label htmlFor="newPassword">Password *</Label><div className="relative"><Input id="newPassword" type={showPassword ? "text" : "password"} value={newUserData.password} onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))} placeholder="Masukkan password (minimal 6 karakter)"/><Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div><div className="space-y-2"><Label htmlFor="newNamaLengkap">Nama Lengkap *</Label><Input id="newNamaLengkap" value={newUserData.namaLengkap} onChange={(e) => setNewUserData(prev => ({ ...prev, namaLengkap: e.target.value }))} placeholder="Masukkan nama lengkap"/></div><div className="space-y-2"><Label htmlFor="newRole">Role *</Label><Select value={newUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setNewUserData(prev => ({ ...prev, role: value }))}><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+        {showAddUserModal && <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Tambah User Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newUserId">ID User</Label><Input id="newUserId" value={newUserData.id} readOnly className="bg-muted text-muted-foreground"/><p className="text-xs text-muted-foreground">Dibuat otomatis.</p></div><div className="space-y-2"><Label htmlFor="newUsername">Username *</Label><Input id="newUsername" value={newUserData.username} onChange={(e) => setNewUserData(prev => ({ ...prev, username: e.target.value }))} placeholder="Masukkan username"/></div><div className="space-y-2"><Label htmlFor="newPassword">Password *</Label><div className="relative"><Input id="newPassword" type={showPassword ? "text" : "password"} value={newUserData.password} onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))} placeholder="Masukkan password (minimal 6 karakter)"/><Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div><div className="space-y-2"><Label htmlFor="newNamaLengkap">Nama Lengkap *</Label><Input id="newNamaLengkap" value={newUserData.namaLengkap} onChange={(e) => setNewUserData(prev => ({ ...prev, namaLengkap: e.target.value }))} placeholder="Masukkan nama lengkap"/></div><div className="space-y-2"><Label htmlFor="newRole">Role *</Label><Select value={newUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setNewUserData(prev => ({ ...prev, role: value }))}><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
   <div className="space-y-0.5">
     <Label htmlFor="isPML-new">Status PML</Label>
     <p className="text-[0.8rem] text-muted-foreground">Aktifkan jika user ini adalah seorang PML.</p>
@@ -557,7 +586,7 @@ export default function ManajemenAdmin() {
     onCheckedChange={(checked) => setNewUserData(prev => ({ ...prev, isPML: checked }))}
   />
 </div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddUserModal(false)}>Batal</Button><Button onClick={handleAddUser} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
-        {showAddKetuaTimModal && <Dialog open={showAddKetuaTimModal} onOpenChange={setShowAddKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Tambah Ketua Tim Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newKetuaTimId">ID Ketua Tim *</Label><Input id="newKetuaTimId" value={newKetuaTimData.id} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, id: e.target.value }))} placeholder="Masukkan ID Ketua Tim (contoh: KT001)"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNama">Nama *</Label><Input id="newKetuaTimNama" value={newKetuaTimData.nama} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nama: e.target.value }))} placeholder="Masukkan nama ketua tim"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNip">NIP *</Label><Input id="newKetuaTimNip" value={newKetuaTimData.nip} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nip: e.target.value }))} placeholder="Masukkan NIP (minimal 10 karakter)"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddKetuaTimModal(false)}>Batal</Button><Button onClick={handleAddKetuaTim} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+        {showAddKetuaTimModal && <Dialog open={showAddKetuaTimModal} onOpenChange={setShowAddKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Tambah Ketua Tim Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newKetuaTimId">ID Ketua Tim</Label><Input id="newKetuaTimId" value={newKetuaTimData.id} readOnly className="bg-muted text-muted-foreground"/><p className="text-xs text-muted-foreground">Dibuat otomatis.</p></div><div className="space-y-2"><Label htmlFor="newKetuaTimNama">Nama *</Label><Input id="newKetuaTimNama" value={newKetuaTimData.nama} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nama: e.target.value }))} placeholder="Masukkan nama ketua tim"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNip">NIP *</Label><Input id="newKetuaTimNip" value={newKetuaTimData.nip} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nip: e.target.value }))} placeholder="Masukkan NIP (minimal 10 karakter)"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimTim">Tim</Label><Select value={newKetuaTimData.tim || undefined} onValueChange={(val) => setNewKetuaTimData(prev => ({ ...prev, tim: val }))}><SelectTrigger id="newKetuaTimTim"><SelectValue placeholder="Pilih tim..." /></SelectTrigger><SelectContent>{DAFTAR_TIM.map(t => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent></Select></div><div className="space-y-2"><Label htmlFor="newKetuaTimUser">Akun Pengguna</Label><Select value={newKetuaTimData.userId || "__none__"} onValueChange={(val) => setNewKetuaTimData(prev => ({ ...prev, userId: val === "__none__" ? null : val }))}><SelectTrigger id="newKetuaTimUser"><SelectValue placeholder="Belum ditautkan" /></SelectTrigger><SelectContent><SelectItem value="__none__">— Belum ditautkan —</SelectItem>{userList.map(u => (<SelectItem key={u.id} value={u.id}>{u.namaLengkap} ({u.username})</SelectItem>))}</SelectContent></Select><p className="text-xs text-muted-foreground">Menentukan siapa yang menerima notifikasi kegiatan tim ini.</p></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddKetuaTimModal(false)}>Batal</Button><Button onClick={handleAddKetuaTim} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
         {showAddPPLModal && <Dialog open={showAddPPLModal} onOpenChange={setShowAddPPLModal}>
     <DialogContent>
         <DialogHeader>
@@ -569,8 +598,8 @@ export default function ManajemenAdmin() {
             <FormError message={formError} />
 
             <div className="space-y-2">
-                <Label htmlFor="newPPLId">ID PPL *</Label>
-                <Input id="newPPLId" value={newPPLData.id} onChange={(e) => setNewPPLData(prev => ({ ...prev, id: e.target.value }))} placeholder="Contoh: PPL001"/>
+                <Label htmlFor="newPPLId">ID PPL</Label>
+                <Input id="newPPLId" value={newPPLData.id} readOnly className="bg-muted text-muted-foreground"/><p className="text-xs text-muted-foreground">Dibuat otomatis.</p>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="newPPLNama">Nama PPL *</Label>
@@ -639,7 +668,7 @@ export default function ManajemenAdmin() {
     onCheckedChange={(checked) => setEditUserData({...editUserData, isPML: checked})}
   />
 </div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditUserModal(false)}>Batal</Button><Button onClick={handleEditUser}>Simpan</Button></div></div></DialogContent></Dialog>}
-        {editKetuaTimData && <Dialog open={showEditKetuaTimModal} onOpenChange={setShowEditKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Edit Ketua Tim</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editKtNama">Nama *</Label><Input id="editKtNama" value={editKetuaTimData.nama} onChange={e => setEditKetuaTimData({...editKetuaTimData, nama: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editKtNip">NIP *</Label><Input id="editKtNip" value={editKetuaTimData.nip} onChange={e => setEditKetuaTimData({...editKetuaTimData, nip: e.target.value})} /></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditKetuaTimModal(false)}>Batal</Button><Button onClick={handleEditKetuaTim}>Simpan</Button></div></div></DialogContent></Dialog>}
+        {editKetuaTimData && <Dialog open={showEditKetuaTimModal} onOpenChange={setShowEditKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Edit Ketua Tim</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editKtNama">Nama *</Label><Input id="editKtNama" value={editKetuaTimData.nama} onChange={e => setEditKetuaTimData({...editKetuaTimData, nama: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editKtNip">NIP *</Label><Input id="editKtNip" value={editKetuaTimData.nip} onChange={e => setEditKetuaTimData({...editKetuaTimData, nip: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editKtTim">Tim</Label><Select value={editKetuaTimData.tim || undefined} onValueChange={val => setEditKetuaTimData({...editKetuaTimData, tim: val})}><SelectTrigger id="editKtTim"><SelectValue placeholder="Pilih tim..." /></SelectTrigger><SelectContent>{DAFTAR_TIM.map(t => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent></Select></div><div className="space-y-2"><Label htmlFor="editKetuaTimUser">Akun Pengguna</Label><Select value={editKetuaTimData.userId || "__none__"} onValueChange={(val) => setEditKetuaTimData({ ...editKetuaTimData, userId: val === "__none__" ? null : val })}><SelectTrigger id="editKetuaTimUser"><SelectValue placeholder="Belum ditautkan" /></SelectTrigger><SelectContent><SelectItem value="__none__">— Belum ditautkan —</SelectItem>{userList.map(u => (<SelectItem key={u.id} value={u.id}>{u.namaLengkap} ({u.username})</SelectItem>))}</SelectContent></Select><p className="text-xs text-muted-foreground">Menentukan siapa yang menerima notifikasi kegiatan tim ini.</p></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditKetuaTimModal(false)}>Batal</Button><Button onClick={handleEditKetuaTim}>Simpan</Button></div></div></DialogContent></Dialog>}
         {editPPLData && <Dialog open={showEditPPLModal} onOpenChange={setShowEditPPLModal}>
           <DialogContent>
             <DialogHeader><DialogTitle>Edit PPL</DialogTitle></DialogHeader>

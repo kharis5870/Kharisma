@@ -1,0 +1,70 @@
+@startuml activity-proses-usulan
+' Pengganti Gambar 7 (Activity Diagram alur proses bisnis usulan).
+' Gambaran umum satu siklus kegiatan. Rincian tiap proses ada di 03 s.d. 07.
+!include _gaya.iuml
+
+|Ketua Tim|
+start
+:Membuat kegiatan: jadwal empat tahap,
+tahap opsional, dan dokumen wajib;
+
+repeat
+  |Ketua Tim|
+  :Mengalokasikan mitra, PML,
+  beban kerja, dan harga satuan;
+  |Sistem|
+  :Membagi honor ke bulan pembebanan
+  dan membandingkan dengan batas SBM;
+repeat while (Melebihi batas SBM dan\nKetua Tim memilih merevisi?) is (ya) not (tidak)
+
+|Sistem|
+:Menyimpan kegiatan, alokasi,
+dan pembebanan honor;
+
+fork
+  |Tim Keuangan|
+  :Membuat SPK mitra (PDF);
+fork again
+  |PML|
+  :Menginput progres
+  pekerjaan mitra;
+fork again
+  |Ketua Tim|
+  :Mengisi tautan dokumen
+  setiap tahap;
+end fork
+
+|Sistem|
+:Memperbarui dashboard monitoring
+dan notifikasi;
+
+|Tim Keuangan|
+repeat
+  :Memeriksa kelengkapan dan
+  keabsahan dokumen;
+  if (Dokumen valid?) then (ya)
+    :Menyetujui dokumen;
+  else (tidak)
+    :Menolak dokumen
+    dengan catatan;
+    |Sistem|
+    :Mengirim notifikasi
+    penolakan;
+    |Ketua Tim|
+    :Memperbaiki tautan dokumen;
+  endif
+  |Tim Keuangan|
+repeat while (Masih ada dokumen\nbelum disetujui?) is (ya) not (tidak)
+
+:Membuat BAST mitra (PDF);
+
+|PML|
+:Menilai kinerja mitra
+(tiga aspek, skala 1–10);
+
+|Sistem|
+:Menghitung rata-rata dan
+peringkat mitra per triwulan;
+stop
+
+@enduml

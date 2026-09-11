@@ -1,6 +1,7 @@
 // server/routes/settings.ts
 import express from 'express';
 import { getSetting, updateSetting } from '../services/settingsService';
+import { wajibAdmin } from '../auth/middleware';
 
 const router = express.Router();
 
@@ -17,7 +18,8 @@ router.get('/:key', async (req, res) => {
 });
 
 // Endpoint untuk MEMPERBARUI satu pengaturan
-router.put('/:key', async (req, res) => {
+// Pengaturan aplikasi berlaku untuk semua orang; hanya admin yang boleh mengubahnya.
+router.put('/:key', wajibAdmin, async (req, res) => {
     try {
         const { key } = req.params;
         const { value } = req.body;

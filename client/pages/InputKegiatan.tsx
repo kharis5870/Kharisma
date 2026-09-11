@@ -5,27 +5,30 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import PilihPembebananHonor from "@/components/PilihPembebananHonor";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, Plus, Trash2, Link2, X, Lock, Users, XCircle, ChevronsUpDown, Check, Loader2 } from "lucide-react";
+import { Plus, Trash2, Link2, X, Lock, Users, XCircle, ChevronsUpDown, Check, Loader2, History, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { format, isValid } from "date-fns";
+import { isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import useInputKegiatanStore, { HonorariumSettings } from "@/stores/useInputKegiatanStore";
-import { Separator } from "@/components/ui/separator";
+import useInputKegiatanStore, { HonorariumSettings, TahapHonor } from "@/stores/useInputKegiatanStore";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { bulanDalamRentang, keTeksTanggal, keTanggal, pembebananBelumLengkap } from "@/lib/honorPeriode";
+import { Badge } from "@/components/ui/badge";
 import { PPLMaster, KetuaTim, Kegiatan, UserData, PPL, HonorariumDetail, Dokumen } from "@shared/api";
+import { periksaTautan } from "@shared/tautanDokumen";
 import { useAuth } from "@/contexts/AuthContext";
 import AlertModal from "@/components/AlertModal";
-import { getYear, format as formatDateFns } from 'date-fns';
-import { id as localeID } from 'date-fns/locale';
 import { apiClient } from "@/lib/apiClient";
 
 type DateFieldName =
@@ -34,18 +37,9 @@ type DateFieldName =
   | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
   | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
-const formatHonor = (value: string | number): string => {
-  if (value === '' || value === null || value === undefined) return '';
-  const numString = String(value).replace(/[^0-9]/g, '');
-  const num = Number(numString);
-  if (isNaN(num)) return '';
-  return num.toLocaleString('id-ID');
-};
-
-const parseHonor = (value: string | number): string => {
-    if (value === '' || value === null || value === undefined) return '';
-    return String(value).replace(/\./g, '');
-};
+// formatHonor/parseHonor kini dipakai bersama dari @/lib/angka - sebelumnya
+// disalin identik di sini dan di EditActivity.tsx.
+import { formatHonor, parseHonor, sanitizeJumlah } from "@/lib/angka";
 
 
 const createActivity = async (data: any): Promise<Kegiatan> => {
@@ -64,7 +58,7 @@ const fetchPMLs = async (): Promise<UserData[]> => {
     return apiClient.get<UserData[]>('/admin/pml');
 };
 
-const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, store, existingPplIds, tahap }: any) => {
+const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, store, existingPplIds, tahap, opsiBulan }: any) => {
     const { updatePPL, updatePPLBebanKerja } = store.getState();
     const [openPPL, setOpenPPL] = useState(false);
     const [openPML, setOpenPML] = useState(false);
@@ -115,11 +109,24 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, 
     };
 
     return (
-        <div className="p-4 border rounded-lg space-y-4 bg-gray-50">
+        <div className="p-4 border rounded-lg space-y-4 bg-muted">
             <div className="flex justify-between items-center">
                 <h4 className="font-medium">{ppl.namaPPL || `Alokasi Baru ${index + 1}`}</h4>
-                <Button type="button" variant="ghost" size="icon" onClick={onRemove}>
-                    <Trash2 className="w-4 h-4 text-red-500"/>
+                {/* Merah baru muncul penuh saat disorot: ikon tempat sampah
+                    yang selalu menyala merah di setiap kartu membuat seluruh
+                    daftar alokasi terlihat penuh peringatan. Latar merah muda
+                    saat disorot juga menegaskan sasaran kliknya — targetnya
+                    kecil dan berdempetan dengan judul kartu. */}
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={onRemove}
+                    title="Hapus alokasi PPL ini"
+                    aria-label={`Hapus alokasi ${ppl.namaPPL || `Alokasi Baru ${index + 1}`}`}
+                    className="text-muted-foreground transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/60 dark:hover:text-red-400"
+                >
+                    <Trash2 className="w-4 h-4"/>
                 </Button>
             </div>
             <div className="space-y-4">
@@ -148,7 +155,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, 
                                                     <Check className={cn("mr-2 h-4 w-4", ppl.ppl_master_id === String(p.id) ? "opacity-100" : "opacity-0")} />
                                                     <div className="flex flex-col">
                                                         <span>{p.namaPPL}</span>
-                                                        <span className="text-xs text-gray-500">ID: {p.id}</span>
+                                                        <span className="text-xs text-muted-foreground">ID: {p.id}</span>
                                                     </div>
                                                 </CommandItem>
                                             ))}
@@ -182,7 +189,7 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, 
                                                         <Check className={cn("mr-2 h-4 w-4", String(ppl.pml_id) === String(pml.id) ? "opacity-100" : "opacity-0")} />
                                                         <div className="flex flex-col">
                                                             <span>{pml.namaLengkap}</span>
-                                                            <span className="text-xs text-gray-500">ID: {pml.id}</span>
+                                                            <span className="text-xs text-muted-foreground">ID: {pml.id}</span>
                                                         </div>
                                                     </CommandItem>
                                                 ))}
@@ -197,12 +204,21 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
                     <div className="space-y-2">
                         <Label>{getBebanKerjaLabel()}</Label>
-                        <Input type="number" placeholder="Jumlah..." value={localBebanKerja} onChange={(e) => setLocalBebanKerja(e.target.value)} onBlur={handleBebanKerjaBlur} />
+                        <Input type="number" min="1" inputMode="numeric" placeholder="Jumlah..." value={localBebanKerja} onChange={(e) => setLocalBebanKerja(sanitizeJumlah(e.target.value))} onBlur={handleBebanKerjaBlur} />
                     </div>
                     <div className="space-y-2">
                         <Label>Total Honor (Rp)</Label>
-                        <Input value={formatHonor(totalHonorPPL)} readOnly className="bg-gray-100 font-bold"/>
+                        <Input value={formatHonor(totalHonorPPL)} readOnly className="bg-muted font-bold"/>
                     </div>
+                    <PilihPembebananHonor
+                        opsiBulan={opsiBulan ?? []}
+                        metode={ppl.metodePembebanan}
+                        bulanDipilih={ppl.bulanPembebananDipilih}
+                        onChange={(metode, bulan) => {
+                            updatePPL(ppl.id, 'metodePembebanan', metode);
+                            updatePPL(ppl.id, 'bulanPembebananDipilih', bulan);
+                        }}
+                    />
                 </div>
             </div>
         </div>
@@ -211,26 +227,40 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, 
 
 const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: string }) => {
     const store = useInputKegiatanStore();
-    const { updateFormField } = store;
     
-    const bulanPembayaranHonor = useMemo(() => {
-        if (tahap === 'listing') return store.bulanHonorListing;
-        if (tahap === 'pencacahan') return store.bulanHonorPencacahan;
-        if (tahap === 'pengolahan-analisis') return store.bulanHonorPengolahan;
-        return undefined;
-    }, [store.bulanHonorListing, store.bulanHonorPencacahan, store.bulanHonorPengolahan, tahap]);
+    // Nama kolom di store/DB memakai akhiran "Pengolahan", sedangkan tahap
+    // di sisi PPL bernama "pengolahan-analisis".
+    const tahapHonor: TahapHonor =
+        tahap === 'listing' ? 'Listing' : tahap === 'pencacahan' ? 'Pencacahan' : 'Pengolahan';
 
-    const handleBulanHonorChange = (value: string) => {
-        if (tahap === 'listing') updateFormField('bulanHonorListing', value);
-        if (tahap === 'pencacahan') updateFormField('bulanHonorPencacahan', value);
-        if (tahap === 'pengolahan-analisis') updateFormField('bulanHonorPengolahan', value);
+    const rentangHonor = {
+        mulai: store[`tanggalMulaiHonor${tahapHonor}`],
+        selesai: store[`tanggalSelesaiHonor${tahapHonor}`],
     };
+
+    // Kalau rentang menyentuh lebih dari satu bulan, pengguna harus memilih
+    // salah satunya sebagai bulan pembebanan: HONOR_LIMIT berlaku per bulan,
+    // jadi honor tidak boleh dihitung di dua bulan sekaligus.
+    const opsiBulanPembebanan = useMemo(
+        () => bulanDalamRentang(rentangHonor.mulai, rentangHonor.selesai),
+        [rentangHonor.mulai, rentangHonor.selesai],
+    );
 
     const pplForStage = store.pplAllocations.filter(p => p.tahap === tahap);
     const storeActions = useInputKegiatanStore.getState();
+
     const { data: pplList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
     const { data: pmlList = [] } = useQuery({ queryKey: ['pmls'], queryFn: fetchPMLs });
     const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: PPL['tahap'] | null}>({isOpen: false, tahap: null});
+    /**
+     * Alokasi PPL yang menunggu konfirmasi hapus; null = tidak ada.
+     *
+     * Satu kartu alokasi memuat PPL, PML, beban kerja, dan honor yang sudah
+     * diketik, dan tidak ada urungkan — salah klik berarti mengetik ulang
+     * semuanya. Namanya ikut disimpan supaya dialognya bisa menyebut kartu
+     * mana yang akan hilang; di tahap yang ramai, kartunya mirip semua.
+     */
+    const [konfirmasiHapusPPL, setKonfirmasiHapusPPL] = useState<{ id: string; nama: string } | null>(null);
     
     const honorSettings = store.honorariumSettings;
     const [localSettings, setLocalSettings] = useState(honorSettings);
@@ -263,52 +293,6 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
         if (!honorSettingKey) return;
         storeActions.updateHonorariumSetting(honorSettingKey, field, localSettings[honorSettingKey][field]);
     };
-
-    const [showAllMonths, setShowAllMonths] = useState(false);
-
-    const suggestedMonths = useMemo(() => {
-        // Ambil tanggal paling awal dan paling akhir dari seluruh jadwal kegiatan
-        const allDates = [
-            store.tanggalMulaiPersiapan, store.tanggalSelesaiPersiapan,
-            store.tanggalMulaiPengumpulanData, store.tanggalSelesaiPengumpulanData,
-            store.tanggalMulaiPengolahanAnalisis, store.tanggalSelesaiPengolahanAnalisis,
-            store.tanggalMulaiDiseminasiEvaluasi, store.tanggalSelesaiDiseminasiEvaluasi
-        ].filter(d => d && isValid(d)); // Filter hanya tanggal yang valid
-
-        if (allDates.length < 2) return [];
-
-        const startDate = new Date(Math.min(...allDates.map(d => d!.getTime())));
-        const endDate = new Date(Math.max(...allDates.map(d => d!.getTime())));
-
-        const monthsInRange: { value: string, label: string }[] = [];
-        let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-
-        while (currentDate <= endDate) {
-            const monthOption = {
-                value: formatDateFns(currentDate, 'MM-yyyy'),
-                label: formatDateFns(currentDate, 'MMMM yyyy', { locale: localeID }),
-            };
-            monthsInRange.push(monthOption);
-            currentDate.setMonth(currentDate.getMonth() + 1);
-        }
-        return monthsInRange;
-    }, [
-        store.tanggalMulaiPersiapan, store.tanggalSelesaiPersiapan,
-        store.tanggalMulaiPengumpulanData, store.tanggalSelesaiPengumpulanData,
-        store.tanggalMulaiPengolahanAnalisis, store.tanggalSelesaiPengolahanAnalisis,
-        store.tanggalMulaiDiseminasiEvaluasi, store.tanggalSelesaiDiseminasiEvaluasi
-    ]);
-
-    const allYearMonths = useMemo(() => {
-        const currentYear = getYear(new Date());
-        return Array.from({ length: 12 }, (_, i) => {
-            const monthDate = new Date(currentYear, i, 1);
-            return {
-                value: formatDateFns(monthDate, 'MM-yyyy'),
-                label: formatDateFns(monthDate, 'MMMM yyyy', { locale: localeID }),
-            };
-        });
-    }, []);
 
     
 
@@ -345,8 +329,8 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="p-4 border rounded-lg bg-blue-50/50 space-y-4">
-                    <h4 className="font-medium text-gray-800">Pengaturan Honorarium & Pembayaran</h4>
+                <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/40 space-y-4">
+                    <h4 className="font-medium text-foreground">Pengaturan Honorarium & Pembayaran</h4>
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label>Satuan Beban Kerja</Label>
@@ -357,47 +341,32 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
                             <Input placeholder="Contoh: 15000" value={honorSettingKey ? formatHonor(localSettings[honorSettingKey].hargaSatuan) : ''} onChange={e => handleSettingChange('hargaSatuan', e.target.value)} onBlur={() => handleSettingBlur('hargaSatuan')} />
                         </div>
                         <div className="space-y-2">
-                           <Label>Bulan Pembayaran Honor *</Label>
-                           <Select value={bulanPembayaranHonor} onValueChange={handleBulanHonorChange}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Pilih bulan..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {suggestedMonths.length > 0 && (
-                                        <>
-                                            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">Bulan Sesuai Jadwal</div>
-                                            {suggestedMonths.map(option => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                            <Separator className="my-1" />
-                                        </>
-                                    )}
-
-                                    {showAllMonths || suggestedMonths.length === 0 ? (
-                                        <>
-                                            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">Semua Bulan</div>
-                                            {allYearMonths.map(option => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </>
-                                    ) : (
-                                        <div 
-                                            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
-                                            onClick={() => setShowAllMonths(true)}
-                                        >
-                                            Pilih Bulan Lain...
-                                        </div>
-                                    )}
-                                </SelectContent>
-                            </Select>
+                           <Label>Rentang Tanggal Honor *</Label>
+                           <DateRangePicker
+                               value={rentangHonor}
+                               onChange={({ mulai, selesai }) => storeActions.setRentangHonor(tahapHonor, mulai, selesai)}
+                               defaultMonth={store.tanggalMulaiPersiapan}
+                               placeholder="Pilih rentang..."
+                           />
                         </div>
                     </div>
+
+                    {opsiBulanPembebanan.length > 1 && (
+                        <p className="text-sm text-muted-foreground">
+                            Rentang honor melintasi {opsiBulanPembebanan.length} bulan. Pilihan bulannya
+                            ada di tiap kartu alokasi PPL di bawah &mdash; batas honor dihitung per mitra
+                            per bulan, jadi tiap mitra bisa berbeda.
+                        </p>
+                    )}
+
+                    {opsiBulanPembebanan.length === 1 && (
+                        <div className="text-sm text-muted-foreground">
+                            Dibebankan pada bulan{' '}
+                            <Badge variant="outline" className="font-medium">{opsiBulanPembebanan[0].label}</Badge>
+                        </div>
+                    )}
                 </div>
-                
+
                 <div className="space-y-4">
                     {pplForStage.map((ppl, index) => {
                        const existingPplIdsForCurrentStage = pplForStage
@@ -408,9 +377,10 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
                            <PPLAllocationItem 
                                key={ppl.id} 
                                tahap={tahap}
+                               opsiBulan={opsiBulanPembebanan}
                                ppl={ppl} 
                                index={index} 
-                               onRemove={() => storeActions.removePPL(ppl.id)} 
+                               onRemove={() => setKonfirmasiHapusPPL({ id: ppl.id, nama: ppl.namaPPL || '' })} 
                                pmlList={pmlList} 
                                pplList={pplList} 
                                store={useInputKegiatanStore} 
@@ -420,6 +390,20 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
                     })}
                     <Button type="button" variant="outline" onClick={() => storeActions.addPPL(tahap)} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL Manual</Button>
                 </div>
+                <ConfirmationModal
+                   isOpen={konfirmasiHapusPPL !== null}
+                   onClose={() => setKonfirmasiHapusPPL(null)}
+                   onConfirm={() => {
+                       if (konfirmasiHapusPPL) storeActions.removePPL(konfirmasiHapusPPL.id);
+                       setKonfirmasiHapusPPL(null);
+                   }}
+                   title="Hapus Alokasi PPL?"
+                   description={`Alokasi ${konfirmasiHapusPPL?.nama || 'ini'} beserta PML, beban kerja, dan honor yang sudah diisi akan dihapus dari daftar.`}
+                   confirmLabel="Ya, Hapus"
+                   cancelLabel="Batal"
+                   variant="danger"
+                   icon={<Trash2 className="w-6 h-6" />}
+                />
                 <ConfirmationModal
                    isOpen={showClearConfirmModal.isOpen && showClearConfirmModal.tahap === tahap}
                    onClose={() => setShowClearConfirmModal({isOpen: false, tahap: null})}
@@ -450,15 +434,15 @@ const DokumenContent = ({ tipe, title }: { tipe: Dokumen['tipe'], title: string 
             </CardHeader>
             <CardContent className="space-y-4">
                 {documents.map(doc => (
-                    <div key={doc.id} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 border-blue-200" : "bg-gray-50/50")}>
+                    <div key={doc.id} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800" : "bg-muted/50")}>
                         <div className="flex-grow space-y-2">
                             {doc.isWajib ? <Label className="font-semibold">{doc.nama}</Label> : <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.id, 'nama', e.target.value)} />}
                             <div className="flex items-center gap-2">
-                                <Link2 className="w-4 h-4 text-gray-400"/>
+                                <Link2 className="w-4 h-4 text-muted-foreground"/>
                                 <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.id, 'link', e.target.value)} />
                             </div>
                         </div>
-                        {!doc.isWajib ? (<Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.id)} className="self-center"><X className="w-4 h-4 text-gray-500"/></Button>) : (<div className="self-center p-2" title="Dokumen Wajib"><Lock className="w-4 h-4 text-gray-400"/></div>)}
+                        {!doc.isWajib ? (<Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.id)} className="self-center"><X className="w-4 h-4 text-muted-foreground"/></Button>) : (<div className="self-center p-2" title="Dokumen Wajib"><Lock className="w-4 h-4 text-muted-foreground"/></div>)}
                     </div>
                 ))}
             </CardContent>
@@ -484,6 +468,71 @@ export default function InputKegiatan() {
     const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
     
     const store = useInputKegiatanStore();
+
+    /**
+     * Jadwal per tahap kini satu pemilih RENTANG, bukan dua pemilih tanggal
+     * tunggal — konsisten dengan Rentang Tanggal Honor: klik pertama tanggal
+     * mulai, klik kedua tanggal selesai.
+     */
+    const jadwalTahap = [
+        { label: 'Persiapan', mulai: 'tanggalMulaiPersiapan', selesai: 'tanggalSelesaiPersiapan' },
+        { label: 'Pengumpulan Data', mulai: 'tanggalMulaiPengumpulanData', selesai: 'tanggalSelesaiPengumpulanData' },
+        ...(store.adaPengolahan ? [{ label: 'Pengolahan & Analisis', mulai: 'tanggalMulaiPengolahanAnalisis', selesai: 'tanggalSelesaiPengolahanAnalisis' }] : []),
+        ...(store.adaDiseminasi ? [{ label: 'Diseminasi & Evaluasi', mulai: 'tanggalMulaiDiseminasiEvaluasi', selesai: 'tanggalSelesaiDiseminasiEvaluasi' }] : []),
+    ] as { label: string; mulai: DateFieldName; selesai: DateFieldName }[];
+
+    const storeActions = useInputKegiatanStore.getState();
+
+    const jumlahTahapDokumen = 2 + (store.adaPengolahan ? 1 : 0) + (store.adaDiseminasi ? 1 : 0);
+    // Tab yang sedang dibuka bisa lenyap saat tahapnya dimatikan. Tanpa ini,
+    // Radix kehilangan tab aktifnya dan isi tab dokumen jadi kosong sama sekali.
+    useEffect(() => {
+        if (docStageTab === 'pengolahan-analisis' && !store.adaPengolahan) setDocStageTab('persiapan');
+        if (docStageTab === 'diseminasi-evaluasi' && !store.adaDiseminasi) setDocStageTab('persiapan');
+    }, [docStageTab, store.adaPengolahan, store.adaDiseminasi]);
+
+    const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+    const [historyLoadedName, setHistoryLoadedName] = useState<string | null>(null);
+    const [historySearch, setHistorySearch] = useState("");
+    const [loadingHistoryId, setLoadingHistoryId] = useState<number | null>(null);
+
+    // Daftar kegiatan untuk dipilih sebagai sumber salinan. Query ini sudah
+    // dipakai dashboard, jadi biasanya sudah ada di cache react-query.
+    const { data: riwayatKegiatan = [] } = useQuery({
+        queryKey: ['kegiatan'],
+        queryFn: () => apiClient.get<Kegiatan[]>('/kegiatan'),
+        enabled: showHistoryDialog,
+    });
+
+    const riwayatTersaring = useMemo(() => {
+        const kata = historySearch.toLowerCase();
+        return riwayatKegiatan.filter(k => k.namaKegiatan.toLowerCase().includes(kata));
+    }, [riwayatKegiatan, historySearch]);
+
+    // Daftar kegiatan tidak memuat relasi lengkap, jadi detailnya diambil dulu
+    // supaya alokasi PPL dan dokumen ikut tersalin.
+    const handlePilihHistoris = async (kegiatanId: number) => {
+        setLoadingHistoryId(kegiatanId);
+        try {
+            const detail = await apiClient.get<Kegiatan>(`/kegiatan/${kegiatanId}`);
+            store.loadFromHistory(detail);
+            setHistoryLoadedName(detail.namaKegiatan);
+            setShowHistoryDialog(false);
+            setHistorySearch("");
+            setMainTab("info-dasar");
+        } catch (error: any) {
+            setAlertModal({ isOpen: true, title: "Gagal Mengambil Data", message: error.message });
+        } finally {
+            setLoadingHistoryId(null);
+        }
+    };
+
+    // Tim melekat pada master ketua tim, jadi cukup ditampilkan (read-only)
+    // begitu ketua tim dipilih — tidak perlu diinput ulang per kegiatan.
+    const timKetuaTerpilih = useMemo(
+        () => ketuaTimList.find(k => String(k.id) === String(store.ketua_tim_id))?.tim,
+        [ketuaTimList, store.ketua_tim_id],
+    );
 
     useEffect(() => {
      const { newPpls, tahap, from } = location.state || {};
@@ -520,11 +569,15 @@ export default function InputKegiatan() {
        } = store;
    
        const stages = [
+        // Tahap yang dimatikan dikeluarkan dari pemeriksaan urutan. Tanggalnya
+        // masih tersimpan di state (server yang mengosongkannya saat disimpan),
+        // jadi tanpa penyaringan ini jadwal tahap yang sudah dinyatakan tidak
+        // ada bisa menolak penyimpanan.
            { start: tanggalMulaiPersiapan, end: tanggalSelesaiPersiapan, name: 'Persiapan' },
            { start: tanggalMulaiPengumpulanData, end: tanggalSelesaiPengumpulanData, name: 'Pengumpulan Data' },
-           { start: tanggalMulaiPengolahanAnalisis, end: tanggalSelesaiPengolahanAnalisis, name: 'Pengolahan & Analisis' },
-           { start: tanggalMulaiDiseminasiEvaluasi, end: tanggalSelesaiDiseminasiEvaluasi, name: 'Diseminasi & Evaluasi' }
-       ];
+           ...(store.adaPengolahan ? [{ start: tanggalMulaiPengolahanAnalisis, end: tanggalSelesaiPengolahanAnalisis, name: 'Pengolahan & Analisis' }] : []),
+           ...(store.adaDiseminasi ? [{ start: tanggalMulaiDiseminasiEvaluasi, end: tanggalSelesaiDiseminasiEvaluasi, name: 'Diseminasi & Evaluasi' }] : []),
+          ];
    
        for (let i = 0; i < stages.length; i++) {
            const stage = stages[i];
@@ -550,6 +603,7 @@ export default function InputKegiatan() {
        queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
        setShowSuccessModal(true);
        store.resetForm();
+       setHistoryLoadedName(null);
      },
      onError: (error: any) => {
       // Cek apakah error memiliki struktur yang kita harapkan dari server
@@ -585,7 +639,31 @@ export default function InputKegiatan() {
        namaKegiatan, ketua_tim_id,
        tanggalMulaiPersiapan, tanggalSelesaiPersiapan,
      } = store;
-     return !namaKegiatan || !ketua_tim_id || !tanggalMulaiPersiapan || !tanggalSelesaiPersiapan; 
+     if (!namaKegiatan || !ketua_tim_id || !tanggalMulaiPersiapan || !tanggalSelesaiPersiapan) return true;
+
+     // Setiap tahap yang punya alokasi mitra wajib punya rentang honor lengkap,
+     // dan — bila rentangnya melintasi lebih dari satu bulan — setiap alokasi
+     // wajib sudah ditentukan cara pembebanannya. Tanpa itu, HONOR_LIMIT tidak
+     // bisa dinilai dan honornya tidak muncul di rekap mana pun.
+     const tahapTerpakai: { tahap: PPL['tahap']; kolom: TahapHonor }[] = [
+       { tahap: 'listing', kolom: 'Listing' },
+       { tahap: 'pencacahan', kolom: 'Pencacahan' },
+       { tahap: 'pengolahan-analisis', kolom: 'Pengolahan' },
+     ];
+     return tahapTerpakai.some(({ tahap, kolom }) => {
+       const adaMitra = store.pplAllocations.some(p => p.tahap === tahap && p.ppl_master_id);
+       if (!adaMitra) return false;
+       const mulai = store[`tanggalMulaiHonor${kolom}`];
+       const selesai = store[`tanggalSelesaiHonor${kolom}`];
+       if (!mulai || !selesai) return true;
+       // Dulu di sini diperiksa `bulanHonor${kolom}`. Sejak bulan pembebanan
+       // dipilih PER ALOKASI, kolom tahap itu memang dibiarkan kosong untuk
+       // periode lintas bulan — memeriksanya akan membuat kegiatan seperti itu
+       // tidak pernah bisa disimpan.
+       return pembebananBelumLengkap(
+         bulanDalamRentang(mulai, selesai),
+         store.pplAllocations.filter(p => p.tahap === tahap && p.ppl_master_id));
+     });
    };
    
    const [showHonorWarningModal, setShowHonorWarningModal] = useState(false);
@@ -597,6 +675,25 @@ export default function InputKegiatan() {
             setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
             return;
         }
+
+        // Jalur pembuatan kegiatan memasukkan seluruh dokumennya sekaligus,
+        // jadi ia perlu penjagaan sendiri di samping tombol simpan per-dokumen
+        // di halaman Edit Kegiatan.
+        const dokumenBermasalah = store.documents
+            .filter(d => d.jenis !== 'catatan')
+            .map(d => ({ nama: d.nama, hasil: periksaTautan(d.link) }))
+            .filter(d => !d.hasil.sah);
+        if (dokumenBermasalah.length > 0) {
+            const daftar = dokumenBermasalah
+                .map(d => `• ${d.nama || '(tanpa nama)'}: ${d.hasil.galat}`)
+                .join('\n');
+            setAlertModal({
+                isOpen: true,
+                title: "Link Dokumen Tidak Valid",
+                message: `Perbaiki link berikut sebelum menyimpan:\n\n${daftar}`,
+            });
+            return;
+        }
 
         setLastActivityName(store.namaKegiatan);
 
@@ -611,6 +708,8 @@ export default function InputKegiatan() {
           createdBy_userId: user?.id,
           deskripsiKegiatan: store.deskripsiKegiatan,
           adaListing: store.adaListing,
+          adaPengolahan: store.adaPengolahan,
+          adaDiseminasi: store.adaDiseminasi,
           isFasih: store.isFasih,
           username: user?.username,
           ppl: store.pplAllocations,
@@ -640,6 +739,12 @@ export default function InputKegiatan() {
           bulanHonorListing: store.bulanHonorListing,
           bulanHonorPencacahan: store.bulanHonorPencacahan,
           bulanHonorPengolahan: store.bulanHonorPengolahan,
+          tanggalMulaiHonorListing: store.tanggalMulaiHonorListing,
+          tanggalSelesaiHonorListing: store.tanggalSelesaiHonorListing,
+          tanggalMulaiHonorPencacahan: store.tanggalMulaiHonorPencacahan,
+          tanggalSelesaiHonorPencacahan: store.tanggalSelesaiHonorPencacahan,
+          tanggalMulaiHonorPengolahan: store.tanggalMulaiHonorPengolahan,
+          tanggalSelesaiHonorPengolahan: store.tanggalSelesaiHonorPengolahan,
           bypassHonorLimit: bypassHonorLimit
         };
 
@@ -654,11 +759,27 @@ export default function InputKegiatan() {
      <Layout>
        <div className="max-w-4xl mx-auto pb-12">
          <div className="mb-8">
-           <h1 className="text-3xl font-bold text-gray-900 mb-2">Input Kegiatan</h1>
-           <p className="text-gray-600">Lengkapi semua informasi kegiatan dalam satu halaman</p>
+           <div className="flex items-start justify-between gap-4">
+             <div>
+               <h1 className="text-3xl font-bold text-foreground mb-2">Input Kegiatan</h1>
+               <p className="text-muted-foreground">Lengkapi semua informasi kegiatan dalam satu halaman</p>
+             </div>
+             <Button type="button" variant="outline" onClick={() => setShowHistoryDialog(true)}>
+               <History className="w-4 h-4 mr-2" />
+               Ambil dari Historis
+             </Button>
+           </div>
+           {historyLoadedName && (
+               <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 rounded-lg">
+                   <p className="text-green-800 dark:text-green-300 text-sm">
+                       ✅ Data disalin dari <strong>{historyLoadedName}</strong>. Tanggal dan isi link dokumen sengaja
+                       dikosongkan — silakan lengkapi, semua masih bisa diubah sebelum disimpan.
+                   </p>
+               </div>
+           )}
            {showAutoPopulateMessage && (
-               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                   <p className="text-blue-800 text-sm">✅ {addedPPLCount} PPL telah ditambahkan ke Tahap {pplStageTab.replace('-', ' ')}.</p>
+               <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg">
+                   <p className="text-blue-800 dark:text-blue-300 text-sm">✅ {addedPPLCount} PPL telah ditambahkan ke Tahap {pplStageTab.replace('-', ' ')}.</p>
                </div>
            )}
          </div>
@@ -682,31 +803,54 @@ export default function InputKegiatan() {
                                          <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
                                          <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={String(ketua.id)}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
                                      </Select>
+                                     {/* Tim mengikuti master ketua tim, diatur di Manajemen Admin. */}
+                                     {timKetuaTerpilih && (
+                                         <p className="text-sm text-muted-foreground">Tim: <Badge variant="outline">{timKetuaTerpilih}</Badge></p>
+                                     )}
                                  </div>
                              </div>
                              <div className="space-y-2"><Label htmlFor="deskripsiKegiatan">Deskripsi Kegiatan</Label><Textarea id="deskripsiKegiatan" value={store.deskripsiKegiatan} onChange={(e) => store.updateFormField('deskripsiKegiatan', e.target.value)} placeholder="Deskripsikan kegiatan secara singkat..." /></div>
                          </CardContent>
                      </Card>
                      <Card>
-                         <CardHeader><CardTitle>Jadwal Kegiatan *</CardTitle></CardHeader>
+                         <CardHeader>
+                             <CardTitle>Jadwal Kegiatan *</CardTitle>
+                             {/* Sakelar diletakkan DI SINI, bukan di tab Dokumen:
+                                 keputusannya soal ruang lingkup kegiatan, dan
+                                 akibatnya paling terlihat pada daftar jadwal
+                                 tepat di bawahnya. */}
+                             <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:gap-6">
+                                 <label className="flex items-center gap-2 text-sm">
+                                     <Checkbox
+                                         checked={store.adaPengolahan}
+                                         onCheckedChange={(v) => store.updateFormField('adaPengolahan', v === true)}
+                                     />
+                                     Ada tahap Pengolahan &amp; Analisis
+                                 </label>
+                                 <label className="flex items-center gap-2 text-sm">
+                                     <Checkbox
+                                         checked={store.adaDiseminasi}
+                                         onCheckedChange={(v) => store.updateFormField('adaDiseminasi', v === true)}
+                                     />
+                                     Ada tahap Diseminasi &amp; Evaluasi
+                                 </label>
+                             </div>
+                             <p className="pt-1 text-xs text-muted-foreground">
+                                 Matikan bila tahap itu dikerjakan provinsi atau pusat. Jadwal dan
+                                 dokumen wajibnya tidak akan diminta. Alokasi mitra Pengolahan tetap
+                                 ada &mdash; pekerjaannya (entri dan cleaning) berlangsung di masa pendataan.
+                             </p>
+                         </CardHeader>
                          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                             {/* FIX: Menghapus properti field yang duplikat */}
-                             {[ 
-                                 {label: 'Mulai Persiapan', field: 'tanggalMulaiPersiapan'}, 
-                                 {label: 'Selesai Persiapan', field: 'tanggalSelesaiPersiapan'}, 
-                                 {label: 'Mulai Pengumpulan Data', field: 'tanggalMulaiPengumpulanData'}, 
-                                 {label: 'Selesai Pengumpulan Data', field: 'tanggalSelesaiPengumpulanData'}, 
-                                 {label: 'Mulai Pengolahan & Analisis', field: 'tanggalMulaiPengolahanAnalisis'}, 
-                                 {label: 'Selesai Pengolahan & Analisis', field: 'tanggalSelesaiPengolahanAnalisis'}, 
-                                 {label: 'Mulai Diseminasi & Evaluasi', field: 'tanggalMulaiDiseminasiEvaluasi'}, 
-                                 {label: 'Selesai Diseminasi & Evaluasi', field: 'tanggalSelesaiDiseminasiEvaluasi'} 
-                             ].map(({label, field}) => (
-                                 <div key={field} className="space-y-2">
+                             {jadwalTahap.map(({ label, mulai, selesai }) => (
+                                 <div key={label} className="space-y-2">
                                      <Label>{label}</Label>
-                                     <Popover>
-                                        <PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start", !store[field as DateFieldName] && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{store[field as DateFieldName] ? format(store[field as DateFieldName]!, "dd MMMM yyyy", { locale: localeID }) : <span>Pilih tanggal</span>}</Button></PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={store[field as DateFieldName]} onSelect={(date) => store.updateFormField(field as DateFieldName, date)} /></PopoverContent>
-                                     </Popover>
+                                     <DateRangePicker
+                                         value={{ mulai: keTeksTanggal(store[mulai]), selesai: keTeksTanggal(store[selesai]) }}
+                                         onChange={(r) => storeActions.setRentangTahap(mulai, selesai, keTanggal(r.mulai), keTanggal(r.selesai))}
+                                         defaultMonth={store[mulai] ?? store.tanggalMulaiPersiapan}
+                                         placeholder="Pilih rentang..."
+                                     />
                                  </div>
                              ))}
                          </CardContent>
@@ -735,16 +879,16 @@ export default function InputKegiatan() {
 
                <TabsContent value="dokumen" className="mt-6">
                  <Tabs value={docStageTab} onValueChange={(val) => setDocStageTab(val as Dokumen['tipe'])}>
-                     <TabsList className="grid w-full grid-cols-4">
+                     <TabsList className={cn("grid w-full", jumlahTahapDokumen === 4 ? "grid-cols-4" : jumlahTahapDokumen === 3 ? "grid-cols-3" : "grid-cols-2")}>
                          <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
                          <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
-                         <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>
-                         <TabsTrigger value="diseminasi-evaluasi">Diseminasi</TabsTrigger>
+                         {store.adaPengolahan && <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>}
+                         {store.adaDiseminasi && <TabsTrigger value="diseminasi-evaluasi">Diseminasi</TabsTrigger>}
                      </TabsList>
                      <TabsContent value="persiapan" className="mt-4"><DokumenContent tipe="persiapan" title="Persiapan" /></TabsContent>
                      <TabsContent value="pengumpulan-data" className="mt-4"><DokumenContent tipe="pengumpulan-data" title="Pengumpulan Data" /></TabsContent>
-                     <TabsContent value="pengolahan-analisis" className="mt-4"><DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" /></TabsContent>
-                     <TabsContent value="diseminasi-evaluasi" className="mt-4"><DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" /></TabsContent>
+                     {store.adaPengolahan && <TabsContent value="pengolahan-analisis" className="mt-4"><DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" /></TabsContent>}
+                     {store.adaDiseminasi && <TabsContent value="diseminasi-evaluasi" className="mt-4"><DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" /></TabsContent>}
                  </Tabs>
                </TabsContent>
              </Tabs>
@@ -787,6 +931,56 @@ export default function InputKegiatan() {
            actionLabel="Ke Dashboard" 
          />
          <AlertModal isOpen={alertModal.isOpen} onClose={() => setAlertModal({ isOpen: false, title: "", message: "" })} title={alertModal.title} description={alertModal.message} />
+
+         <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+           <DialogContent className="max-w-2xl">
+             <DialogHeader>
+               <DialogTitle>Ambil dari Historis</DialogTitle>
+               <DialogDescription>
+                 Pilih kegiatan yang sudah ada untuk disalin. Informasi kegiatan, pengaturan honorarium,
+                 alokasi mitra, dan susunan dokumen akan terisi otomatis. Tanggal dan isi link dokumen
+                 tetap kosong. Data hanya diisikan ke form — belum tersimpan, jadi masih bisa diubah.
+               </DialogDescription>
+             </DialogHeader>
+
+             <div className="relative">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+               <Input
+                 placeholder="Cari nama kegiatan..."
+                 value={historySearch}
+                 onChange={(e) => setHistorySearch(e.target.value)}
+                 className="pl-10"
+               />
+             </div>
+
+             <div className="max-h-80 overflow-y-auto space-y-2">
+               {riwayatTersaring.length === 0 ? (
+                 <p className="text-center text-muted-foreground py-8">
+                   {historySearch ? `Tidak ada kegiatan yang cocok dengan "${historySearch}"` : 'Belum ada kegiatan yang bisa disalin'}
+                 </p>
+               ) : (
+                 riwayatTersaring.map(k => (
+                   <button
+                     key={k.id}
+                     type="button"
+                     disabled={loadingHistoryId !== null}
+                     onClick={() => handlePilihHistoris(k.id)}
+                     className="w-full text-left p-3 rounded-md border hover:bg-accent disabled:opacity-50 flex items-center justify-between gap-3"
+                   >
+                     <div className="min-w-0">
+                       <p className="font-medium truncate">{k.namaKegiatan}</p>
+                       <p className="text-sm text-muted-foreground truncate">
+                         Ketua: {k.namaKetua || '-'}
+                         {k.timKetua ? ` · Tim ${k.timKetua}` : ''}
+                       </p>
+                     </div>
+                     {loadingHistoryId === k.id && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
+                   </button>
+                 ))
+               )}
+             </div>
+           </DialogContent>
+         </Dialog>
        </div>
      </Layout>
    );

@@ -24,4 +24,21 @@ dist-ssr
 *.sw?
 
 .config/
-!.env
+
+# Berkas rahasia. JANGAN dilacak git.
+#
+# Sebelumnya berkas ini justru sengaja TIDAK diabaikan (`!.env`), sehingga
+# kredensial database dan rahasia sesi ikut masuk riwayat repositori. Selain
+# soal keamanan, itu juga merusak deploy: nilai .env di laptop (localhost,
+# root, port 3307) berbeda dari nilai di cPanel (user & password bikinan
+# cPanel, port 3306) — hanya satu yang bisa disimpan di git, dan `git pull` di
+# server akan menimpa konfigurasi server dengan nilai lokal.
+#
+# Nilai yang dibutuhkan didaftar di `.env.example`, tanpa isinya.
+.env
+.env.*
+!.env.example
+
+# Cadangan database sebelum migrasi. Berisi data asli mitra dan hash kata
+# sandi pengguna, jadi tidak boleh ikut masuk repositori.
+db/backup/

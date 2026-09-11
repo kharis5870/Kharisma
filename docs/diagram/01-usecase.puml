@@ -1,0 +1,108 @@
+@startuml usecase
+' Pengganti Gambar 8 (Use Case Diagram).
+'
+' Aktor mengikuti hak akses di kode, bukan jabatan:
+'  - role di tabel users hanya admin | supervisor | user;
+'  - "Tim Keuangan" = role supervisor;
+'  - "Ketua Tim / Pembuat Kegiatan" dan "PML" adalah pengguna role user yang
+'    ditautkan ke kegiatan (ketua_tim.user_id / createdBy_userId) atau
+'    ditugaskan sebagai pengawas mitra (ppl.pml_id).
+' Login sengaja TIDAK di-<<include>> dari setiap use case: ia prasyarat,
+' dan panah include dari semua use case hanya membuat diagram ruwet.
+!include _gaya.iuml
+left to right direction
+
+actor "Pegawai" as P
+actor "Ketua Tim /\nPembuat Kegiatan" as KT
+actor "PML" as PML
+actor "Tim Keuangan" as TK
+actor "Admin" as AD
+
+KT --|> P
+PML --|> P
+TK --|> P
+AD --|> P
+
+rectangle "Sistem Informasi OPTIMA" {
+
+  package "Umum" {
+    usecase "Login" as UC_LOGIN
+    usecase "Melihat Dashboard\nMonitoring" as UC_DASH
+    usecase "Membuat Kegiatan &\nAlokasi Mitra" as UC_BUAT
+    usecase "Melihat Rekap\nHonor Mitra" as UC_REKHONOR
+    usecase "Melihat Rekap &\nPeringkat Penilaian" as UC_REKNILAI
+    usecase "Melihat Notifikasi" as UC_NOTIF
+    usecase "Melihat Riwayat\nKegiatan" as UC_RIWAYAT
+    usecase "Mengelola Profil &\nKata Sandi" as UC_PROFIL
+  }
+
+  package "Operasional Kegiatan" {
+    usecase "Menyunting Kegiatan &\nAlokasi Mitra" as UC_SUNTING
+    usecase "Validasi Batas\nHonor (SBM)" as UC_SBM
+    usecase "Konfirmasi Melebihi\nBatas SBM" as UC_KONF
+    usecase "Mengelola Dokumen\nKegiatan" as UC_DOK
+    usecase "Menginput Progres\nMitra" as UC_PROGRES
+    usecase "Menilai Kinerja\nMitra" as UC_NILAI
+  }
+
+  package "Administrasi & Keuangan" {
+    usecase "Memverifikasi\nDokumen" as UC_VERIF
+    usecase "Menolak Dokumen\ndengan Catatan" as UC_TOLAK
+    usecase "Mengirim Pengingat\nDokumen" as UC_INGAT
+    usecase "Mengatur Penanggung\nJawab Dokumen" as UC_PJ
+    usecase "Mengelola Template\nSurat" as UC_TEMPLATE
+    usecase "Membuat Surat\nPerjanjian Kerja (SPK)" as UC_SPK
+    usecase "Membuat BAST" as UC_BAST
+    usecase "Mengatur Ulang\nNomor Surat" as UC_ATURNOMOR
+  }
+
+  package "Data Master & Pengaturan" {
+    usecase "Mengelola Pengguna" as UC_USER
+    usecase "Mengelola Ketua Tim" as UC_KT
+    usecase "Mengelola Data Mitra" as UC_MITRA
+    usecase "Mengatur Batas\nHonor Bulanan (SBM)" as UC_BATAS
+    usecase "Mengarsipkan /\nMenghapus Kegiatan" as UC_ARSIP
+  }
+}
+
+P --> UC_LOGIN
+P --> UC_DASH
+P --> UC_BUAT
+P --> UC_REKHONOR
+P --> UC_REKNILAI
+P --> UC_NOTIF
+P --> UC_RIWAYAT
+P --> UC_PROFIL
+
+KT --> UC_SUNTING
+KT --> UC_DOK
+
+PML --> UC_PROGRES
+PML --> UC_NILAI
+
+TK --> UC_VERIF
+TK --> UC_INGAT
+TK --> UC_PJ
+TK --> UC_TEMPLATE
+TK --> UC_SPK
+TK --> UC_BAST
+TK --> UC_ATURNOMOR
+
+AD --> UC_USER
+AD --> UC_KT
+AD --> UC_MITRA
+AD --> UC_BATAS
+AD --> UC_ARSIP
+
+UC_BUAT ..> UC_SBM : <<include>>
+UC_SUNTING ..> UC_SBM : <<include>>
+UC_KONF ..> UC_SBM : <<extend>>
+UC_TOLAK ..> UC_VERIF : <<extend>>
+
+note right of AD
+  Admin juga dapat menjalankan
+  seluruh use case Ketua Tim,
+  PML, dan Tim Keuangan.
+end note
+
+@enduml

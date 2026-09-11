@@ -1,0 +1,58 @@
+@startuml activity-surat-spk-bast
+' Rincian use case "Membuat SPK" dan "Membuat BAST" (menu Keuangan > Generate Surat).
+' Nomor BAST mengikuti nomor urut SPK mitra yang sama, sehingga BAST
+' tidak dapat dibuat sebelum SPK-nya ada (kontrakService.pesanNomorBast).
+!include _gaya.iuml
+
+|Tim Keuangan|
+start
+:Membuka menu Generate Surat
+dan memilih periode kontrak;
+
+|Sistem|
+:Menampilkan mitra yang memiliki honor pada periode
+tersebut beserta rincian kegiatan dan total honornya;
+
+|Tim Keuangan|
+:Melengkapi uraian tugas dan
+kode beban anggaran (MAK);
+
+partition "Surat Perjanjian Kerja (SPK)" {
+  :Memesan nomor SPK;
+  |Sistem|
+  if (Mitra sudah memiliki nomor\npada periode ini?) then (ya)
+    :Memakai nomor yang sama;
+  else (tidak)
+    :Memberi nomor urut berikutnya
+    sesuai pola nomor di template;
+  endif
+  :Menyimpan data kontrak mitra;
+  :Menyusun PDF SPK dari template surat;
+  |Tim Keuangan|
+  :Mengunduh dan mencetak SPK;
+}
+
+partition "Berita Acara Serah Terima (BAST)" {
+  :Memilih tanggal BAST;
+  |Sistem|
+  if (SPK mitra sudah dibuat?) then (tidak)
+    :Menandai mitra sebagai
+    belum memiliki SPK;
+  else (ya)
+    :Memberi nomor BAST yang mengikuti
+    nomor urut SPK mitra tersebut;
+    :Menyusun PDF BAST;
+    |Tim Keuangan|
+    :Mengunduh dan mencetak BAST;
+  endif
+}
+stop
+
+note right
+  Bila penomoran perlu diulang, Tim Keuangan
+  memakai "Atur Ulang Nomor"; nomor yang
+  terhapus beserta pelakunya dicatat di
+  tabel riwayat_surat.
+end note
+
+@enduml

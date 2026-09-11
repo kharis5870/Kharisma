@@ -1,9 +1,35 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>Kharisma</title>
+
+    <!--
+      Mencegah kedip putih saat memuat halaman dalam mode gelap.
+      Zustand memang hydrate secara sinkron, tapi peramban sudah mengecat latar
+      dokumen sebelum bundle React selesai diunduh — di jaringan lambat kedipnya
+      sangat terasa. Karena itu skrip ini harus berada SEBELUM bundle.
+
+      Kunci 'sidebar-storage' dan jalur .state.theme mengikuti envelope
+      zustand/persist dan harus sama persis dengan client/stores/useSidebarStore.ts.
+      Kalau nama penyimpanannya diganti, skrip ini berhenti bekerja diam-diam.
+    -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('sidebar-storage');
+          var theme = raw && (JSON.parse(raw).state || {}).theme;
+          if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+          }
+        } catch (e) {
+          /* localStorage diblokir -> jatuh ke mode terang */
+        }
+      })();
+    </script>
   </head>
 
   <body>

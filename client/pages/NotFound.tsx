@@ -19,10 +19,10 @@ const NotFound = () => {
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-9xl font-bold text-bps-blue-100">404</h1>
-          <h2 className="text-3xl font-semibold text-gray-700 mb-4">
+          <h2 className="text-3xl font-semibold text-foreground mb-4">
             Halaman Tidak Ditemukan
           </h2>
-          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+          <p className="text-muted-foreground mb-8 max-w-md mx-auto">
             Halaman yang Anda cari tidak tersedia atau telah dipindahkan.
             Silakan kembali ke beranda atau gunakan navigasi di atas.
           </p>

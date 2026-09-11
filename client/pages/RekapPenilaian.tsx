@@ -8,10 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
-import { ArrowLeft, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Award, Users, Activity } from "lucide-react";
+import { ArrowLeft, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileDown, Sheet } from "lucide-react";
+import { exportToPdf, exportToExcel, type KolomEkspor } from "@/lib/exportUtils";
 import { useQuery } from "@tanstack/react-query";
 import type { RekapPenilaian } from "@shared/api";
 import { apiClient } from "@/lib/apiClient";
+import { useHalamanAman } from "@/hooks/useHalamanAman";
 
 const fetchRekapPenilaian = async (tahun: number, triwulan: number): Promise<RekapPenilaian[]> => {
     return apiClient.get(`/penilaian/rekap?tahun=${tahun}&triwulan=${triwulan}`);
@@ -58,6 +60,7 @@ export default function RekapPenilaian() {
     }, [sortedData, currentPage, rowsPerPage]);
 
     const totalPages = Math.ceil(sortedData.length / rowsPerPage);
+    useHalamanAman(currentPage, totalPages, setCurrentPage);
 
     const handleSort = (key: keyof RekapPenilaian) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -66,9 +69,24 @@ export default function RekapPenilaian() {
     };
 
     const getSortIcon = (columnKey: string) => {
-        if (!sortConfig || sortConfig.key !== columnKey) return <ChevronUp className="w-4 h-4 text-gray-300" />;
-        return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />;
+        if (!sortConfig || sortConfig.key !== columnKey) return <ChevronUp className="w-4 h-4 text-border" />;
+        return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-300" /> : <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-300" />;
     };
+
+    // Diekspor: seluruh data hasil sort, bukan hanya halaman yang sedang tampil.
+    const konteksEkspor = () => ({
+        judul: 'Rekapitulasi Penilaian Mitra',
+        subJudul: `${triwulans.find(t => t.value === filters.triwulan)?.label ?? ''} ${filters.tahun}`,
+        kolom: [
+            { header: 'No', nilai: (_r: RekapPenilaian, i: number) => i + 1, lebar: 'auto' },
+            { header: 'Nama PPL', nilai: (r: RekapPenilaian) => r.namaPPL, lebar: '*' },
+            { header: 'Total Kegiatan', nilai: (r: RekapPenilaian) => r.totalKegiatan, lebar: 'auto', rataKanan: true },
+            { header: 'Rata-rata Nilai', nilai: (r: RekapPenilaian) => r.rataRataNilai ?? 0, lebar: 'auto', rataKanan: true },
+            { header: 'Nilai Akhir', nilai: (r: RekapPenilaian) => r.nilaiAkhir ?? 0, lebar: 'auto', rataKanan: true },
+        ] as KolomEkspor<RekapPenilaian>[],
+        baris: sortedData,
+        namaFile: 'rekap-penilaian-mitra',
+    });
 
     return (
         <Layout>
@@ -76,8 +94,8 @@ export default function RekapPenilaian() {
                 <div className="flex items-center gap-4">
                     <Button variant="outline" asChild><Link to="/penilaian-mitra"><ArrowLeft className="w-4 h-4 mr-2" />Kembali</Link></Button>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Rekapitulasi Penilaian Mitra</h1>
-                        <p className="text-gray-600 mt-1">Peringkat performa PPL berdasarkan penilaian dan jumlah kegiatan.</p>
+                        <h1 className="text-3xl font-bold text-foreground">Rekapitulasi Penilaian Mitra</h1>
+                        <p className="text-muted-foreground mt-1">Peringkat performa PPL berdasarkan penilaian dan jumlah kegiatan.</p>
                     </div>
                 </div>
 
@@ -94,6 +112,12 @@ export default function RekapPenilaian() {
                                     <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
                                     <SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                                 </Select>
+                                <Button variant="outline" size="sm" disabled={sortedData.length === 0} onClick={() => exportToPdf(konteksEkspor())}>
+                                    <FileDown className="w-4 h-4 mr-1" />PDF
+                                </Button>
+                                <Button variant="outline" size="sm" disabled={sortedData.length === 0} onClick={() => exportToExcel(konteksEkspor())}>
+                                    <Sheet className="w-4 h-4 mr-1" />Excel
+                                </Button>
                             </div>
                         </div>
                     </CardHeader>
@@ -110,20 +134,20 @@ export default function RekapPenilaian() {
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (<TableRow><TableCell colSpan={5} className="text-center">Memuat...</TableCell></TableRow>)
-                                : paginatedData.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">Tidak ada data penilaian untuk periode ini.</TableCell></TableRow>)
+                                : paginatedData.length === 0 ? (<TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Tidak ada data penilaian untuk periode ini.</TableCell></TableRow>)
                                 : (paginatedData.map((item, index) => (
                                     <TableRow key={item.pplId}>
                                         <TableCell className="text-center">{(currentPage - 1) * rowsPerPage + index + 1}</TableCell>
                                         <TableCell className="font-medium">{item.namaPPL}</TableCell>
                                         <TableCell className="text-center">{item.totalKegiatan}</TableCell>
                                         <TableCell className="text-center">{item.rataRataNilai?.toFixed(2) || '-'}</TableCell>
-                                        <TableCell className="text-center font-bold text-blue-600">{item.nilaiAkhir?.toFixed(2) || '-'}</TableCell>
+                                        <TableCell className="text-center font-bold text-blue-600 dark:text-blue-300">{item.nilaiAkhir?.toFixed(2) || '-'}</TableCell>
                                     </TableRow>
                                 )))}
                             </TableBody>
                         </Table>
                          <div className="flex items-center justify-between mt-4">
-                            <div className="text-sm text-gray-600">Menampilkan <strong>{paginatedData.length}</strong> dari <strong>{sortedData.length}</strong> data</div>
+                            <div className="text-sm text-muted-foreground">Menampilkan <strong>{paginatedData.length}</strong> dari <strong>{sortedData.length}</strong> data</div>
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2"><span className="text-sm">Baris per halaman:</span><Select value={String(rowsPerPage)} onValueChange={value => { setRowsPerPage(Number(value)); setCurrentPage(1); }}><SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger><SelectContent>{[10, 25, 50, 100].map(size => (<SelectItem key={size} value={String(size)}>{size}</SelectItem>))}</SelectContent></Select></div>
                                 <Pagination>

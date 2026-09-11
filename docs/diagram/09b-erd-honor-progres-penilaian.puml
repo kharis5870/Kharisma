@@ -1,0 +1,88 @@
+@startuml erd-honor-progres-penilaian
+' ERD bagian 2/4: rincian honor, pembebanan per bulan, progres, dan penilaian
+' — semuanya bergantung pada satu alokasi mitra (ppl).
+!include _gaya.iuml
+hide circle
+hide methods
+
+entity "kegiatan" as kegiatan {
+  * id : int <<PK>>
+  --
+  namaKegiatan : varchar(255)
+}
+
+entity "ppl" as ppl {
+  * id : int <<PK>>
+  --
+  kegiatanId : int <<FK>>
+  ppl_master_id : varchar(50) <<FK>>
+  pml_id : varchar(50)
+  tahap : enum
+  besaranHonor : int
+  metodePembebanan : enum
+}
+
+entity "ppl_honorarium" as ppl_honorarium {
+  * id : int <<PK>>
+  --
+  ppl_id : int <<FK>>
+  jenis_pekerjaan : enum
+  bebanKerja : int
+  satuanBebanKerja : varchar(50)
+  hargaSatuan : int
+  besaranHonor : int
+  ..
+  UQ (ppl_id, jenis_pekerjaan)
+}
+
+entity "ppl_honor_bulan" as ppl_honor_bulan {
+  * id : int <<PK>>
+  --
+  ppl_id : int <<FK>>
+  bulan : varchar(7)
+  jumlah : int
+  ..
+  UQ (ppl_id, bulan)
+}
+
+entity "ppl_progress" as ppl_progress {
+  * id : int <<PK>>
+  --
+  ppl_id : int <<FK>>
+  progress_type : enum
+  value : int
+  ..
+  UQ (ppl_id, progress_type)
+}
+
+entity "penilaian_mitra" as penilaian_mitra {
+  * id : int <<PK>>
+  --
+  pplId : int <<FK>>
+  kegiatanId : int <<FK>>
+  pmlId : varchar(50)
+  sikap_perilaku : int
+  kualitas_pekerjaan : int
+  ketepatan_waktu : int
+  rata_rata : decimal(4,2)
+  dinilai_oleh_userId : varchar(50)
+  tanggal_penilaian : timestamp
+  ..
+  UQ (pplId, kegiatanId)
+}
+
+entity "users" as users {
+  * id : varchar(50) <<PK>>
+  --
+  nama_lengkap : varchar(255)
+}
+
+kegiatan ||--o{ ppl
+ppl ||--o{ ppl_honorarium : rincian honor
+ppl ||--o{ ppl_honor_bulan : pembebanan
+ppl ||--o{ ppl_progress : progres
+ppl |o--o| penilaian_mitra : dinilai
+kegiatan ||--o{ penilaian_mitra
+users |o..o{ penilaian_mitra : menilai
+
+@enduml

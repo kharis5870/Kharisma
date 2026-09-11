@@ -6,16 +6,6 @@ import { PPLMaster, PPLAdminData } from '@shared/api';
 
 interface PPLMasterPacket extends PPLMaster, RowDataPacket {}
 
-// Interface baru untuk hasil query mentah dari database
-interface PPLAdminQueryResult extends RowDataPacket {
-    id: string;
-    namaPPL: string;
-    alamat: string;
-    noTelepon: string;
-    totalKegiatan: number;
-    kegiatanNames: string | null; 
-}
-
 // Fungsi ini tetap ada untuk manajemen data master PPL
 export const getAllMasterPPL = async (): Promise<PPLMaster[]> => {
     const [rows] = await db.query<PPLMasterPacket[]>('SELECT id, namaPPL, posisi FROM ppl_master ORDER BY namaPPL ASC');

@@ -13,8 +13,10 @@ const updateUserAPI = ({ id, data }: { id: string, data: UserData }): Promise<Us
 const deleteUserAPI = (id: string): Promise<void> => apiClient.delete(`/admin/users/${id}`);
 
 const addKetuaTimAPI = (data: KetuaTimData): Promise<KetuaTimData> => apiClient.post<KetuaTimData>('/admin/ketua-tim', data);
-const updateKetuaTimAPI = ({ id, data }: { id: string, data: KetuaTimData }): Promise<KetuaTimData> => apiClient.put<KetuaTimData>(`/api/admin/ketua-tim/${id}`, data);
-const deleteKetuaTimAPI = (id: string): Promise<void> => apiClient.delete(`/api/admin/ketua-tim/${id}`);
+// apiClient sudah menambahkan prefiks "/api" sendiri, jadi path di sini tidak
+// boleh mengulanginya — sebelumnya kedua URL ini punya "/api" ganda.
+const updateKetuaTimAPI = ({ id, data }: { id: string, data: KetuaTimData }): Promise<KetuaTimData> => apiClient.put<KetuaTimData>(`/admin/ketua-tim/${id}`, data);
+const deleteKetuaTimAPI = (id: string): Promise<void> => apiClient.delete(`/admin/ketua-tim/${id}`);
 
 const addPPLAPI = (data: PPLAdminData): Promise<PPLAdminData> => apiClient.post<PPLAdminData>('/admin/ppl', data);
 const updatePPLAPI = ({ id, data }: { id: string, data: PPLAdminData }): Promise<PPLAdminData> => apiClient.put<PPLAdminData>(`/admin/ppl/${id}`, data);

@@ -83,7 +83,9 @@ export const getPenilaianList = async (tahun?: number, triwulan?: number) => {
  * Menyimpan atau memperbarui data penilaian mitra.
  */
 export const saveOrUpdatePenilaian = async (data: PenilaianRequest) => {
-  const { penilaianId, sikapPelikaku, kualitasPekerjaan, ketepatanWaktu, pplId, kegiatanId, pmlId, dinilaiOleh_userId } = data;
+  // penilaianId sengaja tidak dipakai: kuerinya ON DUPLICATE KEY UPDATE, jadi
+  // baris lama dikenali dari UNIQUE KEY (pplId, kegiatanId), bukan dari id.
+  const { sikapPelikaku, kualitasPekerjaan, ketepatanWaktu, pplId, kegiatanId, pmlId, dinilaiOleh_userId } = data;
 
   // Hitung rata-rata
   const rataRata = ((sikapPelikaku + kualitasPekerjaan + ketepatanWaktu) / 3).toFixed(2);

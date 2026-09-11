@@ -1,0 +1,62 @@
+' Gaya bersama seluruh diagram PlantUML di folder ini.
+' Diubah di sini = semua diagram ikut berubah, jadi tampilannya seragam di buku.
+
+' Graphviz tidak terpasang di laptop ini; Smetana adalah mesin tata letak
+' bawaan PlantUML sehingga diagram tetap bisa dirender tanpa instalasi apa pun.
+!pragma layout smetana
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam roundCorner 10
+skinparam ArrowColor #333333
+skinparam ArrowThickness 1.1
+
+skinparam activity {
+  BackgroundColor #EEF4FB
+  BorderColor #2F4F75
+  FontSize 12
+  DiamondBackgroundColor #FFF6D9
+  DiamondBorderColor #8A6D00
+  DiamondFontSize 11
+}
+skinparam swimlane {
+  BorderColor #555555
+  BorderThickness 1
+  TitleFontStyle bold
+  TitleFontSize 13
+}
+skinparam partition {
+  BorderColor #555555
+}
+
+skinparam usecase {
+  BackgroundColor #EEF4FB
+  BorderColor #2F4F75
+}
+skinparam actor {
+  BackgroundColor white
+  BorderColor #333333
+}
+skinparam rectangle {
+  BorderColor #555555
+  FontStyle bold
+}
+skinparam package {
+  BorderColor #777777
+  FontStyle bold
+}
+
+skinparam note {
+  BackgroundColor #FFFDE7
+  BorderColor #B8A200
+  FontSize 11
+}
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2F4F75
+  HeaderBackgroundColor #EEF4FB
+  AttributeFontSize 11
+}

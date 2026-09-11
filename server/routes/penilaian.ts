@@ -2,8 +2,9 @@
 
 import express from 'express';
 import { getPenilaianList, saveOrUpdatePenilaian, getRekapPenilaian } from '../services/penilaianService';
-
-// Impor middleware otentikasi jika Anda punya, contoh: import { authenticateToken } from '../middleware/auth';
+// Jalur relatif, BUKAN @shared — lihat catatan di kontrakService.ts.
+import { nilaiPenilaianSah } from '../../shared/mutuPenilaian';
+import { wajibPenilaiMitra } from '../auth/kepemilikan';
 
 const router = express.Router();
 
@@ -22,12 +23,45 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Rute untuk menyimpan atau memperbarui penilaian
-// Jika Anda punya middleware, tambahkan seperti ini: router.post('/', authenticateToken, async (req, res) => {
-router.post('/', async (req, res) => {
+// Rute untuk menyimpan atau memperbarui penilaian.
+// Hanya PML yang mengawasi mitra itu (atau admin) — lihat wajibPenilaiMitra.
+router.post('/', wajibPenilaiMitra, async (req, res) => {
   try {
-    // Anda mungkin ingin menambahkan validasi di sini
-    const result = await saveOrUpdatePenilaian(req.body);
+    const { kegiatanId, sikapPelikaku, kualitasPekerjaan, ketepatanWaktu } = req.body;
+    const ppl = res.locals.pplDinilai as { id: number; kegiatanId: number; pml_id: string | null };
+
+    // kegiatanId dari klien hanya dicocokkan, tidak dipercaya: yang disimpan
+    // selalu kegiatan pemilik alokasi itu.
+    if (kegiatanId !== undefined && Number(kegiatanId) !== Number(ppl.kegiatanId)) {
+      return res.status(400).json({ message: 'Mitra tersebut tidak terdaftar pada kegiatan ini.' });
+    }
+    // Sampai sekarang rentangnya TIDAK pernah diperiksa di mana pun: kolomnya
+    // int(2), jadi klien mana pun bisa mengirim 99 dan nilai itu tersimpan apa
+    // adanya lalu merusak rata-rata mitra tersebut tanpa jejak.
+    const aspek: [string, unknown][] = [
+      ['Sikap dan Perilaku', sikapPelikaku],
+      ['Kualitas Pekerjaan', kualitasPekerjaan],
+      ['Ketepatan Waktu', ketepatanWaktu],
+    ];
+    for (const [label, nilai] of aspek) {
+      if (!nilaiPenilaianSah(nilai)) {
+        return res.status(400).json({
+          message: `Nilai ${label} harus bilangan bulat 1 sampai 10.`,
+        });
+      }
+    }
+
+    // Identitas penilai dan PML diambil dari token dan database, BUKAN dari
+    // badan permintaan — nilai kiriman klien tidak membuktikan apa pun.
+    const result = await saveOrUpdatePenilaian({
+      pplId: ppl.id,
+      kegiatanId: ppl.kegiatanId,
+      pmlId: ppl.pml_id,
+      dinilaiOleh_userId: req.user!.id,
+      sikapPelikaku,
+      kualitasPekerjaan,
+      ketepatanWaktu,
+    });
     res.status(200).json({ message: 'Penilaian berhasil disimpan', data: result });
   } catch (error) {
     console.error('Error saving penilaian:', error);

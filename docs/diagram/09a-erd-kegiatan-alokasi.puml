@@ -1,0 +1,100 @@
+@startuml erd-kegiatan-alokasi
+' ERD bagian 1/4: kegiatan, pengguna, mitra, dan alokasinya.
+' Notasi crow's foot. Garis putus-putus = relasi logis (tanpa FOREIGN KEY).
+!include _gaya.iuml
+hide circle
+hide methods
+
+entity "users" as users {
+  * id : varchar(50) <<PK>>
+  --
+  username : varchar(50) <<UQ>>
+  nama_lengkap : varchar(255)
+  role : enum
+  isPML : tinyint(1)
+}
+
+entity "ketua_tim" as ketua_tim {
+  * id : varchar(50) <<PK>>
+  --
+  user_id : varchar(50) <<FK>>
+  nama_ketua : varchar(255)
+  nip : varchar(50)
+  tim : varchar(100)
+}
+
+entity "kegiatan" as kegiatan {
+  * id : int <<PK>>
+  --
+  namaKegiatan : varchar(255)
+  ketua_tim_id : varchar(50) <<FK>>
+  createdBy_userId : varchar(50) <<FK>>
+  tipe_kegiatan : enum
+  isFasih, adaListing,
+  adaPengolahan, adaDiseminasi : tinyint(1)
+  tanggalMulai/Selesai (4 tahap) : date
+  bulanHonor / tanggalHonor (3 tahap)
+  status : enum
+  isArsip : tinyint(1)
+}
+
+entity "honorarium_kegiatan" as honorarium_kegiatan {
+  * id : int <<PK>>
+  --
+  kegiatanId : int <<FK>>
+  jenis_pekerjaan : enum
+  satuan_beban_kerja : varchar(255)
+  harga_satuan : varchar(255)
+  uraian_tugas : varchar(255)
+  kode_anggaran : varchar(100)
+}
+
+entity "ppl" as ppl {
+  * id : int <<PK>>
+  --
+  kegiatanId : int <<FK>>
+  ppl_master_id : varchar(50) <<FK>>
+  pml_id : varchar(50)
+  tahap : enum
+  bebanKerja : int
+  besaranHonor : int
+  metodePembebanan : enum
+  bulanPembebananDipilih : varchar(7)
+}
+
+entity "ppl_master" as ppl_master {
+  * id : varchar(50) <<PK>>
+  --
+  namaPPL : varchar(255)
+  posisi : enum
+  kecamatan_id : int <<FK>>
+  desa_id : int <<FK>>
+  alamat : text
+  noTelepon : varchar(20)
+}
+
+entity "kecamatan" as kecamatan {
+  * id : int <<PK>>
+  --
+  nama : varchar(255)
+}
+
+entity "desa" as desa {
+  * id : int <<PK>>
+  --
+  kecamatan_id : int <<FK>>
+  nama : varchar(255)
+}
+
+users |o--o{ ketua_tim : ditautkan
+ketua_tim |o--o{ kegiatan : memimpin
+users |o--o{ kegiatan : membuat
+kegiatan ||--o{ honorarium_kegiatan : tarif
+kegiatan ||--o{ ppl : alokasi
+ppl_master |o--o{ ppl : ditugaskan
+users |o..o{ ppl : mengawasi (PML)
+kecamatan ||--o{ desa
+kecamatan |o--o{ ppl_master
+desa |o--o{ ppl_master
+
+@enduml

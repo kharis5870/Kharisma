@@ -1,0 +1,46 @@
+@startuml activity-penilaian
+' Rincian use case "Menilai Kinerja Mitra" dan "Melihat Rekap & Peringkat Penilaian".
+' Rumus peringkat sesuai penilaianService.getRekapPenilaian:
+'   nilai akhir = rata-rata nilai + 0,01 × jumlah kegiatan (per tahap) pada triwulan itu.
+!include _gaya.iuml
+
+|PML|
+start
+:Membuka menu Penilaian Mitra;
+:Memilih tahun dan triwulan;
+
+|Sistem|
+:Menampilkan alokasi mitra yang honornya
+dibebankan pada triwulan tersebut;
+
+|PML|
+:Memilih mitra yang diawasinya;
+:Mengisi nilai Sikap & Perilaku, Kualitas
+Pekerjaan, dan Ketepatan Waktu (1–10);
+
+|Sistem|
+if (Pengguna adalah PML mitra\ntersebut atau admin?) then (tidak)
+  :Menolak penyimpanan;
+  stop
+else (ya)
+endif
+if (Setiap nilai bilangan bulat 1–10?) then (tidak)
+  :Menampilkan pesan galat;
+  stop
+else (ya)
+endif
+:Menghitung rata-rata tiga aspek;
+:Menyimpan penilaian, dengan kegiatan dan
+penilai diambil dari data server;
+
+partition "Rekap & Peringkat Triwulan (saat menu Rekap Penilaian dibuka)" {
+  :Menjumlahkan kegiatan setiap mitra
+  pada triwulan tersebut;
+  :Menghitung nilai akhir =
+  rata-rata nilai + 0,01 × jumlah kegiatan;
+  :Mengurutkan mitra berdasarkan nilai akhir;
+  :Menampilkan peringkat mitra;
+}
+stop
+
+@enduml

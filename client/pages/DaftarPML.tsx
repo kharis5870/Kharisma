@@ -23,6 +23,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { PMLAdminData } from "@shared/api";
 import { apiClient } from "@/lib/apiClient";
+import { useHalamanAman } from "@/hooks/useHalamanAman";
 
 // Fungsi untuk mengambil data dari API yang baru kita buat
 const fetchPMLs = async (): Promise<PMLAdminData[]> => {
@@ -49,11 +50,11 @@ const ActivityDetailModal = ({ isOpen, onClose, pmlData }: {
                     {pmlData.kegiatanDetails && pmlData.kegiatanDetails.length > 0 ? (
                         <ul className="space-y-2">
                             {pmlData.kegiatanDetails.map((keg, index) => (
-                                <li key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-md">
+                                <li key={index} className="flex items-start gap-3 p-3 bg-muted rounded-md">
                                     <List className="w-4 h-4 text-bps-blue-500 mt-1 flex-shrink-0" />
                                     <span>
                                         {keg.nama}
-                                        <span className="text-slate-500 font-normal ml-1 capitalize">
+                                        <span className="text-muted-foreground font-normal ml-1 capitalize">
                                             ({keg.tahap?.replace('-', ' ')})
                                         </span>
                                     </span>
@@ -61,7 +62,7 @@ const ActivityDetailModal = ({ isOpen, onClose, pmlData }: {
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-gray-500 text-center py-4">Tidak ada kegiatan tercatat.</p>
+                        <p className="text-muted-foreground text-center py-4">Tidak ada kegiatan tercatat.</p>
                     )}
                 </div>
                 <div className="mt-6 flex justify-end">
@@ -122,6 +123,7 @@ export default function DaftarPML() {
         return data;
     }, [pmlList, searchTerm, sortConfig]);
     const totalPages = Math.ceil(filteredAndSortedData.length / rowsPerPage);
+    useHalamanAman(currentPage, totalPages, setCurrentPage);
 
     const paginatedData = useMemo(() => {
         const startIndex = (currentPage - 1) * rowsPerPage;
@@ -138,23 +140,23 @@ export default function DaftarPML() {
     };
     
     const getSortIcon = (columnKey: string) => {
-        if (!sortConfig || sortConfig.key !== columnKey) return <ChevronUp className="w-4 h-4 text-gray-300" />;
-        return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />;
+        if (!sortConfig || sortConfig.key !== columnKey) return <ChevronUp className="w-4 h-4 text-border" />;
+        return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-300" /> : <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-300" />;
     };
 
     return (
         <Layout>
             <div className="space-y-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Daftar PML</h1>
-                    <p className="text-gray-600 mt-1">Lihat dan kelola daftar Pengawas Mitra Lapangan (PML)</p>
+                    <h1 className="text-3xl font-bold text-foreground">Daftar PML</h1>
+                    <p className="text-muted-foreground mt-1">Lihat dan kelola daftar Pengawas Mitra Lapangan (PML)</p>
                 </div>
 
                 {/* ✔️ TAMBAHKAN BLOK KARTU STATISTIK INI */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">Total PML</p><p className="text-2xl font-bold text-gray-900">{stats.totalPML}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
-                    <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">PML Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.activePML}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
-                    <Card className="border-l-4 border-l-gray-400"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-gray-600">PML Non Aktif</p><p className="text-2xl font-bold text-gray-900">{stats.inactivePML}</p></div><UserX className="w-8 h-8 text-gray-400" /></div></CardContent></Card>
+                    <Card className="border-l-4 border-l-bps-blue-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Total PML</p><p className="text-2xl font-bold text-foreground">{stats.totalPML}</p></div><Users className="w-8 h-8 text-bps-blue-500" /></div></CardContent></Card>
+                    <Card className="border-l-4 border-l-bps-green-500"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">PML Aktif</p><p className="text-2xl font-bold text-foreground">{stats.activePML}</p></div><UserCheck className="w-8 h-8 text-bps-green-500" /></div></CardContent></Card>
+                    <Card className="border-l-4 border-l-gray-400"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">PML Non Aktif</p><p className="text-2xl font-bold text-foreground">{stats.inactivePML}</p></div><UserX className="w-8 h-8 text-muted-foreground" /></div></CardContent></Card>
                 </div>
 
                 <Card>
@@ -163,7 +165,7 @@ export default function DaftarPML() {
                             <CardTitle>Semua PML ({pmlList.length})</CardTitle>
                             <div className="w-64">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                                     <Input 
                                         type="text" 
                                         placeholder="Cari nama atau ID PML..." 
@@ -195,7 +197,7 @@ export default function DaftarPML() {
                                 {isLoading ? (
                                     <TableRow><TableCell colSpan={4} className="text-center">Memuat...</TableCell></TableRow>
                                 ) : paginatedData.length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-500">Tidak ada data PML</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Tidak ada data PML</TableCell></TableRow>
                                 ) : (
                                     paginatedData.map((pml, index) => (
                                         <TableRow key={pml.id}>
@@ -205,7 +207,7 @@ export default function DaftarPML() {
                                             <TableCell>
                                                 <Button 
                                                     variant="link" 
-                                                    className="p-0 h-auto text-blue-600" 
+                                                    className="p-0 h-auto text-blue-600 dark:text-blue-300" 
                                                     onClick={() => handleOpenDetailModal(pml)}
                                                     disabled={pml.totalKegiatan === 0}
                                                 >
@@ -218,7 +220,7 @@ export default function DaftarPML() {
                             </TableBody>
                         </Table>
                         <div className="flex items-center justify-between mt-4">
-                            <div className="text-sm text-gray-600">
+                            <div className="text-sm text-muted-foreground">
                                 Menampilkan <strong>{paginatedData.length}</strong> dari <strong>{filteredAndSortedData.length}</strong> data
                             </div>
                             <div className="flex items-center gap-4">
