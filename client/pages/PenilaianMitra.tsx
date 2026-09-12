@@ -218,7 +218,6 @@ export default function PenilaianMitraPage() {
     const queryClient = useQueryClient();
     const { user } = useAuth();
     const [searchQuery, setSearchQuery] = useState("");
-    const [filterKegiatan, setFilterKegiatan] = useState("all");
     const [filterStatus, setFilterStatus] = useState("all");
     // Penyaring mitra yang dinilai akun ini, sejajar dengan modal Update
     // Progress: seorang PML biasanya hanya mengurus sebagian mitra.
@@ -263,13 +262,12 @@ export default function PenilaianMitraPage() {
           item.namaPPL.toLowerCase().includes(searchQuery.toLowerCase()) ||
           item.namaKegiatan.toLowerCase().includes(searchQuery.toLowerCase()) ||
           pmlName.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesKegiatan = filterKegiatan === "all" || item.namaKegiatan === filterKegiatan;
         const matchesStatus = filterStatus === "all" ||
           (filterStatus === "sudah" && item.sudahDinilai) ||
           (filterStatus === "belum" && !item.sudahDinilai);
         const matchesPML = filterPML !== "hanya-saya" || milikSaya(item);
 
-        return matchesSearch && matchesKegiatan && matchesStatus && matchesPML;
+        return matchesSearch && matchesStatus && matchesPML;
       });
 
       // Urutan stabil: mitra yang dinilai akun ini naik ke atas, sisanya tetap
@@ -281,7 +279,7 @@ export default function PenilaianMitraPage() {
         });
       }
       return hasil;
-    }, [penilaianData, searchQuery, filterKegiatan, filterStatus, filterPML, user?.id]);
+    }, [penilaianData, searchQuery, filterStatus, filterPML, user?.id]);
 
     const totalPages = useMemo(() => {
         return Math.ceil(filteredData.length / pageSize);
@@ -296,11 +294,6 @@ export default function PenilaianMitraPage() {
     // Halaman ini berbasis indeks (mulai 0), berbeda dengan halaman lain yang
     // mulai dari 1 — karena itu argumen terakhirnya 0.
     useHalamanAman(pageIndex, totalPages, setPageIndex, 0);
-    
-    const uniqueKegiatan = useMemo(() => {
-      if (!penilaianData) return [];
-      return Array.from(new Set(penilaianData.map(p => p.namaKegiatan)));
-    }, [penilaianData]);
   
     const stats = useMemo(() => {
       const total = penilaianData?.length || 0;
@@ -366,7 +359,7 @@ export default function PenilaianMitraPage() {
             <CardTitle>Filter dan Pencarian</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
               <div>
                 <Label>Cari Mitra/Kegiatan</Label>
                 <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" /><Input placeholder="Cari nama PPL..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10"/></div>
@@ -388,13 +381,6 @@ export default function PenilaianMitraPage() {
                           {triwulans.map(t => <SelectItem key={t.value} value={String(t.value)}>{t.label}</SelectItem>)}
                       </SelectContent>
                   </Select>
-              </div>
-              <div>
-                <Label>Filter Kegiatan</Label>
-                <Select value={filterKegiatan} onValueChange={setFilterKegiatan}>
-                  <SelectTrigger><SelectValue placeholder="Pilih kegiatan" /></SelectTrigger>
-                  <SelectContent><SelectItem value="all">Semua Kegiatan</SelectItem>{uniqueKegiatan.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}</SelectContent>
-                </Select>
               </div>
               <div>
                 <Label>Status Penilaian</Label>
@@ -446,8 +432,10 @@ export default function PenilaianMitraPage() {
                   <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8"><Users className="w-8 h-8 mx-auto mb-2" /><p>Tidak ada data ditemukan</p></TableCell></TableRow>
                 ) : (
                   paginatedData.map((item: PenilaianMitraType, index: number) => {
-                    // ✔️ 'useAuth' dipanggil di dalam map agar selalu mendapat konteks terbaru
-                    const { user } = useAuth();
+                    // `user` diambil dari cakupan komponen (baris useAuth di atas), BUKAN
+                    // dengan memanggil useAuth() di sini. Hook tidak boleh dipanggil di dalam
+                    // callback .map(): jumlah pemanggilannya ikut jumlah baris tabel, dan begitu
+                    // useAuth berisi hook lain, halaman ini crash saat pindah halaman/filter.
                     const isAuthorizedPML = String(user?.id) === String(item.pmlId);
                     const isButtonDisabled = !(isAuthorizedPML || user?.role === 'admin');
 

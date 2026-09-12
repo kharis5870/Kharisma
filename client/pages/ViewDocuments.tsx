@@ -1,6 +1,6 @@
 // client/pages/ViewDocuments.tsx
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext"; 
@@ -164,6 +164,25 @@ export default function ViewDocuments() {
     // Perbaikan dokumen adalah wewenang pemilik kegiatan, bukan pemeriksanya.
     // Aturan yang sama dipakai server; lihat @shared/hakKegiatan.
     const bolehMengedit = bolehMenyuntingKegiatan(user as any, activityData as any);
+
+    /**
+     * Tab tahap mengikuti pengaturan kegiatan: tahap Pengolahan/Diseminasi yang
+     * dimatikan tidak ditampilkan sama sekali, dan muncul lagi begitu kegiatan
+     * disunting menjadi punya jadwal tahap itu. Boolean() karena database
+     * mengirim 0/1 — angka 0 di JSX tercetak sebagai "0".
+     */
+    const pengolahanAktif = Boolean(activityData?.adaPengolahan ?? true);
+    const diseminasiAktif = Boolean(activityData?.adaDiseminasi ?? true);
+    const jumlahTab = 2 + (pengolahanAktif ? 1 : 0) + (diseminasiAktif ? 1 : 0);
+
+    // Tautan notifikasi bisa menunjuk tahap yang kini sudah dimatikan; tanpa
+    // ini Radix kehilangan tab aktifnya dan halaman tampak kosong.
+    useEffect(() => {
+        if ((tahapAktif === 'pengolahan-analisis' && !pengolahanAktif)
+            || (tahapAktif === 'diseminasi-evaluasi' && !diseminasiAktif)) {
+            setTahapAktif('persiapan');
+        }
+    }, [tahapAktif, pengolahanAktif, diseminasiAktif]);
 
     const statusMutation = useMutation({
         mutationFn: updateDocumentStatus,
@@ -667,16 +686,16 @@ export default function ViewDocuments() {
                     onValueChange={(v) => setTahapAktif(v as Dokumen['tipe'])} 
                     className="space-y-6"
                     >
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className={cn("grid w-full", jumlahTab === 4 ? "grid-cols-4" : jumlahTab === 3 ? "grid-cols-3" : "grid-cols-2")}>
                         <TabsTrigger value="persiapan">Persiapan <Badge variant="secondary" className="ml-2">{docsByTipe('persiapan').length}</Badge></TabsTrigger>
                         <TabsTrigger value="pengumpulan-data">Pengumpulan Data <Badge variant="secondary" className="ml-2">{docsByTipe('pengumpulan-data').length}</Badge></TabsTrigger>
-                        <TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis <Badge variant="secondary" className="ml-2">{docsByTipe('pengolahan-analisis').length}</Badge></TabsTrigger>
-                        <TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi <Badge variant="secondary" className="ml-2">{docsByTipe('diseminasi-evaluasi').length}</Badge></TabsTrigger>
+                        {pengolahanAktif && (<TabsTrigger value="pengolahan-analisis">Pengolahan & Analisis <Badge variant="secondary" className="ml-2">{docsByTipe('pengolahan-analisis').length}</Badge></TabsTrigger>)}
+                        {diseminasiAktif && (<TabsTrigger value="diseminasi-evaluasi">Diseminasi & Evaluasi <Badge variant="secondary" className="ml-2">{docsByTipe('diseminasi-evaluasi').length}</Badge></TabsTrigger>)}
                     </TabsList>
                     <TabsContent value="persiapan">{renderTahapanContent('persiapan', 'Dokumen Persiapan')}</TabsContent>
                     <TabsContent value="pengumpulan-data">{renderTahapanContent('pengumpulan-data', 'Dokumen Pengumpulan Data')}</TabsContent>
-                    <TabsContent value="pengolahan-analisis">{renderTahapanContent('pengolahan-analisis', 'Dokumen Pengolahan & Analisis')}</TabsContent>
-                    <TabsContent value="diseminasi-evaluasi">{renderTahapanContent('diseminasi-evaluasi', 'Dokumen Diseminasi & Evaluasi')}</TabsContent>
+                    {pengolahanAktif && (<TabsContent value="pengolahan-analisis">{renderTahapanContent('pengolahan-analisis', 'Dokumen Pengolahan & Analisis')}</TabsContent>)}
+                    {diseminasiAktif && (<TabsContent value="diseminasi-evaluasi">{renderTahapanContent('diseminasi-evaluasi', 'Dokumen Diseminasi & Evaluasi')}</TabsContent>)}
                 </Tabs>
                 {/* Hanya bagi yang berhak menyunting. Sebelumnya banner ini tampil
                     untuk semua peran, sehingga supervisor pun diarahkan ke halaman

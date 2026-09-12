@@ -24,6 +24,7 @@ export const HALAMAN_APLIKASI: HalamanAplikasi[] = [
   { path: '/penilaian-mitra', judul: 'Penilaian Mitra' },
   { path: '/rekap-penilaian', judul: 'Rekapitulasi Penilaian Mitra' },
   { path: '/generate-kontrak', judul: 'Generate Kontrak Mitra', peran: ['admin', 'supervisor'] },
+  { path: '/riwayat-surat', judul: 'Riwayat Penyuratan', peran: ['admin', 'supervisor'] },
   { path: '/template-surat', judul: 'Template Surat', peran: ['admin', 'supervisor'] },
   { path: '/manajemen-admin', judul: 'Manajemen Admin', peran: ['admin'] },
   { path: '/profil', judul: 'Pengaturan Profil' },

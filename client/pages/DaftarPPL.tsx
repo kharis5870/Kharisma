@@ -1,9 +1,13 @@
 // client/pages/DaftarPPL.tsx
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
+import { PilihCari, NILAI_SEMUA } from "@/components/ui/pilih-cari";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { exportToExcel, type KolomEkspor } from "@/lib/exportUtils";
+import { kueriPeriode, rentangPeriode, LABEL_PERIODE, URUTAN_PERIODE, type KunciPeriode } from "@/lib/periodePreset";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,8 +47,13 @@ import { GAYA_POSISI_PPL, NADA_STATUS } from "@/lib/statusStyles";
 const fetchKecamatan = async (): Promise<Kecamatan[]> => apiClient.get('/alamat/kecamatan');
 const fetchDesa = async (kecamatanId: string): Promise<Desa[]> => apiClient.get(`/alamat/desa?kecamatanId=${kecamatanId}`);
 
-const fetchPPLs = async (): Promise<PPLAdminData[]> => {
-    return apiClient.get<PPLAdminData[]>('/admin/ppl');
+/**
+ * Tanpa periode, kolom Kegiatan memuat SELURUH riwayat penugasan mitra. Dengan
+ * periode, ia hanya memuat kegiatan yang honornya jatuh pada rentang itu —
+ * itulah yang dibutuhkan saat menilai siapa yang masih longgar bulan depan.
+ */
+const fetchPPLs = async (periode: KunciPeriode): Promise<PPLAdminData[]> => {
+    return apiClient.get<PPLAdminData[]>(`/admin/ppl${kueriPeriode(rentangPeriode(periode))}`);
 };
 
 const ActivityDetailModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, onClose: () => void, pplData: PPLAdminData | null }) => {
@@ -136,7 +145,13 @@ export default function DaftarPPL() {
     const kegiatanId = location.state?.kegiatanId;
     const existingPplIds = location.state?.existingPplIds || [];
 
-    const { data: pplList = [], isLoading } = useQuery({ queryKey: ['pplAdmin'], queryFn: fetchPPLs });
+    const [periodeFilter, setPeriodeFilter] = useState<KunciPeriode>('semua');
+    // Periode ikut di dalam kunci query: tanpa itu, mengganti periode akan
+    // menampilkan hasil periode sebelumnya dari cache.
+    const { data: pplList = [], isLoading } = useQuery({
+        queryKey: ['pplAdmin', periodeFilter],
+        queryFn: () => fetchPPLs(periodeFilter),
+    });
     
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [successModalConfig, setSuccessModalConfig] = useState({ title: "", description: "", actionLabel: "", onAction: () => {} });
@@ -279,12 +294,12 @@ export default function DaftarPPL() {
         description: `${selectedPPLObjects.length} PPL yang dipilih akan ditambahkan ke tahap ${sourceTahap.replace(/-/g, ' ')}.`,
         actionLabel: "Kembali ke Edit Kegiatan",
         onAction: () => {
-            navigate(`/edit-activity/${kegiatanId}`, { 
-                state: { newPpls: selectedPPLObjects, tahap: sourceTahap, from: 'daftar-ppl' }
-            });
-            setSelectedPPLs([]);
-            setSelectionMode(false);
-          }
+            navigate(`/edit-activity/${kegiatanId}`, { 
+                state: { newPpls: selectedPPLObjects, tahap: sourceTahap, from: 'daftar-ppl' }
+            });
+            setSelectedPPLs([]);
+            setSelectionMode(false);
+          }
       });
     } else { // from 'input-kegiatan'
         setShowSuccessModal(true);
@@ -293,12 +308,12 @@ export default function DaftarPPL() {
             description: `${selectedPPLObjects.length} PPL yang dipilih telah ditambahkan ke form Input Kegiatan.`,
             actionLabel: "Ke Input Kegiatan",
             onAction: () => {
-                navigate('/input-kegiatan', { 
-                    state: { newPpls: selectedPPLObjects, tahap: sourceTahap, from: 'daftar-ppl' } 
-                });
-                setSelectedPPLs([]);
-                setSelectionMode(false);
-              }
+                navigate('/input-kegiatan', { 
+                    state: { newPpls: selectedPPLObjects, tahap: sourceTahap, from: 'daftar-ppl' } 
+                });
+                setSelectedPPLs([]);
+                setSelectionMode(false);
+              }
         });
     }
 
@@ -318,6 +333,66 @@ export default function DaftarPPL() {
   const handleOpenDetailModal = (ppl: PPLAdminData) => {
     setSelectedPplDetails(ppl);
     setIsDetailModalOpen(true);
+  };
+
+  /**
+   * Sorotan dari pencarian global: `/daftar-ppl?sorot=<id mitra>`.
+   *
+   * Filter dikosongkan lebih dulu, kalau tidak mitra yang dicari bisa
+   * tersembunyi oleh filter yang sedang aktif dan pengguna dibawa ke halaman
+   * ini tanpa menemukan apa-apa. Halamannya ikut dipindah karena tabel ini
+   * berpaginasi — mitra yang dicari sering tidak ada di halaman pertama.
+   */
+  const paramSorot = new URLSearchParams(location.search).get('sorot');
+  const [pplDisorot, setPplDisorot] = useState<string | null>(null);
+  const sorotDitangani = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!paramSorot) { sorotDitangani.current = null; return; }
+    if (sorotDitangani.current === paramSorot) return;
+    sorotDitangani.current = paramSorot;
+    setSearchTerm('');
+    setPosisiFilter('Semua');
+    setSelectedKecamatan(NILAI_SEMUA);
+    setSelectedDesa(NILAI_SEMUA);
+    setPplDisorot(paramSorot);
+    window.setTimeout(() => setPplDisorot(null), 3500);
+  }, [paramSorot]);
+
+  // Pencarian barisnya dipisah ke efek kedua: pengosongan filter di atas baru
+  // berlaku pada render berikutnya, jadi menghitung posisi baris di efek yang
+  // sama akan memakai hasil penyaringan yang lama.
+  useEffect(() => {
+    if (!pplDisorot) return;
+    const posisi = filteredAndSortedData.findIndex(p => p.id === pplDisorot);
+    if (posisi < 0) return;
+    setCurrentPage(Math.floor(posisi / rowsPerPage) + 1);
+    window.setTimeout(() => {
+      document.querySelector(`[data-ppl-id="${pplDisorot}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+  }, [pplDisorot, filteredAndSortedData, rowsPerPage]);
+
+  /** Ekspor daftar yang SEDANG tersaring, bukan seluruh data. */
+  const eksporPpl = () => {
+    const kolom: KolomEkspor<PPLAdminData>[] = [
+      { header: "ID", nilai: p => p.id },
+      { header: "Nama", nilai: p => p.namaPPL },
+      { header: "Posisi", nilai: p => p.posisi },
+      { header: "Kecamatan", nilai: p => p.namaKecamatan || "-" },
+      { header: "Desa", nilai: p => p.namaDesa || "-" },
+      { header: "Alamat", nilai: p => p.alamat || "-" },
+      { header: "No. Telepon", nilai: p => p.noTelepon || "-" },
+      { header: "Jumlah Kegiatan", nilai: p => p.totalKegiatan, rataKanan: true },
+      { header: "Status", nilai: p => (p.totalKegiatan > 0 ? "Aktif" : "Non Aktif") },
+    ];
+    void exportToExcel({
+      judul: "Daftar Mitra (PPL)",
+      subJudul: `${filteredAndSortedData.length} mitra sesuai filter yang sedang aktif`,
+      kolom,
+      baris: filteredAndSortedData,
+      namaFile: "daftar-ppl",
+    });
   };
 
   const stats = useMemo(() => {
@@ -399,6 +474,20 @@ export default function DaftarPPL() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle>Daftar PPL</CardTitle>
               <div className="flex flex-wrap items-center gap-2">
+                {/* Menyaring KOLOM KEGIATAN, bukan daftar mitranya: mitra yang
+                    tidak kebagian kegiatan pada periode ini tetap tampil dengan
+                    0, karena justru merekalah yang dicari saat membagi beban. */}
+                <Select value={periodeFilter} onValueChange={v => setPeriodeFilter(v as KunciPeriode)}>
+                    <SelectTrigger className="w-full sm:w-[170px]"><SelectValue placeholder="Periode..." /></SelectTrigger>
+                    <SelectPortal>
+                    <SelectContent position="popper" className="max-h-56">
+                        {URUTAN_PERIODE.map(k => (
+                            <SelectItem key={k} value={k}>{LABEL_PERIODE[k]}</SelectItem>
+                        ))}
+                    </SelectContent>
+                    </SelectPortal>
+                </Select>
+
                 <Select value={posisiFilter} onValueChange={setPosisiFilter}>
                     <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter Posisi..." /></SelectTrigger>
                     <SelectPortal>
@@ -411,25 +500,30 @@ export default function DaftarPPL() {
                     </SelectPortal>
                 </Select>
 
-                <Select value={selectedKecamatan} onValueChange={setSelectedKecamatan}>
-                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter Kecamatan..." /></SelectTrigger>
-                    <SelectPortal>
-                    <SelectContent position="popper" className="max-h-56">
-                        <SelectItem value="all">Semua Kecamatan</SelectItem>
-                        {kecamatanList.map(kec => <SelectItem key={kec.id} value={String(kec.id)}>{kec.nama}</SelectItem>)}
-                    </SelectContent>
-                    </SelectPortal>
-                </Select>
+                {/* Bisa dicari, bukan digulir: daftar desa di kabupaten ini
+                    terlalu panjang untuk ditemukan dengan menggulir. */}
+                <PilihCari
+                    className="w-full sm:w-[180px]"
+                    nilai={selectedKecamatan}
+                    onUbah={setSelectedKecamatan}
+                    opsi={kecamatanList.map(kec => ({ nilai: String(kec.id), label: kec.nama }))}
+                    labelSemua="Semua Kecamatan"
+                    placeholder="Filter Kecamatan..."
+                    cariPlaceholder="Cari kecamatan..."
+                    pesanKosong="Kecamatan tidak ditemukan."
+                />
 
-                <Select value={selectedDesa} onValueChange={setSelectedDesa} disabled={selectedKecamatan === 'all'}>
-                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter Desa..." /></SelectTrigger>
-                    <SelectPortal>
-                    <SelectContent position="popper" className="max-h-56">
-                        <SelectItem value="all">Semua Desa</SelectItem>
-                        {desaOptions.map(desa => <SelectItem key={desa.id} value={String(desa.id)}>{desa.nama}</SelectItem>)}
-                    </SelectContent>
-                    </SelectPortal>
-                </Select>
+                <PilihCari
+                    className="w-full sm:w-[180px]"
+                    nilai={selectedDesa}
+                    onUbah={setSelectedDesa}
+                    opsi={desaOptions.map(desa => ({ nilai: String(desa.id), label: desa.nama }))}
+                    labelSemua="Semua Desa"
+                    placeholder="Filter Desa..."
+                    cariPlaceholder="Cari desa..."
+                    pesanKosong="Desa tidak ditemukan."
+                    disabled={selectedKecamatan === NILAI_SEMUA}
+                />
 
                 <div className="relative sm:w-auto flex-grow">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -481,12 +575,31 @@ export default function DaftarPPL() {
                         data-state={isSelected && "selected"}
                         className={cn(
                             isAlreadyAdded && "bg-muted text-muted-foreground cursor-not-allowed",
-                            selectionMode && !isAlreadyAdded && "cursor-pointer"
+                            selectionMode && !isAlreadyAdded && "cursor-pointer",
+                            "scroll-mt-24",
+                            pplDisorot === ppl.id && "ring-2 ring-inset ring-blue-400 dark:ring-blue-500"
                         )}
+                        data-ppl-id={ppl.id}
                         onClick={() => handleSelectPPL(ppl.id)}
                     >
                         {selectionMode && (
-                            <TableCell><Checkbox checked={isSelected} disabled={isAlreadyAdded} /></TableCell>
+                            <TableCell>
+                                {/* Mitra yang SUDAH ada di kegiatan ini tampil tercentang
+                                    dan terkunci. Sebelumnya kotaknya kosong dan mati tanpa
+                                    keterangan, sehingga terlihat seperti kegagalan memilih. */}
+                                {isAlreadyAdded ? (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="inline-flex">
+                                                <Checkbox checked disabled />
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>PPL sudah ditambahkan ke kegiatan ini</TooltipContent>
+                                    </Tooltip>
+                                ) : (
+                                    <Checkbox checked={isSelected} />
+                                )}
+                            </TableCell>
                         )}
                         {/* ✔️ No. juga dibuat terpusat */}
                         <TableCell className="text-center">{(currentPage - 1) * rowsPerPage + index + 1}</TableCell>
@@ -521,8 +634,19 @@ export default function DaftarPPL() {
 </Table>
             </div>
             <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-muted-foreground">
-                    Menampilkan <strong>{paginatedData.length}</strong> dari <strong>{filteredAndSortedData.length}</strong> data
+                <div className="flex items-center gap-3">
+                    <div className="text-sm text-muted-foreground">
+                        Menampilkan <strong>{paginatedData.length}</strong> dari <strong>{filteredAndSortedData.length}</strong> data
+                    </div>
+                    {/* Hanya di luar mode pemilihan: saat sedang memilih mitra untuk
+                        sebuah kegiatan, mengunduh daftar bukan yang dicari pengguna
+                        dan tombolnya justru mengalihkan perhatian. */}
+                    {!selectionMode && (
+                        <Button variant="outline" size="sm" onClick={eksporPpl}
+                            disabled={filteredAndSortedData.length === 0}>
+                            Export Excel
+                        </Button>
+                    )}
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -563,7 +687,14 @@ export default function DaftarPPL() {
             onAction={() => { setShowSuccessModal(false); successModalConfig.onAction(); }} 
             title={successModalConfig.title} 
             description={successModalConfig.description} 
-            actionLabel={successModalConfig.actionLabel} 
+            actionLabel={successModalConfig.actionLabel}
+            aksiKedua={{
+                label: "Batal Tambah PPL",
+                // Belum ada yang tersimpan: mitra pilihan baru dikirim ke form
+                // saat pengalihan. Jadi membatalkan cukup menutup dialog, dan
+                // pilihannya sengaja DIPERTAHANKAN supaya bisa disesuaikan.
+                onClick: () => setShowSuccessModal(false),
+            }} 
         />
         <ActivityDetailModal 
             isOpen={isDetailModalOpen}

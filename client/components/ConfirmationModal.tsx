@@ -60,7 +60,7 @@ export default function ConfirmationModal({
 
           {/* Description */}
           {description ? (
-            <DialogDescription className="text-muted-foreground text-center max-w-sm text-sm">
+            <DialogDescription className="text-muted-foreground text-center max-w-sm text-sm whitespace-pre-line">
               {description}
             </DialogDescription>
           ) : (

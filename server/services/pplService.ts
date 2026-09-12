@@ -20,39 +20,60 @@ export const getAllMasterPPL = async (): Promise<PPLMaster[]> => {
  * Fungsi ini mengambil data untuk halaman admin Daftar PPL,
  * dan memecah kegiatan berdasarkan tahap PPL.
  */
-export const getPplAdminData = async (): Promise<PPLAdminData[]> => {
+// Fragmen SQL rentang honor dipakai bersama beberapa layanan; lihat
+// rentangHonorSql.ts untuk aturan dan alasannya.
+import { KONDISI_PERIODE, paramPeriode } from './rentangHonorSql';
+
+/** Rentang tanggal untuk menyaring kegiatan menurut periode honornya. */
+export interface PeriodeFilter {
+    mulai: string;
+    selesai: string;
+}
+
+export const getPplAdminData = async (periode?: PeriodeFilter): Promise<PPLAdminData[]> => {
+    // Penyaringan periode dilakukan DI DALAM tabel turunan, bukan di WHERE
+    // kueri utama. Kalau ditaruh di WHERE, mitra yang tidak punya kegiatan pada
+    // periode itu akan HILANG dari daftar, padahal yang benar adalah tetap
+    // tampil dengan 0 kegiatan — daftar ini adalah daftar mitra, bukan daftar
+    // penugasan.
+    const saringPeriode = periode ? KONDISI_PERIODE : '1';
     const query = `
         SELECT
-            pm.id, 
-            pm.namaPPL, 
+            pm.id,
+            pm.namaPPL,
             pm.posisi,
             pm.kecamatan_id,
             pm.desa_id,
             kec.nama AS namaKecamatan,
             desa.nama AS namaDesa,
-            pm.alamat, 
+            pm.alamat,
             pm.noTelepon,
-            COUNT(p.id) AS totalKegiatan,
-            GROUP_CONCAT(DISTINCT 
-                CONCAT_WS(';;', 
-                    IFNULL(k.namaKegiatan, 'Kegiatan Tidak Ditemukan'), 
-                    p.tahap
+            COUNT(x.id) AS totalKegiatan,
+            GROUP_CONCAT(DISTINCT
+                CONCAT_WS(';;',
+                    IFNULL(x.namaKegiatan, 'Kegiatan Tidak Ditemukan'),
+                    x.tahap
                 )
             SEPARATOR '||') as kegiatanDetails
-        FROM 
+        FROM
             ppl_master pm
-        LEFT JOIN ppl p ON pm.id = p.ppl_master_id
-        LEFT JOIN kegiatan k ON p.kegiatanId = k.id
+        LEFT JOIN (
+            SELECT p.id, p.ppl_master_id, p.tahap, k.namaKegiatan
+              FROM ppl p
+              LEFT JOIN kegiatan k ON p.kegiatanId = k.id
+             WHERE ${saringPeriode}
+        ) x ON x.ppl_master_id = pm.id
         LEFT JOIN kecamatan kec ON pm.kecamatan_id = kec.id
         LEFT JOIN desa ON pm.desa_id = desa.id
-        GROUP BY 
+        GROUP BY
             pm.id, pm.namaPPL, pm.posisi, pm.alamat, pm.noTelepon, pm.kecamatan_id, pm.desa_id
-        ORDER BY 
+        ORDER BY
             pm.namaPPL ASC;
     `;
-    
+
     // Ganti mapping agar sesuai dengan query yang lebih sederhana
-    const [rows] = await db.query<any[]>(query);
+    const [rows] = await db.query<any[]>(
+        query, periode ? paramPeriode(periode.mulai, periode.selesai) : []);
     
     return rows.map(row => ({
         id: row.id,

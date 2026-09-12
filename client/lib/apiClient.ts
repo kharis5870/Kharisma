@@ -50,10 +50,10 @@ async function request(endpoint: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     // 1. Ambil seluruh data JSON dari respons error (termasuk 'details')
-    const errorData = await response.json().catch(() => ({
-      message: `Request Gagal: ${response.status} ${response.statusText}`,
-    }));
-    
+    const errorData = await response.json().catch(() => ({
+      message: `Request Gagal: ${response.status} ${response.statusText}`,
+    }));
+    
     // 2. Buat objek Error standar dengan pesan yang jelas
     const error = new Error(errorData.message || "Terjadi kesalahan pada server.");
 
@@ -63,7 +63,7 @@ async function request(endpoint: string, options: RequestInit = {}) {
     
     // 4. Lempar error yang sudah diperkaya dengan detail
     throw error;
-  }
+  }
 
   if (response.status === 204) {
     return; // Handle respons "No Content"

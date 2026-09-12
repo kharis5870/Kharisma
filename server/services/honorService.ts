@@ -3,10 +3,14 @@
 import { RowDataPacket } from 'mysql2';
 import db from '../db';
 import { PPLHonorData } from '@shared/api';
-import { getSetting } from './settingsService';
 // Jalur relatif, BUKAN '@shared/...': alias itu tidak tersedia saat
 // vite.config.ts memuat kode server lewat Node, dan ini nilai runtime.
 import { bulanDilalui } from '../../shared/pembebananHonor';
+// Fragmen SQL rentang honor dipakai bersama beberapa layanan. Dulu disalin di
+// berkas ini DAN di kontrakService; lihat rentangHonorSql.ts untuk alasannya.
+import {
+    kondisiOverlap, listingRange, pencacahanRange, pengolahanRange,
+} from './rentangHonorSql';
 
 interface HonorRowResult extends RowDataPacket {
     id: string;
@@ -17,34 +21,6 @@ interface HonorRowResult extends RowDataPacket {
     besaranHonor: number;
     bulanPembebanan: string | null;
 }
-
-/**
- * Tanggal mulai/selesai honor untuk sebuah tahap, dengan fallback ke kolom
- * `bulanHonor*` yang lama. Fallback ini menjaga baris yang belum ter-backfill
- * (atau kegiatan lama yang hanya punya bulan) tetap ikut terbaca sebagai
- * rentang tanggal 1 s.d. akhir bulan.
- */
-const rentangHonorSql = (tahap: 'Listing' | 'Pencacahan' | 'Pengolahan') => {
-    const bulanKolom = `k.bulanHonor${tahap}`;
-    const awalBulan = `STR_TO_DATE(CONCAT('01-', ${bulanKolom}), '%d-%m-%Y')`;
-    return {
-        mulai: `COALESCE(k.tanggalMulaiHonor${tahap}, ${awalBulan})`,
-        selesai: `COALESCE(k.tanggalSelesaiHonor${tahap}, LAST_DAY(${awalBulan}))`,
-        bulan: bulanKolom,
-    };
-};
-
-const listingRange = rentangHonorSql('Listing');
-const pencacahanRange = rentangHonorSql('Pencacahan');
-const pengolahanRange = rentangHonorSql('Pengolahan');
-
-/**
- * Sebuah kegiatan ikut terhitung bila rentang honornya BERIRISAN dengan
- * rentang filter, bukan harus termuat seluruhnya. Contoh: honor listing
- * 1-15 Januari tetap muncul saat difilter 10-31 Januari.
- */
-const kondisiOverlap = (r: ReturnType<typeof rentangHonorSql>) =>
-    `(${r.mulai} <= ? AND ${r.selesai} >= ?)`;
 
 /**
  * Rekap honor per mitra untuk sebuah rentang tanggal.
@@ -226,31 +202,4 @@ export const getTotalHonorPPLByMonth = async (
 
     const [rows] = await db.query<RowDataPacket[]>(query, params);
     return Number(rows[0]?.totalHonor) || 0;
-};
-
-// FUNGSI INI TIDAK BERUBAH
-export const validatePplHonor = async (pplMasterId: string, bulan: number, tahun: number, currentActivityHonor: number, kegiatanIdToExclude: number | null) => {
-  const honorLimitString = await getSetting('HONOR_LIMIT', '3000000');
-  const honorLimit = parseInt(honorLimitString, 10);
-  const existingHonor = await getTotalHonorPPLByMonth(pplMasterId, bulan, tahun, kegiatanIdToExclude);
-  const projectedTotal = existingHonor + currentActivityHonor;
-
-  if (projectedTotal > honorLimit) {
-    const error: any = new Error(`Total honor untuk PPL akan menjadi ${projectedTotal}, melebihi batas ${honorLimit}.`);
-    error.statusCode = 409; 
-    error.details = {
-        code: 'HONOR_LIMIT_EXCEEDED',
-        ppl_master_id: pplMasterId,
-        projectedTotal,
-        limit: honorLimit,
-    };
-    throw error;
-  }
-  
-  // Jika tidak ada error, kembalikan status sukses (opsional, karena fungsi ini sekarang fokus pada error)
-  return {
-    isOverLimit: false,
-    limit: honorLimit,
-    projectedTotal: projectedTotal
-  };
 };

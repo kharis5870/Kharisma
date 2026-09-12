@@ -28,6 +28,7 @@ import {
   ubahPenanggungJawabDokumen,
   setArsipKegiatan,
     kirimPengingatDokumen,
+    urungkanPembuatanKegiatan, BATAS_URUNGKAN_MENIT,
 } from '../services/kegiatanService';
 
 const router = Router();
@@ -57,6 +58,7 @@ router.get('/', async (_req, res) => {
     const kegiatan = await getAllKegiatan();
     res.json(kegiatan);
   } catch (error) {
+    console.error('Error fetching kegiatan:', error);
     res.status(500).json({ message: 'Error fetching kegiatan' });
   }
 });
@@ -71,6 +73,7 @@ router.get('/:id', async (req, res) => {
       res.status(404).json({ message: 'Kegiatan not found' });
     }
   } catch (error) {
+    console.error('Error fetching kegiatan details:', error);
     res.status(500).json({ message: 'Error fetching kegiatan details' });
   }
 });
@@ -84,12 +87,15 @@ router.post('/', async (req, res) => {
     // memberi orang itu hak menyuntingnya, karena pembuat adalah salah satu
     // pihak yang berhak.
     kegiatanData.createdBy_userId = req.user!.id;
+    // Sama alasannya dengan PUT: nama pembuat dari token, bukan dari body.
+    kegiatanData.username = req.user!.username;
+    kegiatanData.lastEditedBy = req.user!.username;
     const newKegiatan = await createKegiatan(kegiatanData, bypassHonorLimit);
     res.status(201).json(newKegiatan);
   } catch (error: any) {
     // ✅ PERUBAHAN DI SINI
     // Jika ini adalah error batas honor yang sudah kita tangani...
-    if (error.details?.code === 'HONOR_LIMIT_EXCEEDED') {
+    if (error.details?.code === 'HONOR_LIMIT_EXCEEDED') {
         // ...cukup catat sebagai info biasa, bukan error menakutkan.
         console.log(`INFO: Validasi batas honor terpicu untuk PPL ID ${error.details.ppl_master_id}. Respons 409 dikirim.`);
     } else {
@@ -97,11 +103,11 @@ router.post('/', async (req, res) => {
         console.error("CREATE KEGIATAN ERROR:", error);
     }
 
-    if (error.statusCode) {
-      return res.status(error.statusCode).json({ message: error.message, details: error.details });
-    }
-    res.status(500).json({ message: 'Error creating kegiatan' });
-  }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message, details: error.details });
+    }
+    res.status(500).json({ message: 'Error creating kegiatan' });
+  }
 });
 
 // PUT update (untuk detail kegiatan)
@@ -125,6 +131,13 @@ router.get('/:id/riwayat', async (req, res) => {
 router.put('/:id', wajibPemilikKegiatan(dariParamId), async (req, res) => {
     try {
         const { bypassHonorLimit, ...kegiatanData } = req.body;
+        // Identitas penyunting diambil dari token, BUKAN dari body. Nilai ini
+        // masuk ke kolom `lastEditedBy`, ke riwayat 'kegiatan_disunting', dan
+        // menjadi pengunggah dokumen yang baru diisi — kalau diambil dari body,
+        // siapa pun yang berhak menyunting bisa mencatat perubahannya atas
+        // nama orang lain.
+        kegiatanData.lastEditedBy = req.user!.username;
+        kegiatanData.lastUpdatedBy = req.user!.username;
         const updatedKegiatan = await updateKegiatan(parseInt(req.params.id), kegiatanData, bypassHonorLimit);
         res.json(updatedKegiatan);
     } catch (error: any) {
@@ -159,8 +172,8 @@ router.put('/ppl/:pplId/progress', wajibPmlMitra, async (req, res) => {
             return res.status(400).json({ message: 'Request body tidak lengkap. Harap sertakan progressData.' });
         }
 
-       // Teruskan username sebagai argumen ketiga
-       const updatedPpl = await updatePplProgress(parseInt(pplId), progressData, username);
+       // Teruskan username sebagai argumen ketiga
+       const updatedPpl = await updatePplProgress(parseInt(pplId), progressData, username);
         res.json(updatedPpl);
     } catch (error) {
         console.error("Error updating PPL progress:", error);
@@ -353,6 +366,25 @@ router.put('/:id/arsip', wajibAdmin, async (req, res) => {
 });
 
 // DELETE kegiatan
+/**
+ * Mengurungkan pembuatan kegiatan yang baru saja dibuat. Aturan siapa dan
+ * kapan ada di `urungkanPembuatanKegiatan`; di sini hanya pemetaan statusnya.
+ */
+router.delete('/:id/urungkan', async (req, res) => {
+    try {
+        const hasil = await urungkanPembuatanKegiatan(Number(req.params.id), req.user!.id, req.user!.role);
+        if (hasil === 'tidak-ada') return res.status(404).json({ message: 'Kegiatan tidak ditemukan.' });
+        if (hasil === 'bukan-pembuat') return res.status(403).json({ message: 'Hanya pembuat kegiatan yang boleh membatalkan penyimpanannya.' });
+        if (hasil === 'kedaluwarsa') {
+            return res.status(409).json({ message: `Batas waktu membatalkan (${BATAS_URUNGKAN_MENIT} menit) sudah lewat. Hubungi admin untuk menghapus kegiatan ini.` });
+        }
+        res.status(204).send();
+    } catch (error) {
+        console.error('Error urungkan kegiatan:', error);
+        res.status(500).json({ message: 'Gagal membatalkan penyimpanan kegiatan.' });
+    }
+});
+
 router.delete('/:id', wajibAdmin, async (req, res) => {
     try {
         const success = await deleteKegiatan(parseInt(req.params.id));

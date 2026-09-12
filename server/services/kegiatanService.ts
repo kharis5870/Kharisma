@@ -303,6 +303,13 @@ export const getKegiatanById = async (id: number): Promise<Kegiatan | null> => {
  */
 const tahapAktif = (nilai: unknown): boolean => nilai === undefined || nilai === null || Boolean(nilai);
 
+/** Tahap alokasi -> kunci harga satuannya di `honorariumSettings`. */
+const KUNCI_HARGA_TAHAP = {
+    'listing': 'pengumpulan-data-listing',
+    'pencacahan': 'pengumpulan-data-pencacahan',
+    'pengolahan-analisis': 'pengolahan-analisis',
+} as const;
+
 /**
  * Menghitung pembebanan honor SELURUH alokasi PPL sebuah kegiatan.
  *
@@ -329,13 +336,19 @@ const siapkanPembebanan = async (
         const ppl = daftarPpl[i];
         if (!ppl?.ppl_master_id) continue;
 
-        const totalHonor = ppl.honorarium?.reduce(
-            (jumlah: number, h: any) => jumlah + parseRupiah(h.besaranHonor), 0) || 0;
+        // Yang dibagi ke bulan-bulan adalah MUATAN (unit beban kerja), bukan
+        // rupiah: Surat PK honor lintas bulan dipecah menurut muatannya, dan
+        // rupiah tiap bulan mengikuti — volume x harga satuan tahap ini.
+        const volume = ppl.honorarium?.reduce(
+            (jumlah: number, h: any) => jumlah + parseRupiah(h.bebanKerja), 0) || 0;
+        const kunciHarga = KUNCI_HARGA_TAHAP[ppl.tahap as keyof typeof KUNCI_HARGA_TAHAP];
+        const hargaSatuan = kunciHarga ? parseRupiah(data.honorariumSettings?.[kunciHarga]?.hargaSatuan) : 0;
 
         const alokasi: AlokasiUntukPembebanan = {
             ppl_master_id: ppl.ppl_master_id,
             tahap: ppl.tahap,
-            totalHonor,
+            volume,
+            hargaSatuan,
             metode: (ppl.metodePembebanan as MetodePembebanan) || 'bulan_tertentu',
             bulanDipilih: ppl.bulanPembebananDipilih ?? null,
         };
@@ -1323,6 +1336,40 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
 // =================================================================
 // END OF MODIFICATION: updatePplProgress function
 // =================================================================
+
+/** Berapa lama setelah dibuat, sebuah kegiatan masih boleh diurungkan pembuatnya. */
+export const BATAS_URUNGKAN_MENIT = 15;
+
+export type HasilUrungkan = 'ok' | 'tidak-ada' | 'bukan-pembuat' | 'kedaluwarsa';
+
+/**
+ * Mengurungkan pembuatan kegiatan yang BARU SAJA dibuat — tombol "Batal Simpan
+ * Kegiatan" di modal sukses Input Kegiatan.
+ *
+ * Penghapusan kegiatan biasa khusus admin. Pintu ini sengaja sempit supaya
+ * tidak menjadi jalan belakang: hanya PEMBUATNYA (atau admin), dan hanya dalam
+ * `BATAS_URUNGKAN_MENIT` sejak dibuat. Waktu pembuatan diambil dari riwayat
+ * 'kegiatan_dibuat' karena tabel kegiatan tidak punya kolom createdAt.
+ */
+export const urungkanPembuatanKegiatan = async (
+    id: number,
+    userId: string,
+    role: string,
+): Promise<HasilUrungkan> => {
+    const [rows] = await db.query<RowDataPacket[]>(
+        `SELECT k.createdBy_userId,
+                (SELECT TIMESTAMPDIFF(SECOND, MAX(r.terjadiPada), NOW())
+                   FROM riwayat_kegiatan r
+                  WHERE r.kegiatanId = k.id AND r.aksi = 'kegiatan_dibuat') AS umurDetik
+           FROM kegiatan k WHERE k.id = ?`,
+        [id]);
+    const k = rows[0];
+    if (!k) return 'tidak-ada';
+    if (role !== 'admin' && k.createdBy_userId !== userId) return 'bukan-pembuat';
+    if (k.umurDetik === null || Number(k.umurDetik) > BATAS_URUNGKAN_MENIT * 60) return 'kedaluwarsa';
+    await deleteKegiatan(id);
+    return 'ok';
+};
 
 export const deleteKegiatan = async (id: number): Promise<boolean> => {
     const [result] = await db.execute<OkPacket>('DELETE FROM kegiatan WHERE id = ?', [id]);

@@ -8,19 +8,17 @@ const router = express.Router();
 const ROLE_SAH = ['admin', 'supervisor', 'user'] as const;
 
 /**
- * GET /api/notifikasi?userId=<id>&role=<role>
+ * GET /api/notifikasi
  *
- * BATASAN KEAMANAN, dinyatakan terbuka: `userId` dan `role` datang sebagai
- * query parameter dari klien, jadi siapa pun bisa memanggil dengan
- * `role=admin` dan membaca seluruh dokumen tertunda beserta tautannya.
+ * Mengembalikan notifikasi milik pengguna yang sedang login. Identitas dan
+ * perannya diambil dari token sesi (`req.user`, diisi middleware `wajibLogin`),
+ * bukan dari URL.
  *
- * Ini konsisten dengan sisa aplikasi — `apiClient` tidak pernah mengirim
- * header Authorization, dan setiap route yang mengubah data sudah memercayai
- * `username` dari body — jadi endpoint ini tidak MENURUNKAN standar yang ada.
- * Tapi ini IDOR sungguhan. Perbaikannya satu hal, bukan banyak: terbitkan
- * token saat login, pasang di apiClient.request, lalu satu middleware Express
- * yang mengisi req.user. Seluruh route yang sekarang memercayai body langsung
- * ikut benar. Layak dijadwalkan sebagai pekerjaan tersendiri.
+ * Dulu `userId` dan `role` dikirim sebagai query parameter dan dipercaya begitu
+ * saja, sehingga siapa pun bisa membaca notifikasi pengguna lain — termasuk
+ * memakai `role=admin` untuk melihat seluruh dokumen tertunda beserta
+ * tautannya. Sejak autentikasi token diterapkan, parameter itu tidak lagi
+ * dibaca sama sekali.
  */
 router.get('/', async (req, res) => {
   // Identitas diambil dari token, BUKAN dari query. Sebelumnya `userId` dan

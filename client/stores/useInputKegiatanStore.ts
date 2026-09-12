@@ -119,6 +119,8 @@ export type Actions = {
   removePPL: (id: string) => void;
   updatePPL: (id: string, field: keyof PPLItem, value: any) => void;
   updatePPLBebanKerja: (pplId: string, jenisPekerjaan: HonorariumDetail['jenis_pekerjaan'], bebanKerja: string) => void;
+  /** Catatan tahap; isinya disimpan di kolom `nama`, sama seperti di Edit Kegiatan. */
+  addCatatan: (tipe: Dokumen['tipe']) => void;
   addDocumentLink: (tipe: Dokumen['tipe']) => void;
   updateDocument: (id: string, field: 'nama' | 'link', value: string) => void;
   removeDocument: (id: string) => void;
@@ -310,6 +312,17 @@ const useInputKegiatanStore = create<State & Actions>()(
           }
       })),
       
+      addCatatan: (tipe) => set(produce((state: State) => {
+        state.documents.push({
+          id: `catatan-${Date.now()}`,
+          nama: '',
+          link: '',
+          jenis: 'catatan',
+          tipe,
+          isWajib: false,
+        } as DocumentItem);
+      })),
+
       addDocumentLink: (tipe) => set(produce((state: State) => {
         const newDoc: DocumentItem = {
             id: `custom-${Date.now()}`,
@@ -355,8 +368,9 @@ const useInputKegiatanStore = create<State & Actions>()(
         state.adaListing = Boolean(kegiatan.adaListing);
         // `?? true`: kegiatan lama (dan respons yang di-cache sebelum kolomnya
         // ada) tidak memuat kunci ini, dan semuanya memang punya kedua tahap.
-        state.adaPengolahan = kegiatan.adaPengolahan ?? true;
-        state.adaDiseminasi = kegiatan.adaDiseminasi ?? true;
+        // Boolean(): database mengirim 0/1, dan angka 0 tercetak sebagai "0" di JSX.
+        state.adaPengolahan = Boolean(kegiatan.adaPengolahan ?? true);
+        state.adaDiseminasi = Boolean(kegiatan.adaDiseminasi ?? true);
         state.isFasih = Boolean(kegiatan.isFasih);
 
         const sumber = kegiatan.honorariumSettings;

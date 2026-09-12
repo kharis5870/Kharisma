@@ -23,6 +23,7 @@ import DaftarPML from './pages/DaftarPML';
 import RekapPenilaian from "./pages/RekapPenilaian";
 import TemplateSurat from "./pages/TemplateSurat";
 import GenerateKontrak from "./pages/GenerateKontrak";
+import RiwayatSurat from "./pages/RiwayatSurat";
 import EditProfil from "./pages/EditProfil";
 
 const queryClient = new QueryClient();
@@ -82,6 +83,7 @@ const App = () => {
                 <Route path="/daftar-pml" element={<ProtectedRoute><DaftarPML /></ProtectedRoute>} />
                 <Route path="/template-surat" element={<ProtectedRoute><TemplateSurat /></ProtectedRoute>} />
                 <Route path="/generate-kontrak" element={<ProtectedRoute><GenerateKontrak /></ProtectedRoute>} />
+                <Route path="/riwayat-surat" element={<ProtectedRoute><RiwayatSurat /></ProtectedRoute>} />
                 <Route path="/profil" element={<ProtectedRoute><EditProfil /></ProtectedRoute>} />
 
                 <Route path="*" element={<NotFound />} />

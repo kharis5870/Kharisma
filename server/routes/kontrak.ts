@@ -12,6 +12,13 @@ import {
     pesanNomorBast,
     getMaksNomorUrut,
     aturUlangNomorPeriode,
+    getRiwayatSurat,
+    ubahNomorSurat,
+    batalkanSurat,
+    ubahCatatanSurat,
+    hapusSuratBatal,
+    rapikanNomorTahun,
+    perbaruiIsiSurat,
 } from '../services/kontrakService';
 // Jalur relatif, BUKAN @shared — lihat catatan di kontrakService.ts.
 import { penandaTidakDikenal, polaTanpaNomor } from '../../shared/nomorSurat';
@@ -252,6 +259,169 @@ router.post('/nomor/atur-ulang', wajibKeuangan, aturUlangLimiter, async (req, re
     } catch (error: any) {
         console.error('Error atur ulang nomor:', error);
         res.status(500).json({ message: error.message || 'Gagal mengatur ulang nomor surat.' });
+    }
+});
+
+// =====================================================================
+// Riwayat Penyuratan
+//
+// Semuanya `wajibKeuangan`: yang boleh menyentuh nomor surat hanyalah tim
+// keuangan (role supervisor) dan admin. Identitas pelaku selalu diambil dari
+// token, tidak pernah dari badan permintaan.
+// =====================================================================
+
+/** Membaca dan memvalidasi parameter tahun. */
+const bacaTahun = (nilai: unknown): number | null => {
+    const tahun = Number(nilai);
+    return Number.isInteger(tahun) && tahun >= 2000 && tahun <= 2999 ? tahun : null;
+};
+
+/** Membaca id surat dari path. */
+const bacaIdSurat = (nilai: string): number | null => {
+    const id = Number(nilai);
+    return Number.isInteger(id) && id > 0 ? id : null;
+};
+
+// GET seluruh surat satu tahun, surat batal ikut, beserta nomor yang kosong.
+router.get('/riwayat', wajibKeuangan, async (req, res) => {
+    try {
+        const tahun = bacaTahun(req.query.tahun);
+        if (tahun === null) return res.status(400).json({ message: 'Parameter tahun tidak valid.' });
+        res.json(await getRiwayatSurat(tahun));
+    } catch (error: any) {
+        console.error('Error fetching riwayat surat:', error);
+        res.status(500).json({ message: error.message || 'Gagal memuat riwayat surat.' });
+    }
+});
+
+/**
+ * PUT ganti nomor urut sebuah surat.
+ *
+ * PUT, bukan PATCH, karena apiClient di klien hanya punya get/post/put/delete.
+ */
+router.put('/surat/:id/nomor', wajibKeuangan, async (req, res) => {
+    try {
+        const id = bacaIdSurat(req.params.id);
+        const nomor = Number(req.body?.nomor);
+        if (id === null) return res.status(400).json({ message: 'Id surat tidak valid.' });
+        if (!Number.isInteger(nomor) || nomor < 1 || nomor > 9999) {
+            return res.status(400).json({ message: 'Nomor surat harus bilangan bulat 1 sampai 9999.' });
+        }
+        const hasil = await ubahNomorSurat(id, nomor, req.user!.username);
+        if (!hasil.ok && hasil.alasan === 'tidak-ada') {
+            return res.status(404).json({ message: 'Surat tidak ditemukan.' });
+        }
+        if (!hasil.ok) {
+            return res.status(409).json({ message: `Nomor ${nomor} sudah dipakai surat lain yang masih berlaku pada tahun ini.` });
+        }
+        res.json(hasil);
+    } catch (error: any) {
+        console.error('Error ubah nomor surat:', error);
+        res.status(500).json({ message: error.message || 'Gagal mengubah nomor surat.' });
+    }
+});
+
+// POST batalkan sebuah surat. Nomornya tetap tercatat di riwayat.
+router.post('/surat/:id/batal', wajibKeuangan, async (req, res) => {
+    try {
+        const id = bacaIdSurat(req.params.id);
+        if (id === null) return res.status(400).json({ message: 'Id surat tidak valid.' });
+        const catatan = typeof req.body?.catatan === 'string' ? req.body.catatan.trim() : '';
+        if (catatan.length === 0) {
+            return res.status(400).json({ message: 'Catatan alasan pembatalan wajib diisi, supaya riwayatnya bisa dibaca orang lain.' });
+        }
+        const berhasil = await batalkanSurat(id, catatan, req.user!.username);
+        if (!berhasil) {
+            return res.status(404).json({ message: 'Surat tidak ditemukan atau memang sudah batal.' });
+        }
+        res.json({ ok: true });
+    } catch (error: any) {
+        console.error('Error batalkan surat:', error);
+        res.status(500).json({ message: error.message || 'Gagal membatalkan surat.' });
+    }
+});
+
+// PUT sunting catatan sebuah surat.
+router.put('/surat/:id/catatan', wajibKeuangan, async (req, res) => {
+    try {
+        const id = bacaIdSurat(req.params.id);
+        if (id === null) return res.status(400).json({ message: 'Id surat tidak valid.' });
+        const catatan = typeof req.body?.catatan === 'string' ? req.body.catatan.trim() : '';
+        const berhasil = await ubahCatatanSurat(id, catatan);
+        if (!berhasil) return res.status(404).json({ message: 'Surat tidak ditemukan.' });
+        res.json({ ok: true });
+    } catch (error: any) {
+        console.error('Error ubah catatan surat:', error);
+        res.status(500).json({ message: error.message || 'Gagal menyimpan catatan.' });
+    }
+});
+
+/**
+ * DELETE hapus permanen sebuah surat yang SUDAH batal.
+ *
+ * Surat yang masih berlaku tidak bisa dihapus lewat sini: batalkan dulu. Dengan
+ * begitu tidak ada nomor berlaku yang lenyap dalam satu langkah.
+ */
+router.delete('/surat/:id', wajibKeuangan, aturUlangLimiter, async (req, res) => {
+    try {
+        const id = bacaIdSurat(req.params.id);
+        if (id === null) return res.status(400).json({ message: 'Id surat tidak valid.' });
+        const berhasil = await hapusSuratBatal(id, req.user!.username);
+        if (!berhasil) {
+            return res.status(409).json({ message: 'Hanya surat yang sudah dibatalkan yang bisa dihapus. Batalkan suratnya lebih dulu.' });
+        }
+        res.status(204).send();
+    } catch (error: any) {
+        console.error('Error hapus surat batal:', error);
+        res.status(500).json({ message: error.message || 'Gagal menghapus surat.' });
+    }
+});
+
+/**
+ * POST rapikan nomor surat satu tahun.
+ *
+ * `pratinjau: true` hanya mengembalikan rencananya tanpa mengubah apa pun,
+ * supaya layar bisa memperlihatkan pergeserannya sebelum disetujui. Penerapan
+ * sungguhan menuntut frasa konfirmasi yang sama dengan atur ulang nomor.
+ */
+router.post('/nomor/rapikan', wajibKeuangan, aturUlangLimiter, async (req, res) => {
+    try {
+        const tahun = bacaTahun(req.body?.tahun);
+        if (tahun === null) return res.status(400).json({ message: 'Parameter tahun tidak valid.' });
+        const pratinjau = req.body?.pratinjau === true;
+        if (!pratinjau && !konfirmasiAturUlangSah(req.body?.konfirmasi)) {
+            return res.status(400).json({ message: 'Konfirmasi tidak sesuai. Ketik frasa konfirmasi dengan benar.' });
+        }
+        res.json(await rapikanNomorTahun(tahun, pratinjau, req.user!.username));
+    } catch (error: any) {
+        console.error('Error rapikan nomor surat:', error);
+        res.status(500).json({ message: error.message || 'Gagal merapikan nomor surat.' });
+    }
+});
+
+/**
+ * POST perbarui isi surat mengikuti data sekarang, nomornya tetap.
+ *
+ * Jawaban atas peringatan "isi surat berubah sejak digenerate". Tidak memakai
+ * frasa konfirmasi: tindakan ini menyelaraskan surat dengan kenyataan, bukan
+ * menghanguskan nomor, jadi cukup dikonfirmasi di layar.
+ */
+router.post('/surat/:id/perbarui', wajibKeuangan, async (req, res) => {
+    try {
+        const id = bacaIdSurat(req.params.id);
+        if (id === null) return res.status(400).json({ message: 'Id surat tidak valid.' });
+        const hasil = await perbaruiIsiSurat(id, req.user!.username);
+        if (hasil === 'tidak-ada') return res.status(404).json({ message: 'Surat tidak ditemukan.' });
+        if (hasil === 'tidak-aktif') {
+            return res.status(409).json({ message: 'Surat yang sudah dibatalkan tidak bisa diperbarui.' });
+        }
+        if (hasil === 'tanpa-data') {
+            return res.status(409).json({ message: 'Mitra ini sudah tidak punya honor pada periode surat tersebut. Batalkan suratnya, jangan diperbarui.' });
+        }
+        res.json({ ok: true });
+    } catch (error: any) {
+        console.error('Error perbarui isi surat:', error);
+        res.status(500).json({ message: error.message || 'Gagal memperbarui isi surat.' });
     }
 });
 

@@ -38,14 +38,13 @@ interface Props {
   dataMitra: DataKontrakMitra[];
   memuatMitra: boolean;
   bolehMengubah: boolean;
-  username?: string;
   onPindahKeTabSpk: () => void;
   onSukses: (pesan: string) => void;
   onGagal: (judul: string, pesan: string) => void;
 }
 
 export default function TabBast({
-  rentang, template, dataMitra, memuatMitra, bolehMengubah, username,
+  rentang, template, dataMitra, memuatMitra, bolehMengubah,
   onPindahKeTabSpk, onSukses, onGagal,
 }: Props) {
   const queryClient = useQueryClient();
@@ -70,7 +69,6 @@ export default function TabBast({
       periodeMulai: rentang.mulai,
       periodeSelesai: rentang.selesai,
       tanggalBast,
-      username,
       daftarPplMasterId: daftar.map(m => m.pplMasterId),
     });
     queryClient.invalidateQueries({ queryKey: ["kontrakData"] });

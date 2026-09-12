@@ -5,6 +5,7 @@ import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import PilihPembebananHonor from "@/components/PilihPembebananHonor";
+import { periksaKelengkapanAlokasi, teksPeringatan, type KelompokPeringatan, type TahapAlokasi } from "@/lib/kelengkapanAlokasi";
 import { dokumenWajibTahap } from "@/lib/dokumenWajib";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/apiClient";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { bulanDalamRentang, bulanPembebananSetelahUbah, rentangHonorBawaan, FORMAT_TANGGAL, keTeksTanggal, keTanggal, pembebananBelumLengkap } from "@/lib/honorPeriode";
+import { bulanDalamRentang, bulanPembebananSetelahUbah, rentangHonorBawaan, FORMAT_TANGGAL, keTeksTanggal, keTanggal, pembebananBelumLengkap, labelRentang } from "@/lib/honorPeriode";
 import type { TahapHonor } from "@/stores/useInputKegiatanStore";
 
 type TahapDokumen = 'persiapan' | 'pengumpulan-data' | 'pengolahan-analisis' | 'diseminasi-evaluasi';
@@ -78,7 +79,7 @@ type DateFieldName =
 
 // Dipakai bersama dari @/lib/angka (dulu salinan identik dari InputKegiatan.tsx).
 import { hitungBesaranHonor, hitungTotalHonorPPL } from "@/lib/honorPPL";
-import { formatHonor, parseHonor, sanitizeJumlah } from "@/lib/angka";
+import { formatHonor, parseHonor, sanitizeJumlah, parseHonorNumber } from "@/lib/angka";
 
 /** Nilai tahap dokumen yang sah, untuk memvalidasi parameter URL dari notifikasi. */
 const TAHAP_DOKUMEN_SAH: TahapDokumen[] = ['persiapan', 'pengumpulan-data', 'pengolahan-analisis', 'diseminasi-evaluasi'];
@@ -333,10 +334,11 @@ const PPLAllocationItem = React.memo(({ ppl, index, onRemove, onUpdate, pplList,
  * mudah dikira sudah menyimpan. Kotak isiannya kini selalu aktif, dan isinya
  * disetor ke `formData` saat kotaknya ditinggalkan (blur).
  *
- * Kenapa blur, bukan setiap ketikan: `EditActivity` masih mendefinisikan
- * beberapa komponen di dalam badannya, jadi setiap perubahan `formData`
- * memasang ulang subpohon itu. Menyetor per ketikan berarti memasang ulang
- * seluruh daftar alokasi PPL pada tiap huruf yang diketik.
+ * Kenapa blur, bukan setiap ketikan: link diperiksa (dan dinormalkan) saat
+ * disetor, dan memunculkan "link tidak valid" di setiap huruf yang baru
+ * setengah diketik hanya mengganggu. Alasan lamanya — komponen yang dipasang
+ * ulang setiap `formData` berubah — sudah tidak berlaku sejak `DokumenContent`
+ * dan `AlokasiPPLContent` berdiri di tingkat modul.
  */
 const DokumenItem = React.memo(({ doc, removeDocument, onDocumentSaved, onNoteClick, disorot }: any) => {
     const { isWajib, status, nama, link, clientId, jenis } = doc;
@@ -638,6 +640,228 @@ const DokumenContent = ({ tipe, title, dokumen, setFormData, kegiatanId, onNoteC
 };
 
 
+/** Semua yang dibutuhkan `AlokasiPPLContent` dari `EditActivity`, dioper eksplisit. */
+interface AlokasiPPLContentProps {
+    tahap: PPL['tahap'];
+    title: string;
+    formData: Partial<FormState>;
+    setFormData: React.Dispatch<React.SetStateAction<Partial<FormState>>>;
+    kegiatanId: string | undefined;
+    showClearConfirmModal: { isOpen: boolean; tahap: PPL['tahap'] | null };
+    setShowClearConfirmModal: React.Dispatch<React.SetStateAction<{ isOpen: boolean; tahap: PPL['tahap'] | null }>>;
+    setAlertModal: React.Dispatch<React.SetStateAction<{ isOpen: boolean; title: string; message: string }>>;
+    addPPL: (tahap: PPL['tahap'], pplsToAdd?: PPLMaster[]) => void;
+    mintaHapusPPL: (clientId: string) => void;
+    updatePPL: (clientId: string, field: keyof ClientPPL, value: any) => void;
+    pplList: PPLMaster[];
+    pmlList: UserData[];
+}
+
+/**
+ * Isi satu tab Alokasi PPL: pengaturan honorarium lalu daftar alokasinya.
+ *
+ * DIDEFINISIKAN DI TINGKAT MODUL, bukan di dalam `EditActivity`. Saat masih di
+ * dalam, React melihat tipe komponen BARU pada setiap render EditActivity dan
+ * memasang ulang seluruh tab setiap kali `formData` berubah — state lokalnya
+ * (isian harga satuan yang sedang diketik) dan semua kartu alokasi di bawahnya
+ * ikut dibongkar. Kelas bug yang sama dengan tombol "Selesai" di tab Dokumen.
+ */
+const AlokasiPPLContent = ({
+    tahap, title, formData, setFormData, kegiatanId,
+    showClearConfirmModal, setShowClearConfirmModal, setAlertModal,
+    addPPL, mintaHapusPPL, updatePPL, pplList, pmlList,
+}: AlokasiPPLContentProps) => {
+    const pplForStage = useMemo(() => formData.ppl?.filter(p => p.tahap === tahap) || [], [formData.ppl, tahap]);
+    
+    // Nama kolom honor memakai akhiran "Pengolahan", sedangkan tahap PPL
+    // bernama "pengolahan-analisis".
+    const tahapHonor: TahapHonor =
+        tahap === 'listing' ? 'Listing' : tahap === 'pencacahan' ? 'Pencacahan' : 'Pengolahan';
+
+    const rentangHonor = {
+        mulai: formData[`tanggalMulaiHonor${tahapHonor}`],
+        selesai: formData[`tanggalSelesaiHonor${tahapHonor}`],
+    };
+
+    /**
+     * Rentang honor sengaja bisa berbeda dari jadwal pendataan, tapi yang
+     * sering terjadi adalah salah pilih tanggal. Bedanya diberi tanda kuning
+     * — sekadar pengingat untuk memeriksa, bukan larangan.
+     */
+    const mulaiPendataan = keTeksTanggal(formData.tanggalMulaiPengumpulanData);
+    const selesaiPendataan = keTeksTanggal(formData.tanggalSelesaiPengumpulanData);
+    const bedaDenganPendataan = Boolean(
+        rentangHonor.mulai && rentangHonor.selesai && mulaiPendataan && selesaiPendataan
+        && (rentangHonor.mulai !== mulaiPendataan || rentangHonor.selesai !== selesaiPendataan));
+
+    const opsiBulanPembebanan = useMemo(
+        () => bulanDalamRentang(rentangHonor.mulai, rentangHonor.selesai),
+        [rentangHonor.mulai, rentangHonor.selesai],
+    );
+
+    // Rentang dan bulan pembebanan diubah bersama supaya bulan yang
+    // dibebani selalu benar-benar tersentuh oleh rentangnya.
+    const handleRentangChange = ({ mulai, selesai }: { mulai?: string; selesai?: string }) => {
+        setFormData(prev => ({
+            ...prev,
+            [`tanggalMulaiHonor${tahapHonor}`]: mulai,
+            [`tanggalSelesaiHonor${tahapHonor}`]: selesai,
+            [`bulanHonor${tahapHonor}`]: bulanPembebananSetelahUbah(mulai, selesai, prev[`bulanHonor${tahapHonor}`]),
+        }));
+    };
+
+    /**
+     * Pengaturan honor dibaca LANGSUNG dari `formData`, tanpa salinan lokal.
+     *
+     * Dulu ada salinan lokal yang baru disetor ke `formData` saat kotaknya
+     * ditinggalkan (blur), karena komponen ini masih didefinisikan di dalam
+     * `EditActivity` dan dipasang ulang setiap `formData` berubah — menyetor per
+     * ketikan akan membuat kotaknya kehilangan fokus di setiap huruf. Sejak
+     * komponen ini berdiri di tingkat modul, alasan itu hilang: harga satuan
+     * kini masuk ke form setiap diketik, dan total honor tiap mitra di bawahnya
+     * ikut berubah seketika.
+     *
+     * Bonus: "Batalkan Perubahan" tidak lagi perlu efek penyelaras — tidak ada
+     * salinan yang bisa tertinggal dari isi form.
+     */
+    const pengaturanHonor: HonorariumSettings = formData.honorariumSettings || {
+        'pengumpulan-data-listing': { satuanBebanKerja: '', hargaSatuan: '' },
+        'pengumpulan-data-pencacahan': { satuanBebanKerja: '', hargaSatuan: '' },
+        'pengolahan-analisis': { satuanBebanKerja: '', hargaSatuan: '' },
+    };
+
+    const getHonorSettingsKey = (): keyof HonorariumSettings | null => {
+        if (tahap === 'listing') return 'pengumpulan-data-listing';
+        if (tahap === 'pencacahan') return 'pengumpulan-data-pencacahan';
+        if (tahap === 'pengolahan-analisis') return 'pengolahan-analisis';
+        return null;
+    }
+    const honorSettingKey = getHonorSettingsKey();
+
+    const handleSettingChange = (field: 'satuanBebanKerja' | 'hargaSatuan', value: string) => {
+        if (!honorSettingKey) return;
+        setFormData(prev => {
+            const sekarang = prev.honorariumSettings || pengaturanHonor;
+            return {
+                ...prev,
+                honorariumSettings: {
+                    ...sekarang,
+                    [honorSettingKey]: { ...sekarang[honorSettingKey], [field]: value },
+                },
+            };
+        });
+    };
+
+    const handleClearPPLs = () => {
+        setFormData(prev => ({ ...prev, ppl: prev.ppl?.filter(p => p.tahap !== tahap)}));
+        setShowClearConfirmModal({isOpen: false, tahap: null});
+    }
+    
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Alokasi PPL & PML ({title})</CardTitle>
+                        <CardDescription>Atur honorarium, bulan pembayaran, lalu alokasikan PPL.</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {pplForStage.length > 0 && (
+                            <Button type="button" variant="destructive" size="sm" onClick={() => setShowClearConfirmModal({isOpen: true, tahap})}>
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Clear PPL
+                            </Button>
+                        )}
+                        <Button variant="outline" size="sm" asChild>
+                            <Link to="/daftar-ppl" state={{ from: 'daftar-ppl', kegiatanId, tahap: tahap, existingPplIds: pplForStage.map(p => p.ppl_master_id).filter(Boolean) }}><Users className="w-4 h-4 mr-2" />Pilih dari Daftar PPL</Link>
+                        </Button>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/40 space-y-4">
+                    <h4 className="font-medium text-foreground">Pengaturan Honorarium & Pembayaran</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label>Satuan Beban Kerja</Label>
+                            <Input value={honorSettingKey ? pengaturanHonor[honorSettingKey].satuanBebanKerja : ''} onChange={e => handleSettingChange('satuanBebanKerja', e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Harga per Satuan (Rp)</Label>
+                            <Input value={honorSettingKey ? formatHonor(pengaturanHonor[honorSettingKey].hargaSatuan) : ''} onChange={e => handleSettingChange('hargaSatuan', e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Rentang Tanggal Honor *</Label>
+                            <DateRangePicker
+                                value={rentangHonor}
+                                onChange={handleRentangChange}
+                                defaultMonth={formData.tanggalMulaiPersiapan}
+                                placeholder="Pilih rentang..."
+                            />
+                            {bedaDenganPendataan && (
+                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                    Berbeda dengan jadwal pendataan ({labelRentang(mulaiPendataan, selesaiPendataan)}).
+                                    Pastikan ini disengaja, bukan salah pilih tanggal.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {opsiBulanPembebanan.length > 1 && (
+                        <p className="text-sm text-muted-foreground">
+                            Rentang honor melintasi {opsiBulanPembebanan.length} bulan. Pilihan bulannya
+                            ada di tiap kartu alokasi PPL di bawah &mdash; batas honor dihitung per mitra
+                            per bulan, jadi tiap mitra bisa berbeda.
+                        </p>
+                    )}
+
+                    {opsiBulanPembebanan.length === 1 && (
+                        <div className="text-sm text-muted-foreground">
+                            Dibebankan pada bulan{' '}
+                            <Badge variant="outline" className="font-medium">{opsiBulanPembebanan[0].label}</Badge>
+                        </div>
+                    )}
+                </div>
+                <div className="space-y-4">
+                    {pplForStage.map((ppl, index) => {
+                        const existingPplIdsForCurrentStage = pplForStage
+                            .map(p => p.ppl_master_id)
+                            .filter(id => id && id !== ppl.ppl_master_id) as string[];
+
+                        return (
+                            <PPLAllocationItem 
+                                key={ppl.clientId}
+                                tahap={tahap}
+                                opsiBulan={opsiBulanPembebanan}
+                                ppl={ppl}
+                                index={index}
+                                onRemove={mintaHapusPPL}
+                                onUpdate={updatePPL}
+                                setAlertModal={setAlertModal}
+                                pplList={pplList}
+                                pmlList={pmlList}
+                                honorariumSettings={formData.honorariumSettings!}
+                                existingPplIds={existingPplIdsForCurrentStage}
+                            />
+                        )
+                    })}
+                    <Button type="button" variant="outline" onClick={() => addPPL(tahap)} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL Manual</Button>
+                </div>
+                <ConfirmationModal
+                    isOpen={showClearConfirmModal.isOpen && showClearConfirmModal.tahap === tahap}
+                    onClose={() => setShowClearConfirmModal({isOpen: false, tahap: null})}
+                    onConfirm={handleClearPPLs}
+                    title="Hapus Semua PPL?"
+                    description={`Anda akan menghapus semua (${pplForStage.length}) alokasi PPL di tahap ini. Aksi ini tidak dapat dibatalkan.`}
+                    confirmLabel="Ya, Hapus Semua"
+                    variant="danger"
+                />
+            </CardContent>
+        </Card>
+    );
+};
+
+
 // --- Main Component ---
 export default function EditActivity() {
     const { id } = useParams<{ id: string }>();
@@ -805,6 +1029,8 @@ export default function EditActivity() {
     const [konfirmasiHapusPPL, setKonfirmasiHapusPPL] = useState<string | null>(null);
     /** Tahap yang menunggu konfirmasi untuk dimatikan; null = tidak ada. */
     const [konfirmasiMatikanTahap, setKonfirmasiMatikanTahap] = useState<TahapDokumen | null>(null);
+    /** Peringatan kelengkapan yang menunggu konfirmasi "Tetap Simpan". */
+    const [peringatanKelengkapan, setPeringatanKelengkapan] = useState<{ daftar: KelompokPeringatan[]; bypassHonorLimit: boolean } | null>(null);
     const [honorWarningDetails, setHonorWarningDetails] = useState<{ pplName: string; totalHonor: number; limit: number } | null>(null);
 
     /**
@@ -1065,7 +1291,7 @@ export default function EditActivity() {
         return null;
     };
 
-    const handleFormSubmit = (bypassHonorLimit = false) => {
+    const handleFormSubmit = (bypassHonorLimit = false, lewatiKelengkapan = false) => {
         if (!formData.id) return alert("Error: ID Kegiatan tidak ditemukan.");
     
         // Ketua tim wajib dan harus masih ada. Lewat alert, bukan tombol yang
@@ -1198,11 +1424,40 @@ export default function EditActivity() {
                 })),
             })),
             id: formData.id,
-            lastEditedBy: user?.username,
-            lastUpdatedBy: user?.username,
+            // Penyunting TIDAK dikirim: server mengambilnya dari token sesi.
             bulanPembayaranHonor: undefined,
             bypassHonorLimit: bypassHonorLimit
         };
+
+        // Peringatan, bukan larangan: beban kerja 0, mitra tanpa PML, atau
+        // pengaturan honor yang kosong hampir selalu berarti lupa, tapi
+        // kegiatan memang boleh disimpan setengah jadi. Lihat kelengkapanAlokasi.ts.
+        if (!lewatiKelengkapan) {
+            const kunciHonor = { 'listing': ['pengumpulan-data-listing', 'Listing'], 'pencacahan': ['pengumpulan-data-pencacahan', 'Pencacahan'], 'pengolahan-analisis': ['pengolahan-analisis', 'Pengolahan'] } as const;
+            const peringatan = periksaKelengkapanAlokasi(
+                (formData.ppl || []).map(p => ({
+                    tahap: p.tahap as TahapAlokasi,
+                    nama: p.namaPPL,
+                    adaMitra: !!p.ppl_master_id,
+                    bebanKerja: parseHonorNumber(p.honorarium?.[0]?.bebanKerja ?? 0),
+                    adaPml: !!p.pml_id,
+                })),
+                (Object.keys(kunciHonor) as TahapAlokasi[]).map(t => {
+                    const [kunci, kolom] = kunciHonor[t];
+                    const atur = formData.honorariumSettings?.[kunci];
+                    return {
+                        tahap: t,
+                        satuanBebanKerja: atur?.satuanBebanKerja,
+                        hargaSatuan: parseHonorNumber(atur?.hargaSatuan ?? 0),
+                        adaRentang: Boolean(formData[`tanggalMulaiHonor${kolom}`] && formData[`tanggalSelesaiHonor${kolom}`]),
+                    };
+                }),
+            );
+            if (peringatan.length > 0) {
+                setPeringatanKelengkapan({ daftar: peringatan, bypassHonorLimit });
+                return;
+            }
+        }
 
         mutation.mutate(dataToSubmit as Partial<FormState> & {id: number});
     };
@@ -1245,8 +1500,11 @@ export default function EditActivity() {
      * tahap. Menganggapnya false akan membuat seluruh kegiatan lama tiba-tiba
      * kehilangan jadwal dan dokumennya begitu halaman ini dibuka.
      */
-    const pengolahanAktif = formData.adaPengolahan ?? true;
-    const diseminasiAktif = formData.adaDiseminasi ?? true;
+    // Boolean(), bukan nilai mentahnya: kolom ini datang dari database sebagai
+    // angka 0/1, dan di JSX `{0 && <Tab/>}` MENCETAK "0" alih-alih tidak
+    // menampilkan apa-apa — itulah angka "00" yang muncul di tab dokumen.
+    const pengolahanAktif = Boolean(formData.adaPengolahan ?? true);
+    const diseminasiAktif = Boolean(formData.adaDiseminasi ?? true);
     const jumlahTahapDokumen = 2 + (pengolahanAktif ? 1 : 0) + (diseminasiAktif ? 1 : 0);
 
     /** Dokumen yang akan ikut terhapus bila sebuah tahap dimatikan. */
@@ -1372,173 +1630,6 @@ export default function EditActivity() {
         setCurrentNote(null);
     };
     
-    const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: string, setAlertModal: React.Dispatch<React.SetStateAction<{isOpen: boolean; title: string; message: string;}>> }) => {
-        const pplForStage = useMemo(() => formData.ppl?.filter(p => p.tahap === tahap) || [], [formData.ppl, tahap]);
-        
-        // Nama kolom honor memakai akhiran "Pengolahan", sedangkan tahap PPL
-        // bernama "pengolahan-analisis".
-        const tahapHonor: TahapHonor =
-            tahap === 'listing' ? 'Listing' : tahap === 'pencacahan' ? 'Pencacahan' : 'Pengolahan';
-
-        const rentangHonor = {
-            mulai: formData[`tanggalMulaiHonor${tahapHonor}`],
-            selesai: formData[`tanggalSelesaiHonor${tahapHonor}`],
-        };
-
-        const opsiBulanPembebanan = useMemo(
-            () => bulanDalamRentang(rentangHonor.mulai, rentangHonor.selesai),
-            [rentangHonor.mulai, rentangHonor.selesai],
-        );
-
-        // Rentang dan bulan pembebanan diubah bersama supaya bulan yang
-        // dibebani selalu benar-benar tersentuh oleh rentangnya.
-        const handleRentangChange = ({ mulai, selesai }: { mulai?: string; selesai?: string }) => {
-            setFormData(prev => ({
-                ...prev,
-                [`tanggalMulaiHonor${tahapHonor}`]: mulai,
-                [`tanggalSelesaiHonor${tahapHonor}`]: selesai,
-                [`bulanHonor${tahapHonor}`]: bulanPembebananSetelahUbah(mulai, selesai, prev[`bulanHonor${tahapHonor}`]),
-            }));
-        };
-
-        const [localHonorSettings, setLocalHonorSettings] = useState<HonorariumSettings>(
-            formData.honorariumSettings || {
-                'pengumpulan-data-listing': { satuanBebanKerja: '', hargaSatuan: '' },
-                'pengumpulan-data-pencacahan': { satuanBebanKerja: '', hargaSatuan: '' },
-                'pengolahan-analisis': { satuanBebanKerja: '', hargaSatuan: '' },
-            }
-        );
-
-        useEffect(() => {
-            if(formData.honorariumSettings){
-                setLocalHonorSettings(formData.honorariumSettings);
-            }
-        }, [formData.honorariumSettings]);
-
-        const getHonorSettingsKey = (): keyof HonorariumSettings | null => {
-            if (tahap === 'listing') return 'pengumpulan-data-listing';
-            if (tahap === 'pencacahan') return 'pengumpulan-data-pencacahan';
-            if (tahap === 'pengolahan-analisis') return 'pengolahan-analisis';
-            return null;
-        }
-        const honorSettingKey = getHonorSettingsKey();
-
-        const handleSettingChange = (field: 'satuanBebanKerja' | 'hargaSatuan', value: string) => {
-            if (!honorSettingKey) return;
-            setLocalHonorSettings(prev => ({
-                ...prev,
-                [honorSettingKey!]: { ...prev[honorSettingKey!], [field]: value }
-            }));
-        };
-
-        const handleSettingBlur = () => {
-            handleFormFieldChange('honorariumSettings', localHonorSettings);
-        };
-
-        if (!localHonorSettings) return <Skeleton className="h-40 w-full" />;
-
-        const handleClearPPLs = () => {
-            setFormData(prev => ({ ...prev, ppl: prev.ppl?.filter(p => p.tahap !== tahap)}));
-            setShowClearConfirmModal({isOpen: false, tahap: null});
-        }
-        
-        return (
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Alokasi PPL & PML ({title})</CardTitle>
-                            <CardDescription>Atur honorarium, bulan pembayaran, lalu alokasikan PPL.</CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {pplForStage.length > 0 && (
-                                <Button type="button" variant="destructive" size="sm" onClick={() => setShowClearConfirmModal({isOpen: true, tahap})}>
-                                    <XCircle className="w-4 h-4 mr-2" />
-                                    Clear PPL
-                                </Button>
-                            )}
-                            <Button variant="outline" size="sm" asChild>
-                                <Link to="/daftar-ppl" state={{ from: 'daftar-ppl', kegiatanId: id, tahap: tahap, existingPplIds: pplForStage.map(p => p.ppl_master_id).filter(Boolean) }}><Users className="w-4 h-4 mr-2" />Pilih dari Daftar PPL</Link>
-                            </Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/40 space-y-4">
-                        <h4 className="font-medium text-foreground">Pengaturan Honorarium & Pembayaran</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                                <Label>Satuan Beban Kerja</Label>
-                                <Input value={honorSettingKey ? localHonorSettings[honorSettingKey].satuanBebanKerja : ''} onChange={e => handleSettingChange('satuanBebanKerja', e.target.value)} onBlur={handleSettingBlur} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Harga per Satuan (Rp)</Label>
-                                <Input value={honorSettingKey ? formatHonor(localHonorSettings[honorSettingKey].hargaSatuan) : ''} onChange={e => handleSettingChange('hargaSatuan', e.target.value)} onBlur={handleSettingBlur} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Rentang Tanggal Honor *</Label>
-                                <DateRangePicker
-                                    value={rentangHonor}
-                                    onChange={handleRentangChange}
-                                    defaultMonth={formData.tanggalMulaiPersiapan}
-                                    placeholder="Pilih rentang..."
-                                />
-                            </div>
-                        </div>
-
-                        {opsiBulanPembebanan.length > 1 && (
-                            <p className="text-sm text-muted-foreground">
-                                Rentang honor melintasi {opsiBulanPembebanan.length} bulan. Pilihan bulannya
-                                ada di tiap kartu alokasi PPL di bawah &mdash; batas honor dihitung per mitra
-                                per bulan, jadi tiap mitra bisa berbeda.
-                            </p>
-                        )}
-
-                        {opsiBulanPembebanan.length === 1 && (
-                            <div className="text-sm text-muted-foreground">
-                                Dibebankan pada bulan{' '}
-                                <Badge variant="outline" className="font-medium">{opsiBulanPembebanan[0].label}</Badge>
-                            </div>
-                        )}
-                    </div>
-                    <div className="space-y-4">
-                        {pplForStage.map((ppl, index) => {
-                            const existingPplIdsForCurrentStage = pplForStage
-                                .map(p => p.ppl_master_id)
-                                .filter(id => id && id !== ppl.ppl_master_id) as string[];
-
-                            return (
-                                <PPLAllocationItem 
-                                    key={ppl.clientId}
-                                    tahap={tahap}
-                                    opsiBulan={opsiBulanPembebanan}
-                                    ppl={ppl}
-                                    index={index}
-                                    onRemove={mintaHapusPPL}
-                                    onUpdate={updatePPL}
-                                    setAlertModal={setAlertModal}
-                                    pplList={pplList}
-                                    pmlList={pmlList}
-                                    honorariumSettings={formData.honorariumSettings!}
-                                    existingPplIds={existingPplIdsForCurrentStage}
-                                />
-                            )
-                        })}
-                        <Button type="button" variant="outline" onClick={() => addPPL(tahap)} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL Manual</Button>
-                    </div>
-                    <ConfirmationModal
-                        isOpen={showClearConfirmModal.isOpen && showClearConfirmModal.tahap === tahap}
-                        onClose={() => setShowClearConfirmModal({isOpen: false, tahap: null})}
-                        onConfirm={handleClearPPLs}
-                        title="Hapus Semua PPL?"
-                        description={`Anda akan menghapus semua (${pplForStage.length}) alokasi PPL di tahap ini. Aksi ini tidak dapat dibatalkan.`}
-                        confirmLabel="Ya, Hapus Semua"
-                        variant="danger"
-                    />
-                </CardContent>
-            </Card>
-        );
-    };
     
     /**
      * Skeleton ditahan sampai formData BENAR-BENAR terisi, bukan sekadar sampai
@@ -1703,13 +1794,28 @@ export default function EditActivity() {
                                     <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="listing" className="mt-4">
-                                    <AlokasiPPLContent tahap="listing" title="Listing" setAlertModal={setAlertModal} />
+                                    <AlokasiPPLContent tahap="listing" title="Listing" setAlertModal={setAlertModal}
+                                        formData={formData} setFormData={setFormData}
+                                        kegiatanId={id}
+                                        showClearConfirmModal={showClearConfirmModal} setShowClearConfirmModal={setShowClearConfirmModal}
+                                        addPPL={addPPL} mintaHapusPPL={mintaHapusPPL} updatePPL={updatePPL}
+                                        pplList={pplList} pmlList={pmlList} />
                                 </TabsContent>
                                 <TabsContent value="pencacahan" className="mt-4">
-                                    <AlokasiPPLContent tahap="pencacahan" title="Pencacahan" setAlertModal={setAlertModal} />
+                                    <AlokasiPPLContent tahap="pencacahan" title="Pencacahan" setAlertModal={setAlertModal}
+                                        formData={formData} setFormData={setFormData}
+                                        kegiatanId={id}
+                                        showClearConfirmModal={showClearConfirmModal} setShowClearConfirmModal={setShowClearConfirmModal}
+                                        addPPL={addPPL} mintaHapusPPL={mintaHapusPPL} updatePPL={updatePPL}
+                                        pplList={pplList} pmlList={pmlList} />
                                 </TabsContent>
                                 <TabsContent value="pengolahan-analisis" className="mt-4">
-                                    <AlokasiPPLContent tahap="pengolahan-analisis" title="Pengolahan & Analisis" setAlertModal={setAlertModal} />
+                                    <AlokasiPPLContent tahap="pengolahan-analisis" title="Pengolahan" setAlertModal={setAlertModal}
+                                        formData={formData} setFormData={setFormData}
+                                        kegiatanId={id}
+                                        showClearConfirmModal={showClearConfirmModal} setShowClearConfirmModal={setShowClearConfirmModal}
+                                        addPPL={addPPL} mintaHapusPPL={mintaHapusPPL} updatePPL={updatePPL}
+                                        pplList={pplList} pmlList={pmlList} />
                                 </TabsContent>
                             </Tabs>
                         </TabsContent>
@@ -1813,6 +1919,16 @@ export default function EditActivity() {
                     autoCloseDelay={0}
                 />
                 <ConfirmationModal
+                    isOpen={peringatanKelengkapan !== null}
+                    onClose={() => setPeringatanKelengkapan(null)}
+                    onConfirm={() => { const b = peringatanKelengkapan?.bypassHonorLimit ?? false; setPeringatanKelengkapan(null); handleFormSubmit(b, true); }}
+                    title="Periksa Lagi Sebelum Menyimpan?"
+                    description={teksPeringatan(peringatanKelengkapan?.daftar ?? [])}
+                    confirmLabel="Tetap Simpan"
+                    cancelLabel="Periksa Lagi"
+                    variant="warning"
+                />
+                <ConfirmationModal
                     isOpen={konfirmasiMatikanTahap !== null}
                     onClose={() => setKonfirmasiMatikanTahap(null)}
                     onConfirm={matikanTahap}
@@ -1853,7 +1969,7 @@ export default function EditActivity() {
                     onClose={() => setShowHonorWarningModal(false)}
                     onConfirm={() => {
                         setShowHonorWarningModal(false);
-                        handleFormSubmit(true);
+                        handleFormSubmit(true, true);
                     }}
                     title="Peringatan Batas Honor"
                     description={`Total honor untuk ${honorWarningDetails?.pplName} di bulan terpilih akan menjadi ${formatHonor(honorWarningDetails?.totalHonor || 0)}, melebihi batas ${formatHonor(honorWarningDetails?.limit || 0)}. Lanjutkan?`}

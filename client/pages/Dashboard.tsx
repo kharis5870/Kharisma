@@ -1,7 +1,7 @@
 // client/pages/Dashboard.tsx
 
-import { useState, useMemo, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmationModal from "@/components/ConfirmationModal";
@@ -56,12 +56,13 @@ const deleteActivity = async (id: number): Promise<void> => {
     await apiClient.delete(`/kegiatan/${id}`);
 };
 
-const setArsipActivity = async ({ id, isArsip, username }: { id: number; isArsip: boolean; username?: string }) => {
-    return apiClient.put(`/kegiatan/${id}/arsip`, { isArsip, username });
+// Identitas pelaku tidak dikirim: server mengambilnya dari token sesi.
+const setArsipActivity = async ({ id, isArsip }: { id: number; isArsip: boolean }) => {
+    return apiClient.put(`/kegiatan/${id}/arsip`, { isArsip });
 };
 
-const updatePplProgress = async ({ pplId, progressData, username }: { pplId: number; progressData: any; username?: string }) => {
-    return apiClient.put(`/kegiatan/ppl/${pplId}/progress`, { progressData, username });
+const updatePplProgress = async ({ pplId, progressData }: { pplId: number; progressData: any }) => {
+    return apiClient.put(`/kegiatan/ppl/${pplId}/progress`, { progressData });
 };
 
 const calculateActivityStatus = (kegiatan: Kegiatan): KegiatanWithDynamicStatus['dynamicStatus'] => {
@@ -138,6 +139,149 @@ const getRelativeTime = (dateString: string) => {
         return format(date, 'dd MMM yyyy', { locale: localeID });
     }
     return formatDistanceToNow(date, { addSuffix: true, locale: localeID });
+};
+
+/**
+ * Kartu pembaruan progress satu alokasi PPL.
+ *
+ * DIDEFINISIKAN DI TINGKAT MODUL, bukan di dalam `Dashboard`. Saat masih di
+ * dalam, React melihat tipe komponen BARU pada setiap render Dashboard dan
+ * memasang ulang semua kartu — `localProgress` yang sedang diketik ikut hilang
+ * setiap kali Dashboard render ulang, misalnya saat data disegarkan otomatis
+ * ketika jendela kembali difokuskan. `revertNonce` dan `progressErrors` milik
+ * Dashboard karena itu dioper sebagai prop.
+ */
+const PPLUpdateCard = ({ ppl, handleUpdatePPL, user, revertNonce, progressErrors }: { 
+    ppl: PPLWithProgress, 
+    handleUpdatePPL: (pplId: number, field: EditableProgressKey, value: string) => void,
+    user: any,
+    revertNonce: number,
+    progressErrors: Record<string, string>
+}) => {
+    const [localProgress, setLocalProgress] = useState(ppl.progress);
+
+    // revertNonce ikut jadi dependensi: saat validasi gagal, nilainya
+    // dinaikkan supaya kotak kembali ke angka tersimpan alih-alih terus
+    // menampilkan angka yang baru saja ditolak. Kini ia prop, bukan nilai
+    // milik Dashboard — dependensi yang sah bagi efek ini.
+    useEffect(() => {
+        setLocalProgress(ppl.progress);
+    }, [ppl.progress, revertNonce]);
+    const isAuthorized = bolehMemperbaruiProgress(user as any, ppl as any);
+    const isPendataan = ppl.tahap === 'listing' || ppl.tahap === 'pencacahan';
+    const honorDetail = ppl.honorarium?.[0];
+    const targetBebanKerja = honorDetail?.bebanKerja || '0';
+
+    const handleLocalChange = (field: EditableProgressKey, value: string) => {
+        const numValue = parseInt(value, 10);
+        setLocalProgress(prev => ({
+            ...prev,
+            [field]: isNaN(numValue) ? 0 : numValue
+        }));
+    };
+
+    // 3. Buat handler untuk onBlur (menyimpan ke state global)
+    const handleBlur = (field: EditableProgressKey) => {
+        handleUpdatePPL(ppl.id!, field, String(localProgress[field] ?? '0'));
+    };
+
+    // Satu kotak isian + pesan galatnya. Kotak yang bermasalah diberi tepi
+    // merah dan pesan tepat di bawahnya, menggantikan modal global yang
+    // tidak memberi tahu kotak mana yang salah.
+    //
+    // PENTING: ini fungsi biasa yang DIPANGGIL, bukan komponen yang
+    // dirender lewat <KotakProgress />. Mendeklarasikan komponen di dalam
+    // badan komponen lain membuat identitasnya berubah pada setiap render;
+    // React lalu menganggapnya tipe baru, melepas <Input> yang lama dan
+    // memasang yang baru. Akibatnya fokus hilang di tiap ketikan dan
+    // onBlur TIDAK PERNAH menyala — perpindahan progress tidak tersimpan
+    // sehingga tahap sebelumnya (mis. Open) tidak ikut berkurang.
+    const kotakProgress = (field: EditableProgressKey, label: string) => {
+        const galat = progressErrors[kunciGalat(ppl.id!, field)];
+        return (
+            <div key={field}>
+                <Label className="text-xs text-muted-foreground capitalize">{label}</Label>
+                <Input
+                    type="number"
+                    min="0"
+                    value={localProgress[field] ?? 0}
+                    onChange={e => handleLocalChange(field, e.target.value)}
+                    onBlur={() => handleBlur(field)}
+                    disabled={!isAuthorized}
+                    aria-invalid={!!galat}
+                    aria-errormessage={galat ? `err-${ppl.id}-${field}` : undefined}
+                    title={!isAuthorized ? "Hanya PML yang bersangkutan atau Admin yang dapat mengubah progress" : ""}
+                    className={cn(
+                        "mt-1 text-center",
+                        galat && "border-destructive ring-1 ring-destructive focus-visible:ring-destructive"
+                    )}
+                />
+                {galat && (
+                    <p id={`err-${ppl.id}-${field}`} className="mt-1 text-xs text-red-600 dark:text-red-400">
+                        {galat}
+                    </p>
+                )}
+            </div>
+        );
+    };
+
+    const renderProgressInputs = () => {
+        if (isPendataan) {
+            const stages: EditableProgressKey[] = ['submit', 'diperiksa', 'approved'];
+            return (
+                <div className="grid grid-cols-4 gap-3 items-start">
+                    <div><Label className="text-xs text-muted-foreground">Open</Label><Input type="number" value={localProgress.open ?? 0} disabled className="mt-1 text-center bg-muted"/></div>
+                    {stages.map(field => kotakProgress(field, field))}
+                </div>
+            );
+        }
+
+        const pengolahanStages: EditableProgressKey[] = ['sudah_entry', 'validasi', 'clean'];
+        return (
+            <div className="grid grid-cols-4 gap-3 items-start">
+                <div><Label className="text-xs text-muted-foreground">Belum Entry</Label><Input type="number" value={localProgress.belum_entry ?? 0} disabled className="mt-1 text-center bg-muted"/></div>
+                {pengolahanStages.map(field =>
+                    kotakProgress(field, field === 'sudah_entry' ? 'Dientry' : field)
+                )}
+            </div>
+        );
+    };
+
+    const adaGalat = Object.keys(progressErrors).some(k => k.startsWith(`${ppl.id}:`));
+
+    return (
+        <Card key={ppl.id} className={cn(adaGalat && "border-destructive")}>
+            <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                        <Avatar className="w-10 h-10">
+                            <AvatarImage src="" />
+                            <AvatarFallback className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300">
+                                {(ppl.namaPPL || 'P').split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <h4 className="font-medium text-foreground">{ppl.namaPPL}</h4>
+                            <p className="text-sm text-muted-foreground">PML: {ppl.namaPML}</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-xl font-bold text-bps-blue-600">{getProgressBarValue(ppl).toFixed(0)}%</div>
+                        <div className="text-xs text-muted-foreground -mt-1">{isPendataan ? 'Approved' : 'Clean'}</div>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
+                    <Label className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2 block capitalize">
+                        Progress {ppl.tahap.replace('-', ' ')} (Target: {targetBebanKerja})
+                    </Label>
+                    {renderProgressInputs()}
+                    <Progress value={getProgressBarValue(ppl)} className="h-2 mt-2" />
+                </div>
+            </CardContent>
+        </Card>
+    );
 };
 
 export default function Dashboard() {
@@ -283,6 +427,34 @@ export default function Dashboard() {
         [activeActivities],
     );
 
+    /**
+     * Sorotan dari pencarian global: `/dashboard?sorot=<id>` menggulir kartu
+     * kegiatan itu ke tengah layar dan menandainya sebentar.
+     *
+     * Filter dikosongkan lebih dulu — kalau tidak, kegiatan yang dicari bisa
+     * tersembunyi oleh pencarian atau filter status yang sedang aktif, dan
+     * pengguna dibawa ke Dashboard tanpa menemukan apa-apa. Parameternya
+     * dibuang setelah dipakai supaya muat ulang halaman tidak menyorot lagi.
+     */
+    const [searchParams, setSearchParams] = useSearchParams();
+    const sorot = searchParams.get('sorot');
+    const [kegiatanDisorot, setKegiatanDisorot] = useState<number | null>(null);
+    const sorotDitangani = useRef<string | null>(null);
+    useEffect(() => {
+        if (!sorot) { sorotDitangani.current = null; return; }
+        if (activeActivities.length === 0 || sorotDitangani.current === sorot) return;
+        sorotDitangani.current = sorot;
+        const idKegiatan = Number(sorot);
+        setSearchTerm(''); setStatusFilter('all'); setTimFilter('all');
+        setKegiatanDisorot(idKegiatan);
+        window.setTimeout(() => {
+            document.querySelector(`[data-kegiatan-id="${idKegiatan}"]`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setSearchParams(prev => { const p = new URLSearchParams(prev); p.delete('sorot'); return p; }, { replace: true });
+        }, 150);
+        window.setTimeout(() => setKegiatanDisorot(null), 3500);
+    }, [sorot, activeActivities.length]);
+
     const handleOpenUpdateModal = (activity: KegiatanWithDynamicStatus) => {
         setLocalPplProgress(JSON.parse(JSON.stringify(activity.ppl || [])));
         // Galat dari sesi sebelumnya tidak berlaku lagi: isian dimuat ulang
@@ -361,7 +533,6 @@ export default function Dashboard() {
                 return progressMutation.mutateAsync({
                     pplId: ppl.id!,
                     progressData: progressValues,
-                    username: user?.username,
                 });
             }));
             setUpdateModalActivity(null);
@@ -437,135 +608,6 @@ export default function Dashboard() {
         </div>
     );
 
-    const PPLUpdateCard = ({ ppl, handleUpdatePPL, user }: { 
-        ppl: PPLWithProgress, 
-        handleUpdatePPL: (pplId: number, field: EditableProgressKey, value: string) => void,
-        user: any
-    }) => {
-        const [localProgress, setLocalProgress] = useState(ppl.progress);
-
-        // revertNonce ikut jadi dependensi: saat validasi gagal, nilainya
-        // dinaikkan supaya kotak kembali ke angka tersimpan alih-alih terus
-        // menampilkan angka yang baru saja ditolak.
-        useEffect(() => {
-            setLocalProgress(ppl.progress);
-        }, [ppl.progress, revertNonce]);
-        const isAuthorized = bolehMemperbaruiProgress(user as any, ppl as any);
-        const isPendataan = ppl.tahap === 'listing' || ppl.tahap === 'pencacahan';
-        const honorDetail = ppl.honorarium?.[0];
-        const targetBebanKerja = honorDetail?.bebanKerja || '0';
-
-        const handleLocalChange = (field: EditableProgressKey, value: string) => {
-            const numValue = parseInt(value, 10);
-            setLocalProgress(prev => ({
-                ...prev,
-                [field]: isNaN(numValue) ? 0 : numValue
-            }));
-        };
-
-        // 3. Buat handler untuk onBlur (menyimpan ke state global)
-        const handleBlur = (field: EditableProgressKey) => {
-            handleUpdatePPL(ppl.id!, field, String(localProgress[field] ?? '0'));
-        };
-
-        // Satu kotak isian + pesan galatnya. Kotak yang bermasalah diberi tepi
-        // merah dan pesan tepat di bawahnya, menggantikan modal global yang
-        // tidak memberi tahu kotak mana yang salah.
-        //
-        // PENTING: ini fungsi biasa yang DIPANGGIL, bukan komponen yang
-        // dirender lewat <KotakProgress />. Mendeklarasikan komponen di dalam
-        // badan komponen lain membuat identitasnya berubah pada setiap render;
-        // React lalu menganggapnya tipe baru, melepas <Input> yang lama dan
-        // memasang yang baru. Akibatnya fokus hilang di tiap ketikan dan
-        // onBlur TIDAK PERNAH menyala — perpindahan progress tidak tersimpan
-        // sehingga tahap sebelumnya (mis. Open) tidak ikut berkurang.
-        const kotakProgress = (field: EditableProgressKey, label: string) => {
-            const galat = progressErrors[kunciGalat(ppl.id!, field)];
-            return (
-                <div key={field}>
-                    <Label className="text-xs text-muted-foreground capitalize">{label}</Label>
-                    <Input
-                        type="number"
-                        min="0"
-                        value={localProgress[field] ?? 0}
-                        onChange={e => handleLocalChange(field, e.target.value)}
-                        onBlur={() => handleBlur(field)}
-                        disabled={!isAuthorized}
-                        aria-invalid={!!galat}
-                        aria-errormessage={galat ? `err-${ppl.id}-${field}` : undefined}
-                        title={!isAuthorized ? "Hanya PML yang bersangkutan atau Admin yang dapat mengubah progress" : ""}
-                        className={cn(
-                            "mt-1 text-center",
-                            galat && "border-destructive ring-1 ring-destructive focus-visible:ring-destructive"
-                        )}
-                    />
-                    {galat && (
-                        <p id={`err-${ppl.id}-${field}`} className="mt-1 text-xs text-red-600 dark:text-red-400">
-                            {galat}
-                        </p>
-                    )}
-                </div>
-            );
-        };
-
-        const renderProgressInputs = () => {
-            if (isPendataan) {
-                const stages: EditableProgressKey[] = ['submit', 'diperiksa', 'approved'];
-                return (
-                    <div className="grid grid-cols-4 gap-3 items-start">
-                        <div><Label className="text-xs text-muted-foreground">Open</Label><Input type="number" value={localProgress.open ?? 0} disabled className="mt-1 text-center bg-muted"/></div>
-                        {stages.map(field => kotakProgress(field, field))}
-                    </div>
-                );
-            }
-
-            const pengolahanStages: EditableProgressKey[] = ['sudah_entry', 'validasi', 'clean'];
-            return (
-                <div className="grid grid-cols-4 gap-3 items-start">
-                    <div><Label className="text-xs text-muted-foreground">Belum Entry</Label><Input type="number" value={localProgress.belum_entry ?? 0} disabled className="mt-1 text-center bg-muted"/></div>
-                    {pengolahanStages.map(field =>
-                        kotakProgress(field, field === 'sudah_entry' ? 'Dientry' : field)
-                    )}
-                </div>
-            );
-        };
-
-        const adaGalat = Object.keys(progressErrors).some(k => k.startsWith(`${ppl.id}:`));
-
-        return (
-            <Card key={ppl.id} className={cn(adaGalat && "border-destructive")}>
-                <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <Avatar className="w-10 h-10">
-                                <AvatarImage src="" />
-                                <AvatarFallback className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300">
-                                    {(ppl.namaPPL || 'P').split(' ').map(n => n[0]).join('')}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <h4 className="font-medium text-foreground">{ppl.namaPPL}</h4>
-                                <p className="text-sm text-muted-foreground">PML: {ppl.namaPML}</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <div className="text-xl font-bold text-bps-blue-600">{getProgressBarValue(ppl).toFixed(0)}%</div>
-                            <div className="text-xs text-muted-foreground -mt-1">{isPendataan ? 'Approved' : 'Clean'}</div>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
-                        <Label className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2 block capitalize">
-                            Progress {ppl.tahap.replace('-', ' ')} (Target: {targetBebanKerja})
-                        </Label>
-                        {renderProgressInputs()}
-                        <Progress value={getProgressBarValue(ppl)} className="h-2 mt-2" />
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    };
 
     /**
      * Titik kecil di pojok tombol "Update" yang meringkas keadaan mitra
@@ -629,7 +671,7 @@ export default function Dashboard() {
         return (
             <div className="space-y-4">
                 {tampil.map(ppl => (
-                    <PPLUpdateCard key={ppl.id} ppl={ppl} handleUpdatePPL={handleUpdatePPL} user={user} />
+                    <PPLUpdateCard key={ppl.id} ppl={ppl} handleUpdatePPL={handleUpdatePPL} user={user} revertNonce={revertNonce} progressErrors={progressErrors} />
                 ))}
                 {tampil.length === 0 && (
                     <p className="text-center text-muted-foreground py-4">
@@ -849,7 +891,7 @@ export default function Dashboard() {
                             };
 
                             return (
-                                <Card key={activity.id} className="hover:shadow-lg transition-shadow flex flex-col">
+                                <Card key={activity.id} data-kegiatan-id={activity.id} className={cn("hover:shadow-lg transition-shadow flex flex-col scroll-mt-24", kegiatanDisorot === activity.id && "ring-2 ring-blue-400 dark:ring-blue-500")}>
                                     <CardHeader className="pb-3"><div className="flex items-start justify-between"><div className="flex-1"><CardTitle className="text-lg leading-tight">{activity.namaKegiatan}</CardTitle><p className="text-sm text-muted-foreground mt-1">Ketua: {activity.namaKetua}</p></div><Badge className={cn("ml-2 whitespace-nowrap", warnings.length > 0 ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' : color)}>{warnings.length > 0 ? 'Warning' : status}</Badge></div></CardHeader>
                                     <CardContent className="space-y-4 flex-grow flex flex-col justify-between">
                                         <div>
@@ -961,7 +1003,7 @@ export default function Dashboard() {
                                                         variant="outline"
                                                         size="sm"
                                                         disabled={arsipMutation.isPending}
-                                                        onClick={() => arsipMutation.mutate({ id: activity.id, isArsip: false, username: user?.username })}
+                                                        onClick={() => arsipMutation.mutate({ id: activity.id, isArsip: false})}
                                                     >
                                                         <ArchiveRestore className="w-4 h-4 mr-1" />Batalkan Arsip
                                                     </Button>
@@ -1156,7 +1198,7 @@ export default function Dashboard() {
                 <ConfirmationModal isOpen={!!activityToDelete} onConfirm={handleDeleteConfirm} onClose={() => setActivityToDelete(null)} title="Konfirmasi Hapus" description={`Yakin ingin menghapus "${activityToDelete?.namaKegiatan}"?`} />
                 <ConfirmationModal
                     isOpen={!!activityToArchive}
-                    onConfirm={() => activityToArchive && arsipMutation.mutate({ id: activityToArchive.id, isArsip: true, username: user?.username })}
+                    onConfirm={() => activityToArchive && arsipMutation.mutate({ id: activityToArchive.id, isArsip: true})}
                     onClose={() => setActivityToArchive(null)}
                     title="Konfirmasi Arsip"
                     description={`Arsipkan "${activityToArchive?.namaKegiatan}"? Kegiatan akan disembunyikan dari daftar utama, tapi datanya tetap tersimpan dan masih terhitung di rekap honor. Anda bisa membatalkan arsip kapan saja.`}

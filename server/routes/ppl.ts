@@ -19,6 +19,7 @@ router.get('/', async (_req, res) => {
     const pplList = await getAllMasterPPL();
     res.json(pplList);
   } catch (error) {
+    console.error('Error fetching PPL list:', error);
     res.status(500).json({ message: 'Error fetching PPL list' });
   }
 });

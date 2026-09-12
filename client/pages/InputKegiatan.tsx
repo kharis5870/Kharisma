@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
+import { periksaKelengkapanAlokasi, teksPeringatan, type KelompokPeringatan, type TahapAlokasi } from "@/lib/kelengkapanAlokasi";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import PilihPembebananHonor from "@/components/PilihPembebananHonor";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Link2, X, Lock, Users, XCircle, ChevronsUpDown, Check, Loader2, History, Search } from "lucide-react";
+import { Plus, Trash2, Link2, X, Lock, Users, XCircle, ChevronsUpDown, Check, Loader2, History, Search, MessageSquare } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { isValid } from "date-fns";
@@ -23,39 +24,38 @@ import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore, { HonorariumSettings, TahapHonor } from "@/stores/useInputKegiatanStore";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { bulanDalamRentang, keTeksTanggal, keTanggal, pembebananBelumLengkap } from "@/lib/honorPeriode";
+import { bulanDalamRentang, keTeksTanggal, keTanggal, pembebananBelumLengkap, labelRentang } from "@/lib/honorPeriode";
 import { Badge } from "@/components/ui/badge";
 import { PPLMaster, KetuaTim, Kegiatan, UserData, PPL, HonorariumDetail, Dokumen } from "@shared/api";
 import { periksaTautan } from "@shared/tautanDokumen";
-import { useAuth } from "@/contexts/AuthContext";
 import AlertModal from "@/components/AlertModal";
 import { apiClient } from "@/lib/apiClient";
 
 type DateFieldName =
-  | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
-  | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData'
-  | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
-  | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
+  | 'tanggalMulaiPersiapan' | 'tanggalSelesaiPersiapan'
+  | 'tanggalMulaiPengumpulanData' | 'tanggalSelesaiPengumpulanData'
+  | 'tanggalMulaiPengolahanAnalisis' | 'tanggalSelesaiPengolahanAnalisis'
+  | 'tanggalMulaiDiseminasiEvaluasi' | 'tanggalSelesaiDiseminasiEvaluasi';
 
 // formatHonor/parseHonor kini dipakai bersama dari @/lib/angka - sebelumnya
 // disalin identik di sini dan di EditActivity.tsx.
-import { formatHonor, parseHonor, sanitizeJumlah } from "@/lib/angka";
+import { formatHonor, parseHonor, sanitizeJumlah, parseHonorNumber } from "@/lib/angka";
 
 
 const createActivity = async (data: any): Promise<Kegiatan> => {
-    return apiClient.post<Kegiatan>('/kegiatan', data);
+    return apiClient.post<Kegiatan>('/kegiatan', data);
 }
 
 const fetchPPLs = async (): Promise<PPLMaster[]> => {
-    return apiClient.get<PPLMaster[]>('/ppl');
+    return apiClient.get<PPLMaster[]>('/ppl');
 };
 
 const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
-    return apiClient.get<KetuaTim[]>('/ketua-tim');
+    return apiClient.get<KetuaTim[]>('/ketua-tim');
 };
 
 const fetchPMLs = async (): Promise<UserData[]> => {
-    return apiClient.get<UserData[]>('/admin/pml');
+    return apiClient.get<UserData[]>('/admin/pml');
 };
 
 const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, store, existingPplIds, tahap, opsiBulan }: any) => {
@@ -238,6 +238,14 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
         selesai: store[`tanggalSelesaiHonor${tahapHonor}`],
     };
 
+    // Rentang honor memang boleh berbeda dari jadwal pendataan, tapi yang jauh
+    // lebih sering terjadi adalah salah pilih tanggal. Diberi tanda kuning.
+    const mulaiPendataan = keTeksTanggal(store.tanggalMulaiPengumpulanData);
+    const selesaiPendataan = keTeksTanggal(store.tanggalSelesaiPengumpulanData);
+    const bedaDenganPendataan = Boolean(
+        rentangHonor.mulai && rentangHonor.selesai && mulaiPendataan && selesaiPendataan
+        && (rentangHonor.mulai !== mulaiPendataan || rentangHonor.selesai !== selesaiPendataan));
+
     // Kalau rentang menyentuh lebih dari satu bulan, pengguna harus memilih
     // salah satunya sebagai bulan pembebanan: HONOR_LIMIT berlaku per bulan,
     // jadi honor tidak boleh dihitung di dua bulan sekaligus.
@@ -263,8 +271,6 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
     const [konfirmasiHapusPPL, setKonfirmasiHapusPPL] = useState<{ id: string; nama: string } | null>(null);
     
     const honorSettings = store.honorariumSettings;
-    const [localSettings, setLocalSettings] = useState(honorSettings);
-    useEffect(() => setLocalSettings(honorSettings), [honorSettings]);
     
     const getHonorSettingsKey = (): keyof typeof honorSettings | null => {
         if (tahap === 'listing') return 'pengumpulan-data-listing';
@@ -280,20 +286,18 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
     }
 
     // FIX: Menambahkan tipe eksplisit untuk 'field'
+    /**
+     * Pengaturan honor langsung disetor ke store setiap diketik, sama seperti
+     * di Edit Kegiatan. `updateHonorariumSetting` sekaligus menghitung ulang
+     * honor setiap alokasi, jadi total honor mitra di bawahnya ikut berubah
+     * seketika — tidak lagi menunggu kotaknya ditinggalkan.
+     */
     const handleSettingChange = (field: keyof HonorariumSettings, value: string) => {
         if (!honorSettingKey) return;
-        setLocalSettings(prev => ({
-            ...prev,
-            [honorSettingKey!]: { ...prev[honorSettingKey!], [field]: value }
-        }));
+        storeActions.updateHonorariumSetting(honorSettingKey, field, value);
     };
 
     // FIX: Menambahkan tipe eksplisit untuk 'field'
-    const handleSettingBlur = (field: keyof HonorariumSettings) => {
-        if (!honorSettingKey) return;
-        storeActions.updateHonorariumSetting(honorSettingKey, field, localSettings[honorSettingKey][field]);
-    };
-
     
 
 
@@ -334,11 +338,11 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label>Satuan Beban Kerja</Label>
-                            <Input placeholder="Contoh: Dokumen" value={honorSettingKey ? localSettings[honorSettingKey].satuanBebanKerja : ''} onChange={e => handleSettingChange('satuanBebanKerja', e.target.value)} onBlur={() => handleSettingBlur('satuanBebanKerja')} />
+                            <Input placeholder="Contoh: Dokumen" value={honorSettingKey ? honorSettings[honorSettingKey].satuanBebanKerja : ''} onChange={e => handleSettingChange('satuanBebanKerja', e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label>Harga per Satuan (Rp)</Label>
-                            <Input placeholder="Contoh: 15000" value={honorSettingKey ? formatHonor(localSettings[honorSettingKey].hargaSatuan) : ''} onChange={e => handleSettingChange('hargaSatuan', e.target.value)} onBlur={() => handleSettingBlur('hargaSatuan')} />
+                            <Input placeholder="Contoh: 15000" value={honorSettingKey ? formatHonor(honorSettings[honorSettingKey].hargaSatuan) : ''} onChange={e => handleSettingChange('hargaSatuan', e.target.value)} />
                         </div>
                         <div className="space-y-2">
                            <Label>Rentang Tanggal Honor *</Label>
@@ -348,6 +352,12 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
                                defaultMonth={store.tanggalMulaiPersiapan}
                                placeholder="Pilih rentang..."
                            />
+                            {bedaDenganPendataan && (
+                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                    Berbeda dengan jadwal pendataan ({labelRentang(mulaiPendataan, selesaiPendataan)}).
+                                    Pastikan ini disengaja, bukan salah pilih tanggal.
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -418,22 +428,54 @@ const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: strin
     );
 };
 
+/**
+ * Dokumen dan catatan satu tahap.
+ *
+ * "Tambah Catatan" dulu hanya ada di Edit Kegiatan, sehingga catatan tahap baru
+ * bisa ditulis SETELAH kegiatannya tersimpan. Sekarang disamakan: catatan bisa
+ * langsung ditulis saat kegiatan dibuat, dan tampil paling atas seperti di
+ * halaman Edit.
+ */
 const DokumenContent = ({ tipe, title }: { tipe: Dokumen['tipe'], title: string }) => {
     const documents = useInputKegiatanStore(state => state.documents.filter(d => d.tipe === tipe));
-    const { addDocumentLink, removeDocument, updateDocument } = useInputKegiatanStore.getState();
+    const { addDocumentLink, addCatatan, removeDocument, updateDocument } = useInputKegiatanStore.getState();
+    const catatan = documents.filter(d => d.jenis === 'catatan');
+    const dokumen = documents.filter(d => d.jenis !== 'catatan');
 
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                     <CardTitle>Dokumen {title}</CardTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={() => addDocumentLink(tipe)} className="flex items-center gap-2">
-                        <Plus className="w-4 h-4" />Tambah Dokumen Pendukung
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => addCatatan(tipe)} className="flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4" />Tambah Catatan
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => addDocumentLink(tipe)} className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />Tambah Dokumen Pendukung
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
-                {documents.map(doc => (
+                {catatan.map(doc => (
+                    <div key={doc.id} className="flex items-start gap-3 p-3 border rounded-lg bg-yellow-50 dark:bg-yellow-950/40">
+                        <MessageSquare className="w-5 h-5 text-yellow-700 dark:text-yellow-300 mt-1 flex-shrink-0" />
+                        <div className="flex-grow space-y-1">
+                            <Label className="font-semibold text-yellow-800 dark:text-yellow-300">Catatan</Label>
+                            <Textarea
+                                placeholder="Tulis catatan untuk tahap ini..."
+                                value={doc.nama}
+                                rows={3}
+                                onChange={(e) => updateDocument(doc.id, 'nama', e.target.value)}
+                            />
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.id)} title="Hapus Catatan">
+                            <X className="w-4 h-4 text-muted-foreground"/>
+                        </Button>
+                    </div>
+                ))}
+                {dokumen.map(doc => (
                     <div key={doc.id} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800" : "bg-muted/50")}>
                         <div className="flex-grow space-y-2">
                             {doc.isWajib ? <Label className="font-semibold">{doc.nama}</Label> : <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.id, 'nama', e.target.value)} />}
@@ -448,10 +490,9 @@ const DokumenContent = ({ tipe, title }: { tipe: Dokumen['tipe'], title: string 
             </CardContent>
         </Card>
     );
-  };
+};
 
 export default function InputKegiatan() {
-    const { user } = useAuth();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { data: ketuaTimList = [] } = useQuery({ queryKey: ['ketuaTim'], queryFn: fetchKetuaTim });
@@ -463,6 +504,11 @@ export default function InputKegiatan() {
 
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [lastActivityName, setLastActivityName] = useState("");
+    /** Kegiatan yang baru saja dibuat, selama modal sukses masih terbuka. */
+    const [kegiatanBaru, setKegiatanBaru] = useState<{ id: number } | null>(null);
+    const [sedangMengurungkan, setSedangMengurungkan] = useState(false);
+    /** Peringatan kelengkapan alokasi yang menunggu konfirmasi "Tetap Simpan". */
+    const [peringatanKelengkapan, setPeringatanKelengkapan] = useState<{ daftar: KelompokPeringatan[]; bypassHonorLimit: boolean } | null>(null);
     const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
     const [addedPPLCount, setAddedPPLCount] = useState(0);
     const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
@@ -599,11 +645,14 @@ export default function InputKegiatan() {
 
    const mutation = useMutation({
      mutationFn: createActivity,
-     onSuccess: () => {
+     // Form sengaja TIDAK dikosongkan di sini. Selama modal sukses terbuka,
+     // pengguna masih bisa menekan "Batal Simpan Kegiatan"; kalau form sudah
+     // kosong, membatalkan berarti kehilangan seluruh isian. Pengosongan
+     // dipindah ke saat benar-benar dialihkan ke Dashboard.
+     onSuccess: (dibuat: Kegiatan) => {
        queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
+       setKegiatanBaru(dibuat && dibuat.id ? { id: dibuat.id } : null);
        setShowSuccessModal(true);
-       store.resetForm();
-       setHistoryLoadedName(null);
      },
      onError: (error: any) => {
       // Cek apakah error memiliki struktur yang kita harapkan dari server
@@ -632,7 +681,7 @@ export default function InputKegiatan() {
         message: `Terjadi kesalahan: ${error.response?.data?.message || error.message}` 
       });
    }
-    });
+    });
 
    const isFormIncomplete = (): boolean => {
      const {
@@ -669,12 +718,12 @@ export default function InputKegiatan() {
    const [showHonorWarningModal, setShowHonorWarningModal] = useState(false);
    const [honorWarningDetails, setHonorWarningDetails] = useState<{ pplName: string; totalHonor: number; limit: number } | null>(null);
 
-   const handleFormSubmit = (bypassHonorLimit = false) => {
-        const dateError = validateDates();
-        if (dateError) {
-            setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
-            return;
-        }
+   const handleFormSubmit = (bypassHonorLimit = false, lewatiKelengkapan = false) => {
+        const dateError = validateDates();
+        if (dateError) {
+            setAlertModal({ isOpen: true, title: "Kesalahan Jadwal Kegiatan", message: dateError });
+            return;
+        }
 
         // Jalur pembuatan kegiatan memasukkan seluruh dokumennya sekaligus,
         // jadi ia perlu penjagaan sendiri di samping tombol simpan per-dokumen
@@ -695,25 +744,25 @@ export default function InputKegiatan() {
             return;
         }
 
-        setLastActivityName(store.namaKegiatan);
+        setLastActivityName(store.namaKegiatan);
 
-        const formatDateForSubmission = (date: Date | undefined) => {
-            if (!date) return undefined;
-            return isValid(date) ? date.toISOString() : undefined;
-        };
-        
-        const dataToSubmit = {
+        const formatDateForSubmission = (date: Date | undefined) => {
+            if (!date) return undefined;
+            return isValid(date) ? date.toISOString() : undefined;
+        };
+        
+        const dataToSubmit = {
+          // Pembuat kegiatan TIDAK dikirim: server mengambilnya dari token sesi.
           namaKegiatan: store.namaKegiatan,
           ketua_tim_id: store.ketua_tim_id,
-          createdBy_userId: user?.id,
           deskripsiKegiatan: store.deskripsiKegiatan,
           adaListing: store.adaListing,
           adaPengolahan: store.adaPengolahan,
           adaDiseminasi: store.adaDiseminasi,
           isFasih: store.isFasih,
-          username: user?.username,
           ppl: store.pplAllocations,
-          documents: store.documents,
+          // Catatan yang dibiarkan kosong tidak ikut disimpan.
+          documents: store.documents.filter(d => d.jenis !== 'catatan' || d.nama.trim() !== ''),
           honorariumSettings: {
               'pengumpulan-data-listing': {
                   satuanBebanKerja: store.honorariumSettings['pengumpulan-data-listing'].satuanBebanKerja,
@@ -748,11 +797,70 @@ export default function InputKegiatan() {
           bypassHonorLimit: bypassHonorLimit
         };
 
-        mutation.mutate(dataToSubmit);
-    };
+
+        // Peringatan, bukan larangan: kegiatan boleh disimpan setengah jadi, tapi
+        // beban kerja 0, mitra tanpa PML, atau pengaturan honor yang kosong hampir
+        // selalu berarti lupa. Aturannya ada di kelengkapanAlokasi.ts.
+        if (!lewatiKelengkapan) {
+            const kunciHonor = { 'listing': ['pengumpulan-data-listing', 'Listing'], 'pencacahan': ['pengumpulan-data-pencacahan', 'Pencacahan'], 'pengolahan-analisis': ['pengolahan-analisis', 'Pengolahan'] } as const;
+            const peringatan = periksaKelengkapanAlokasi(
+                store.pplAllocations.map(ppl => ({
+                    tahap: ppl.tahap as TahapAlokasi,
+                    nama: ppl.namaPPL,
+                    adaMitra: !!ppl.ppl_master_id,
+                    bebanKerja: parseHonorNumber(ppl.honorarium?.[0]?.bebanKerja ?? 0),
+                    adaPml: !!ppl.pml_id,
+                })),
+                (Object.keys(kunciHonor) as TahapAlokasi[]).map(t => {
+                    const [kunci, kolom] = kunciHonor[t];
+                    const atur = store.honorariumSettings[kunci];
+                    return {
+                        tahap: t,
+                        satuanBebanKerja: atur?.satuanBebanKerja,
+                        hargaSatuan: parseHonorNumber(atur?.hargaSatuan ?? 0),
+                        adaRentang: Boolean(store[`tanggalMulaiHonor${kolom}`] && store[`tanggalSelesaiHonor${kolom}`]),
+                    };
+                }),
+            );
+            if (peringatan.length > 0) {
+                setPeringatanKelengkapan({ daftar: peringatan, bypassHonorLimit });
+                return;
+            }
+        }
+        mutation.mutate(dataToSubmit);
+    };
 
    const handleSuccessAction = () => {
+     store.resetForm();
+     setHistoryLoadedName(null);
+     setKegiatanBaru(null);
      navigate('/dashboard');
+   };
+
+   /**
+    * "Batal Simpan Kegiatan": kegiatan yang baru dibuat dihapus lagi lewat
+    * pintu khusus di server (hanya pembuatnya, hanya sesaat setelah dibuat),
+    * lalu pengguna tetap di halaman ini dengan isian form masih utuh.
+    */
+   const urungkanSimpan = async () => {
+     if (!kegiatanBaru || sedangMengurungkan) return;
+     setSedangMengurungkan(true);
+     try {
+       await apiClient.delete(`/kegiatan/${kegiatanBaru.id}/urungkan`);
+       queryClient.invalidateQueries({ queryKey: ['kegiatan'] });
+       setShowSuccessModal(false);
+       setKegiatanBaru(null);
+       setAlertModal({
+         isOpen: true,
+         title: 'Penyimpanan Dibatalkan',
+         message: `Kegiatan "${lastActivityName}" batal disimpan. Isian form masih utuh, silakan periksa lalu simpan lagi.`,
+       });
+     } catch (error: any) {
+       setShowSuccessModal(false);
+       setAlertModal({ isOpen: true, title: 'Gagal Membatalkan', message: error.message });
+     } finally {
+       setSedangMengurungkan(false);
+     }
    };
 
    return (
@@ -872,7 +980,7 @@ export default function InputKegiatan() {
                           <AlokasiPPLContent tahap="pencacahan" title="Pencacahan" />
                       </TabsContent>
                       <TabsContent value="pengolahan-analisis" className="mt-4">
-                          <AlokasiPPLContent tahap="pengolahan-analisis" title="Pengolahan & Analisis" />
+                          <AlokasiPPLContent tahap="pengolahan-analisis" title="Pengolahan" />
                       </TabsContent>
                   </Tabs>
                 </TabsContent>
@@ -882,13 +990,13 @@ export default function InputKegiatan() {
                      <TabsList className={cn("grid w-full", jumlahTahapDokumen === 4 ? "grid-cols-4" : jumlahTahapDokumen === 3 ? "grid-cols-3" : "grid-cols-2")}>
                          <TabsTrigger value="persiapan">Persiapan</TabsTrigger>
                          <TabsTrigger value="pengumpulan-data">Pengumpulan Data</TabsTrigger>
-                         {store.adaPengolahan && <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>}
-                         {store.adaDiseminasi && <TabsTrigger value="diseminasi-evaluasi">Diseminasi</TabsTrigger>}
+                         {!!store.adaPengolahan && <TabsTrigger value="pengolahan-analisis">Pengolahan</TabsTrigger>}
+                         {!!store.adaDiseminasi && <TabsTrigger value="diseminasi-evaluasi">Diseminasi</TabsTrigger>}
                      </TabsList>
                      <TabsContent value="persiapan" className="mt-4"><DokumenContent tipe="persiapan" title="Persiapan" /></TabsContent>
                      <TabsContent value="pengumpulan-data" className="mt-4"><DokumenContent tipe="pengumpulan-data" title="Pengumpulan Data" /></TabsContent>
-                     {store.adaPengolahan && <TabsContent value="pengolahan-analisis" className="mt-4"><DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" /></TabsContent>}
-                     {store.adaDiseminasi && <TabsContent value="diseminasi-evaluasi" className="mt-4"><DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" /></TabsContent>}
+                     {!!store.adaPengolahan && <TabsContent value="pengolahan-analisis" className="mt-4"><DokumenContent tipe="pengolahan-analisis" title="Pengolahan & Analisis" /></TabsContent>}
+                     {!!store.adaDiseminasi && <TabsContent value="diseminasi-evaluasi" className="mt-4"><DokumenContent tipe="diseminasi-evaluasi" title="Diseminasi & Evaluasi" /></TabsContent>}
                  </Tabs>
                </TabsContent>
              </Tabs>
@@ -914,21 +1022,33 @@ export default function InputKegiatan() {
              isOpen={showHonorWarningModal}
              onClose={() => setShowHonorWarningModal(false)}
              onConfirm={() => {
-                setShowHonorWarningModal(false);
-                handleFormSubmit(true); // Kirim dengan flag bypass
-             }}
+                setShowHonorWarningModal(false);
+                handleFormSubmit(true, true); // Kirim dengan flag bypass
+             }}
              title="Peringatan Batas Honor"
              description={`Total honor untuk ${honorWarningDetails?.pplName} di bulan terpilih akan menjadi ${formatHonor(honorWarningDetails?.totalHonor || 0)}, melebihi batas ${formatHonor(honorWarningDetails?.limit || 0)}. Lanjutkan?`}
              confirmLabel="Ya, Lanjutkan"
              variant="warning"
            />
-         <SuccessModal 
-           isOpen={showSuccessModal} 
-           onClose={() => setShowSuccessModal(false)} 
-           onAction={handleSuccessAction} 
-           title="Kegiatan Berhasil Disimpan!" 
-           description={`Kegiatan "${lastActivityName}" telah berhasil dibuat.`} 
-           actionLabel="Ke Dashboard" 
+         <SuccessModal
+           isOpen={showSuccessModal}
+           onClose={handleSuccessAction}
+           onAction={handleSuccessAction}
+           title="Kegiatan Berhasil Disimpan!"
+           description={`Kegiatan "${lastActivityName}" telah berhasil dibuat.`}
+           actionLabel="Ke Dashboard"
+           aksiKedua={{ label: sedangMengurungkan ? 'Membatalkan...' : 'Batal Simpan Kegiatan', onClick: urungkanSimpan }}
+           autoCloseDelay={6000}
+         />
+         <ConfirmationModal
+           isOpen={peringatanKelengkapan !== null}
+           onClose={() => setPeringatanKelengkapan(null)}
+           onConfirm={() => { const b = peringatanKelengkapan?.bypassHonorLimit ?? false; setPeringatanKelengkapan(null); handleFormSubmit(b, true); }}
+           title="Periksa Lagi Sebelum Menyimpan?"
+           description={teksPeringatan(peringatanKelengkapan?.daftar ?? [])}
+           confirmLabel="Tetap Simpan"
+           cancelLabel="Periksa Lagi"
+           variant="warning"
          />
          <AlertModal isOpen={alertModal.isOpen} onClose={() => setAlertModal({ isOpen: false, title: "", message: "" })} title={alertModal.title} description={alertModal.message} />
 

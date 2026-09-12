@@ -77,6 +77,36 @@ export const labelRentang = (mulai?: string, selesai?: string): string => {
 };
 
 /**
+ * Label rentang RINGKAS untuk kolom tabel yang sempit, mis. "1-30 September".
+ *
+ * Berbeda dari `labelRentang` yang selalu menyebut tahun. Di tabel Riwayat
+ * Penyuratan, tahunnya sudah ditentukan oleh filter tahun di atas tabel,
+ * sehingga mengulanginya pada setiap baris hanya memakan lebar kolom tanpa
+ * menambah keterangan apa pun.
+ *
+ * Tiga bentuk, makin panjang hanya bila memang perlu:
+ *  - satu bulan yang sama  : "1-30 September"
+ *  - beda bulan, tahun sama: "17 Sep - 17 Okt"
+ *  - beda tahun            : "17 Des 26 - 5 Jan 27" (tahun kembali disebut,
+ *    karena di sinilah menghilangkannya benar-benar menyesatkan)
+ */
+export const labelRentangSingkat = (mulai?: string, selesai?: string): string => {
+  const awal = keDate(mulai);
+  const akhir = keDate(selesai);
+  if (!awal) return "-";
+  if (!akhir) return format(awal, "d MMM yyyy", { locale: localeID });
+
+  const bulanSama = awal.getMonth() === akhir.getMonth() && awal.getFullYear() === akhir.getFullYear();
+  if (bulanSama) {
+    return `${format(awal, "d")}-${format(akhir, "d MMMM", { locale: localeID })}`;
+  }
+  if (awal.getFullYear() === akhir.getFullYear()) {
+    return `${format(awal, "d MMM", { locale: localeID })} - ${format(akhir, "d MMM", { locale: localeID })}`;
+  }
+  return `${format(awal, "d MMM yy", { locale: localeID })} - ${format(akhir, "d MMM yy", { locale: localeID })}`;
+};
+
+/**
  * Rentang honor bawaan untuk ketiga tahap alokasi: mengikuti jadwal PENDATAAN.
  *
  * Alasannya bukan sekadar kemudahan. Ketiga jenis alokasi — listing,

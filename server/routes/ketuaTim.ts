@@ -9,6 +9,7 @@ router.get('/', async (_req, res) => {
     const ketuaTimList = await getAllKetuaTim();
     res.json(ketuaTimList);
   } catch (error) {
+    console.error('Error fetching ketua tim list:', error);
     res.status(500).json({ message: 'Error fetching ketua tim list' });
   }
 });

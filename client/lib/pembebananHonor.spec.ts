@@ -2,36 +2,37 @@ import { describe, it, expect } from "vitest";
 import {
   bacaTanggal,
   batasPeriode,
-  bebankanHonor,
+  bebankanVolume,
   bulanDilalui,
   hariPerBulan,
   kunciBulan,
+  rentangDalamBulan,
+  totalPembebanan,
 } from "@shared/pembebananHonor";
 
 /**
  * Aturan yang dikunci di sini, dan kenapa:
  *
  * Batas SBML berlaku per mitra per BULAN. Begitu periode honor melintasi
- * beberapa bulan, harus ada keputusan berapa rupiah yang jatuh di tiap bulan —
- * dan keputusan itu diambil PER ALOKASI PPL, karena tiap mitra punya sisa kuota
- * yang berbeda.
+ * beberapa bulan, harus ada keputusan berapa yang jatuh di tiap bulan — dan
+ * keputusan itu diambil PER ALOKASI PPL.
  *
- * Dua sifat yang paling mudah rusak tanpa terlihat:
+ * YANG DIBAGI ADALAH MUATAN. Tim keuangan memecah Surat PK honor lintas bulan
+ * menurut unit beban kerja: target 10 responden jadi SPK bulan pertama
+ * 5 responden dan SPK bulan kedua 5 responden. Karena itu:
  *
- * 1. JUMLAHNYA HARUS UTUH. Berapa pun cara membaginya, jumlah seluruh bagian
- *    wajib sama persis dengan honor aslinya. Pembulatan yang menguapkan satu
- *    rupiah membuat rekap tahunan tidak pernah cocok dengan yang dibayarkan.
- *
- * 2. KELEBIHAN TIDAK BOLEH HILANG. Saat 'luber' kehabisan kuota di semua bulan,
- *    kelebihannya dijatuhkan ke bulan terakhir — bukan dibuang. Membuangnya
- *    akan menyembunyikan pelanggaran batas yang justru ingin ditangkap.
+ * 1. VOLUME SELALU BILANGAN BULAT dan menjumlah persis beban kerjanya.
+ * 2. RUPIAH SELALU volume x harga satuan, sehingga jumlah seluruh bulan persis
+ *    sama dengan honor alokasinya.
+ * 3. KELEBIHAN TIDAK BOLEH HILANG. Saat 'luber' kehabisan kuota di semua bulan,
+ *    muatannya dijatuhkan ke bulan terakhir — membuangnya akan menyembunyikan
+ *    pelanggaran batas yang justru ingin ditangkap.
  */
+
+const HARGA = 24_000;
 
 describe("bacaTanggal", () => {
   it("membaca 'YYYY-MM-DD' sebagai tanggal LOKAL, bukan UTC", () => {
-    // `new Date('2026-01-01')` bernilai tengah malam UTC; di WIB (+7) itu masih
-    // 1 Januari, tapi di zona barat menjadi 31 Desember — bulan pembebanannya
-    // ikut meleset satu bulan. Karena itu tanggalnya dipecah manual.
     const d = bacaTanggal("2026-01-01")!;
     expect(d.getFullYear()).toBe(2026);
     expect(d.getMonth()).toBe(0);
@@ -55,15 +56,11 @@ describe("kunciBulan", () => {
 
 describe("bulanDilalui", () => {
   it("periode dalam satu bulan menghasilkan satu bulan", () => {
-    // Satu elemen adalah penanda bahwa layar tidak perlu menawarkan pilihan.
     expect(bulanDilalui("2026-01-01", "2026-01-15")).toEqual(["01-2026"]);
   });
 
-  it("periode lintas dua bulan menghasilkan keduanya, berurutan", () => {
-    expect(bulanDilalui("2026-02-15", "2026-03-15")).toEqual(["02-2026", "03-2026"]);
-  });
-
-  it("periode lintas tiga bulan menghasilkan ketiganya", () => {
+  it("periode lintas bulan menghasilkan semuanya, berurutan", () => {
+    expect(bulanDilalui("2026-01-15", "2026-02-15")).toEqual(["01-2026", "02-2026"]);
     expect(bulanDilalui("2026-01-20", "2026-03-10")).toEqual(["01-2026", "02-2026", "03-2026"]);
   });
 
@@ -79,117 +76,131 @@ describe("bulanDilalui", () => {
 
 describe("hariPerBulan", () => {
   it("menghitung hari di tiap bulan, ujung-ujungnya ikut terhitung", () => {
-    // 15-28 Februari = 14 hari, 1-15 Maret = 15 hari.
-    expect(hariPerBulan("2026-02-15", "2026-03-15")).toEqual({ "02-2026": 14, "03-2026": 15 });
-  });
-
-  it("satu hari tetap satu hari", () => {
-    expect(hariPerBulan("2026-05-10", "2026-05-10")).toEqual({ "05-2026": 1 });
+    // 15-31 Januari = 17 hari, 1-15 Februari = 15 hari.
+    expect(hariPerBulan("2026-01-15", "2026-02-15")).toEqual({ "01-2026": 17, "02-2026": 15 });
   });
 });
 
-describe("bebankanHonor - periode satu bulan", () => {
-  it("seluruh honor jatuh di bulan itu, metode apa pun diabaikan", () => {
+describe("rentangDalamBulan — jangka waktu tiap Surat PK", () => {
+  it("contoh tim keuangan: 15 Jan - 15 Feb jadi 15-31 Jan dan 1-15 Feb", () => {
+    expect(rentangDalamBulan("2026-01-15", "2026-02-15", "01-2026"))
+      .toEqual({ mulai: "2026-01-15", selesai: "2026-01-31" });
+    expect(rentangDalamBulan("2026-01-15", "2026-02-15", "02-2026"))
+      .toEqual({ mulai: "2026-02-01", selesai: "2026-02-15" });
+  });
+
+  it("akhir Februari tahun kabisat benar", () => {
+    expect(rentangDalamBulan("2028-02-10", "2028-03-05", "02-2028"))
+      .toEqual({ mulai: "2028-02-10", selesai: "2028-02-29" });
+  });
+
+  it("bulan yang tidak disentuh periode menghasilkan null", () => {
+    expect(rentangDalamBulan("2026-01-15", "2026-02-15", "03-2026")).toBeNull();
+    expect(rentangDalamBulan(null, "2026-02-15", "01-2026")).toBeNull();
+  });
+});
+
+describe("bebankanVolume — periode satu bulan", () => {
+  it("seluruh muatan jatuh di bulan itu, metode apa pun diabaikan", () => {
     for (const metode of ["bulan_tertentu", "prorata", "luber"] as const) {
-      expect(bebankanHonor(3_000_000, "2026-01-01", "2026-01-31", { metode }))
-        .toEqual({ "01-2026": 3_000_000 });
+      expect(bebankanVolume(10, HARGA, "2026-01-01", "2026-01-31", { metode }))
+        .toEqual({ "01-2026": { volume: 10, jumlah: 240_000 } });
     }
   });
 });
 
-describe("bebankanHonor - bulan_tertentu", () => {
-  it("membebankan seluruhnya ke bulan yang dipilih", () => {
-    expect(bebankanHonor(3_000_000, "2026-02-15", "2026-03-15", {
-      metode: "bulan_tertentu", bulanDipilih: "03-2026",
-    })).toEqual({ "03-2026": 3_000_000 });
-  });
-
-  it("bulan awal maupun bulan akhir sama-sama bisa dipilih", () => {
-    expect(bebankanHonor(1_000_000, "2026-01-20", "2026-03-10", {
+describe("bebankanVolume — bulan_tertentu", () => {
+  it("membebankan seluruh muatan ke bulan yang dipilih", () => {
+    expect(bebankanVolume(10, HARGA, "2026-01-15", "2026-02-15", {
       metode: "bulan_tertentu", bulanDipilih: "02-2026",
-    })).toEqual({ "02-2026": 1_000_000 });
+    })).toEqual({ "02-2026": { volume: 10, jumlah: 240_000 } });
   });
 
   it("pilihan yang tidak lagi dilalui periode jatuh ke bulan pertama, bukan hilang", () => {
-    // Terjadi bila periodenya dipersempit setelah bulannya dipilih. Honor yang
-    // menghilang dari rekap jauh lebih berbahaya daripada bulan yang meleset.
-    expect(bebankanHonor(500_000, "2026-02-15", "2026-03-15", {
+    expect(bebankanVolume(10, HARGA, "2026-01-15", "2026-02-15", {
       metode: "bulan_tertentu", bulanDipilih: "07-2026",
-    })).toEqual({ "02-2026": 500_000 });
+    })).toEqual({ "01-2026": { volume: 10, jumlah: 240_000 } });
   });
 });
 
-describe("bebankanHonor - prorata", () => {
-  it("membagi menurut jumlah hari di tiap bulan", () => {
-    // 14 hari Februari : 15 hari Maret dari total 29 hari.
-    const hasil = bebankanHonor(2_900_000, "2026-02-15", "2026-03-15", { metode: "prorata" });
-    expect(hasil["02-2026"] + hasil["03-2026"]).toBe(2_900_000);
-    expect(hasil["02-2026"]).toBe(1_400_000);
-    expect(hasil["03-2026"]).toBe(1_500_000);
-  });
-
-  it("periode dua bulan berporsi hari seimbang praktis terbagi dua", () => {
-    const hasil = bebankanHonor(1_000_000, "2026-01-16", "2026-02-15", { metode: "prorata" });
-    expect(hasil["01-2026"] + hasil["02-2026"]).toBe(1_000_000);
-    expect(Math.abs(hasil["01-2026"] - hasil["02-2026"])).toBeLessThanOrEqual(35_000);
-  });
-
-  it("tidak menguapkan rupiah saat pembagiannya tidak bulat", () => {
-    const hasil = bebankanHonor(1_000_000, "2026-01-01", "2026-03-31", { metode: "prorata" });
-    const jumlah = Object.values(hasil).reduce((a, b) => a + b, 0);
-    expect(jumlah).toBe(1_000_000);
-  });
-});
-
-describe("bebankanHonor - luber", () => {
-  it("memenuhi kuota bulan pertama, sisanya ke bulan berikutnya", () => {
-    // Mitra masih punya sisa 1 juta di Februari; honornya 3 juta.
-    const hasil = bebankanHonor(3_000_000, "2026-02-15", "2026-03-15", {
-      metode: "luber", sisaKuota: { "02-2026": 1_000_000, "03-2026": 3_000_000 },
+describe("bebankanVolume — prorata", () => {
+  it("contoh tim keuangan: 10 responden pada 15 Jan - 15 Feb menjadi 5 dan 5", () => {
+    // 17 : 15 hari -> 5,31 : 4,69. Sisa satu unit jatuh ke PECAHAN terbesar
+    // (Februari, ,69), bukan ke bulan terpanjang — kalau ke bulan terpanjang
+    // hasilnya 6/4, bukan pembagian yang dipraktikkan tim keuangan.
+    expect(bebankanVolume(10, HARGA, "2026-01-15", "2026-02-15", { metode: "prorata" })).toEqual({
+      "01-2026": { volume: 5, jumlah: 120_000 },
+      "02-2026": { volume: 5, jumlah: 120_000 },
     });
-    expect(hasil).toEqual({ "02-2026": 1_000_000, "03-2026": 2_000_000 });
+  });
+
+  it("volume selalu bulat dan menjumlah persis beban kerjanya", () => {
+    const hasil = bebankanVolume(7, HARGA, "2026-01-01", "2026-03-31", { metode: "prorata" });
+    for (const b of Object.values(hasil)) expect(Number.isInteger(b.volume)).toBe(true);
+    expect(totalPembebanan(hasil)).toEqual({ volume: 7, jumlah: 7 * HARGA });
+  });
+});
+
+describe("bebankanVolume — luber", () => {
+  it("bulan pertama diisi sebanyak unit yang masih muat, sisanya ke bulan berikutnya", () => {
+    // Sisa kuota Januari Rp 100.000 hanya muat 4 dokumen (4 x 24.000 = 96.000).
+    expect(bebankanVolume(10, HARGA, "2026-01-15", "2026-02-15", {
+      metode: "luber", sisaKuota: { "01-2026": 100_000, "02-2026": 3_000_000 },
+    })).toEqual({
+      "01-2026": { volume: 4, jumlah: 96_000 },
+      "02-2026": { volume: 6, jumlah: 144_000 },
+    });
+  });
+
+  it("tidak pernah melewati kuota bulan pertama walau hanya kurang serupiah", () => {
+    // 95.999 tidak cukup untuk dokumen ke-4 (96.000).
+    const hasil = bebankanVolume(10, HARGA, "2026-01-15", "2026-02-15", {
+      metode: "luber", sisaKuota: { "01-2026": 95_999 },
+    });
+    expect(hasil["01-2026"].volume).toBe(3);
+    expect(hasil["01-2026"].jumlah).toBeLessThanOrEqual(95_999);
   });
 
   it("mengalir berurutan melewati tiga bulan", () => {
-    const hasil = bebankanHonor(5_000_000, "2026-01-20", "2026-03-10", {
+    expect(bebankanVolume(10, HARGA, "2026-01-20", "2026-03-10", {
       metode: "luber",
-      sisaKuota: { "01-2026": 2_000_000, "02-2026": 2_000_000, "03-2026": 3_000_000 },
+      sisaKuota: { "01-2026": 48_000, "02-2026": 72_000, "03-2026": 999_999 },
+    })).toEqual({
+      "01-2026": { volume: 2, jumlah: 48_000 },
+      "02-2026": { volume: 3, jumlah: 72_000 },
+      "03-2026": { volume: 5, jumlah: 120_000 },
     });
-    expect(hasil).toEqual({ "01-2026": 2_000_000, "02-2026": 2_000_000, "03-2026": 1_000_000 });
-  });
-
-  it("bulan yang kuotanya sudah habis dilewati tanpa kebagian", () => {
-    const hasil = bebankanHonor(1_500_000, "2026-02-15", "2026-03-15", {
-      metode: "luber", sisaKuota: { "02-2026": 0, "03-2026": 3_000_000 },
-    });
-    expect(hasil).toEqual({ "02-2026": 0, "03-2026": 1_500_000 });
   });
 
   it("kelebihan yang tidak tertampung JATUH ke bulan terakhir, tidak dibuang", () => {
-    // Kalau dibuang, mitra ini akan terlihat aman padahal honornya melanggar.
-    const hasil = bebankanHonor(9_000_000, "2026-02-15", "2026-03-15", {
-      metode: "luber", sisaKuota: { "02-2026": 1_000_000, "03-2026": 500_000 },
+    const hasil = bebankanVolume(10, HARGA, "2026-01-15", "2026-02-15", {
+      metode: "luber", sisaKuota: { "01-2026": 24_000, "02-2026": 0 },
     });
-    expect(hasil["02-2026"]).toBe(1_000_000);
-    expect(hasil["03-2026"]).toBe(8_000_000);
-    expect(Object.values(hasil).reduce((a, b) => a + b, 0)).toBe(9_000_000);
+    expect(hasil["01-2026"].volume).toBe(1);
+    expect(hasil["02-2026"].volume).toBe(9);
+    expect(totalPembebanan(hasil).volume).toBe(10);
   });
 
-  it("sisa kuota yang tidak disebut dianggap nol", () => {
-    const hasil = bebankanHonor(2_000_000, "2026-02-15", "2026-03-15", { metode: "luber" });
-    expect(hasil).toEqual({ "02-2026": 0, "03-2026": 2_000_000 });
+  it("harga satuan nol: seluruh muatan cukup di bulan pertama", () => {
+    expect(bebankanVolume(10, 0, "2026-01-15", "2026-02-15", { metode: "luber" }))
+      .toEqual({ "01-2026": { volume: 10, jumlah: 0 }, "02-2026": { volume: 0, jumlah: 0 } });
   });
 });
 
-describe("bebankanHonor - jumlah selalu utuh", () => {
+describe("bebankanVolume — sifat yang berlaku untuk semua metode", () => {
   it.each([
-    ["bulan_tertentu", { metode: "bulan_tertentu" as const, bulanDipilih: "03-2026" }],
+    ["bulan_tertentu", { metode: "bulan_tertentu" as const, bulanDipilih: "02-2026" }],
     ["prorata", { metode: "prorata" as const }],
-    ["luber", { metode: "luber" as const, sisaKuota: { "02-2026": 777_777 } }],
-  ])("%s menjumlah persis honor aslinya", (_nama, opsi) => {
-    const total = 3_333_333;
-    const hasil = bebankanHonor(total, "2026-02-15", "2026-03-15", opsi);
-    expect(Object.values(hasil).reduce((a, b) => a + b, 0)).toBe(total);
+    ["luber", { metode: "luber" as const, sisaKuota: { "01-2026": 77_777 } }],
+  ])("%s: rupiah tiap bulan = volume x harga, dan totalnya utuh", (_nama, opsi) => {
+    const hasil = bebankanVolume(13, HARGA, "2026-01-15", "2026-02-15", opsi);
+    for (const b of Object.values(hasil)) expect(b.jumlah).toBe(b.volume * HARGA);
+    expect(totalPembebanan(hasil)).toEqual({ volume: 13, jumlah: 13 * HARGA });
+  });
+
+  it("muatan nol tetap tercatat di bulan pertama, bukan hilang", () => {
+    expect(bebankanVolume(0, HARGA, "2026-01-15", "2026-02-15", { metode: "prorata" }))
+      .toEqual({ "01-2026": { volume: 0, jumlah: 0 } });
   });
 });
 
@@ -199,12 +210,7 @@ describe("batasPeriode", () => {
     expect(batasPeriode(3_000_000, "2026-01-01", "2026-12-31")).toBe(36_000_000);
   });
 
-  it("rentang di dalam satu bulan tetap satu kali batas", () => {
-    expect(batasPeriode(3_000_000, "2026-01-05", "2026-01-20")).toBe(3_000_000);
-  });
-
   it("rentang yang tidak sah tidak menghasilkan nol", () => {
-    // Nol akan membuat setiap mitra terlihat melanggar saat filternya belum lengkap.
     expect(batasPeriode(3_000_000, null, null)).toBe(3_000_000);
   });
 });

@@ -1,7 +1,7 @@
 // server/routes/honor.ts
 
 import { Router } from 'express';
-import { getHonorRekap, getHonorDetail, getTotalHonorPPLByMonth, validatePplHonor } from '../services/honorService';
+import { getHonorRekap, getHonorDetail } from '../services/honorService';
 
 const router = Router();
 
@@ -77,37 +77,5 @@ router.get('/:pplId/detail', async (req, res) => {
     }
 });
 
- // RUTE BARU UNTUK VALIDASI HONOR SAAT INPUT KEGIATAN
- // GET /api/honor/ppl/validate?pplId=...&bulan=...&tahun=...
- router.get('/ppl/validate', async (req, res) => {
-   try {
-       const { pplId, bulan, tahun } = req.query;
-
-       if (!pplId || !bulan || !tahun) {
-           return res.status(400).json({ message: 'Parameter pplId, bulan, dan tahun diperlukan' });
-       }
-
-       const totalHonor = await getTotalHonorPPLByMonth(pplId as string, parseInt(bulan as string), parseInt(tahun as string));
-       res.json({ totalHonor });
-
-   } catch (error) {
-       console.error("Error fetching PPL honor for validation:", error);
-       res.status(500).json({ message: 'Gagal memuat data honor PPL' });
-   }
- });
- 
- router.post('/validate', async (req, res) => {
-  try {
-    const { pplMasterId, bulan, tahun, currentActivityHonor, kegiatanIdToExclude } = req.body;
-    if (!pplMasterId || !bulan || !tahun || currentActivityHonor === undefined) {
-      return res.status(400).json({ message: 'Parameter untuk validasi honor tidak lengkap.' });
-    }
-    const result = await validatePplHonor(pplMasterId, bulan, tahun, currentActivityHonor, kegiatanIdToExclude || null);
-    res.json(result);
-  } catch (error) {
-    console.error('API Validation Error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan internal saat melakukan validasi honor.' });
-  }
-});
 
 export default router;

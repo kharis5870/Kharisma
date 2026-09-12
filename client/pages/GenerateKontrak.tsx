@@ -9,18 +9,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileDown, Save, Loader2, Package, ShieldAlert, AlertTriangle, Sheet, RotateCcw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format } from "date-fns";
 import type { UraianTugasKontrak, DataKontrakMitra, TemplateSurat, NomorTerpakaiTahun, HasilAturUlangNomor } from "@shared/api";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
-import { DateRangePicker, type RentangTanggal } from "@/components/ui/date-range-picker";
+import type { RentangTanggal } from "@/components/ui/date-range-picker";
+import { MonthPicker, bulanSekarang } from "@/components/ui/month-picker";
 import { DatePicker } from "@/components/ui/date-picker";
-import { labelRentang } from "@/lib/honorPeriode";
+import { labelRentang, rentangDariBulan } from "@/lib/honorPeriode";
 import { formatRupiah } from "@/lib/terbilang";
-import { sanitizeJumlah } from "@/lib/angka";
-import { nomorPertama, nomorDiabaikan } from "@shared/nomorAwal";
 import { FRASA_KONFIRMASI_ATUR_ULANG, ringkasNomorPeriode } from "@shared/aturUlangNomor";
 import { unduhKontrak, kontrakKeBlob, namaBerkasKontrak } from "@/lib/kontrakPdf";
 import { unduhBlob, exportToExcel, type KolomEkspor } from "@/lib/exportUtils";
@@ -30,11 +31,6 @@ import SuccessModal from "@/components/SuccessModal";
 import AlertModal from "@/components/AlertModal";
 
 const FORMAT_TANGGAL = "yyyy-MM-dd";
-
-const rentangBulanIni = (): RentangTanggal => ({
-  mulai: format(startOfMonth(new Date()), FORMAT_TANGGAL),
-  selesai: format(endOfMonth(new Date()), FORMAT_TANGGAL),
-});
 
 const LABEL_TAHAP: Record<string, string> = {
   listing: "Listing",
@@ -49,12 +45,22 @@ export default function GenerateKontrak() {
   // Tim keuangan diwakili role supervisor; admin juga diberi akses.
   const bolehMengubah = user?.role === "admin" || user?.role === "supervisor";
 
-  const [rentang, setRentang] = useState<RentangTanggal>(rentangBulanIni);
+  // Surat PK diikat per mitra per BULAN, sesuai praktik tim keuangan, jadi
+  // periodenya SELALU satu bulan kalender penuh dan diturunkan dari pilihan
+  // bulan. Dulu di sini ada pemilih rentang bebas: setiap kali rentangnya
+  // digeser sedikit, aplikasi menganggapnya periode baru lalu memesan nomor
+  // surat baru, sehingga satu mitra bisa memegang tiga nomor untuk pekerjaan
+  // yang sama (001, 005, dan 007 pada data nyata).
+  const [bulan, setBulan] = useState(bulanSekarang());
+  const rentang: RentangTanggal = useMemo(() => rentangDariBulan(bulan), [bulan]);
   const [tanggalSurat, setTanggalSurat] = useState(format(new Date(), FORMAT_TANGGAL));
-  // Nomor awal opsional: sebagian satker melanjutkan buku agenda manual yang
-  // sudah berjalan, jadi surat pertama dari aplikasi harus mulai dari sana.
-  const [nomorMulai, setNomorMulai] = useState("");
-  const [tabAktif, setTabAktif] = useState("uraian");
+  // Tab awal bisa ditentukan lewat `?tab=`, dipakai notifikasi "isi surat
+  // berubah" untuk mendaratkan tim keuangan langsung di tab Generate SPK —
+  // tempat peringatan per mitra dan tombol perbaikannya berada.
+  const [paramTab] = useSearchParams();
+  const tabDiminta = paramTab.get('tab');
+  const [tabAktif, setTabAktif] = useState(
+    tabDiminta === 'generate' || tabDiminta === 'bast' ? tabDiminta : "uraian");
   const [dialogAturUlang, setDialogAturUlang] = useState(false);
   const [draftUraian, setDraftUraian] = useState<Record<string, { uraian_tugas: string; kode_anggaran: string }>>({});
   const [sedangGenerate, setSedangGenerate] = useState(false);
@@ -126,9 +132,14 @@ export default function GenerateKontrak() {
         periodeMulai: rentang.mulai,
         periodeSelesai: rentang.selesai,
         tanggalSurat,
-        username: user?.username,
-        daftarMitra: mitra.map(m => ({ pplMasterId: m.pplMasterId, totalHonor: m.totalHonor })),
-        nomorMulai: nomorMulai ? Number(nomorMulai) : undefined,
+        // `baris` ikut dikirim supaya server bisa menyimpan salinan isi surat
+        // saat terbit. Tanpa itu, perubahan honor atau muatan setelah surat
+        // ditandatangani tidak bisa ditunjukkan, hanya selisih totalnya.
+        daftarMitra: mitra.map(m => ({
+          pplMasterId: m.pplMasterId,
+          totalHonor: m.totalHonor,
+          baris: m.baris,
+        })),
       },
     );
     queryClient.invalidateQueries({ queryKey: ["kontrakData"] });
@@ -165,11 +176,38 @@ export default function GenerateKontrak() {
   /** Ringkasan nomor periode yang sedang tampil, untuk dialog atur ulang. */
   const ringkasanNomor = useMemo(() => ringkasNomorPeriode(dataMitra), [dataMitra]);
 
+  /**
+   * Mitra yang suratnya SUDAH terbit tetapi isinya tidak lagi sesuai data
+   * sekarang — honor direvisi, muatan bertambah, atau ada kegiatan baru yang
+   * masuk setelah surat ditandatangani. Dihitung server (lihat
+   * `bandingkanIsiSurat`) supaya layar dan notifikasi tidak pernah berbeda.
+   */
+  const mitraBerubah = useMemo(() => dataMitra.filter(m => (m.perubahan?.length ?? 0) > 0), [dataMitra]);
+  const [suratDiperiksa, setSuratDiperiksa] = useState<DataKontrakMitra | null>(null);
+
+  /**
+   * "Perbarui Kontrak": isi surat disegarkan mengikuti data sekarang, NOMORNYA
+   * TETAP. Bagi tim keuangan ini surat yang sama yang dicetak ulang — memberi
+   * nomor baru justru menciptakan dua surat untuk satu pekerjaan.
+   */
+  const perbaruiKontrak = useMutation({
+    mutationFn: (suratId: number) => apiClient.post(`/kontrak/surat/${suratId}/perbarui`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kontrakData"] });
+      setSuratDiperiksa(null);
+      setSuccessModal({
+        isOpen: true,
+        description: "Isi kontrak diperbarui mengikuti data terbaru. Nomor suratnya tidak berubah — cetak ulang PDF-nya agar berkasnya ikut sesuai.",
+      });
+    },
+    onError: (error: any) =>
+      setAlertModal({ isOpen: true, title: "Gagal Memperbarui Kontrak", message: error.message }),
+  });
+
   const aturUlangNomor = useMutation({
     mutationFn: () => apiClient.post<HasilAturUlangNomor>("/kontrak/nomor/atur-ulang", {
       periodeMulai: rentang.mulai,
       periodeSelesai: rentang.selesai,
-      username: user?.username,
       konfirmasi: FRASA_KONFIRMASI_ATUR_ULANG,
     }),
     onSuccess: (hasil) => {
@@ -299,8 +337,12 @@ export default function GenerateKontrak() {
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="space-y-2 sm:w-80">
-                <Label>Periode Honor</Label>
-                <DateRangePicker value={rentang} onChange={setRentang} />
+                <Label htmlFor="bulanSurat">Bulan Honor</Label>
+                <MonthPicker id="bulanSurat" value={bulan} onChange={setBulan} />
+                <p className="text-xs text-muted-foreground">
+                  Satu surat per mitra per bulan. Honor yang melintasi dua bulan sudah dipecah
+                  menurut muatannya, jadi tiap bulan punya suratnya sendiri.
+                </p>
               </div>
               <div className="space-y-2 sm:w-52">
                 <Label htmlFor="tanggalSurat">Tanggal Surat</Label>
@@ -316,24 +358,17 @@ export default function GenerateKontrak() {
                 )}
               </div>
               <div className="space-y-2 sm:w-44">
-                <Label htmlFor="nomorMulai">Mulai dari Nomor</Label>
-                <Input
-                  id="nomorMulai"
-                  inputMode="numeric"
-                  placeholder="otomatis"
-                  value={nomorMulai}
-                  onChange={e => setNomorMulai(sanitizeJumlah(e.target.value))}
-                />
+                {/* Isian "Mulai dari Nomor" dihapus: nomor yang sudah dipesan
+                    bersifat permanen, jadi isian itu tidak berlaku bagi mitra
+                    yang sudah bernomor dan justru menimbulkan keluhan "sudah
+                    diisi 7 tapi nomornya tetap dari 1". Penyesuaian nomor kini
+                    dilakukan per surat di halaman Riwayat Penyuratan. */}
+                <Label>Penomoran</Label>
                 <p className="text-xs text-muted-foreground">
-                  Kosongkan untuk melanjutkan nomor tertinggi tahun {tahunSurat}
+                  Nomor melanjutkan nomor tertinggi tahun {tahunSurat}
                   {maksTerpakaiTahun > 0 ? ` (sekarang ${maksTerpakaiTahun})` : ""}.
+                  Nomor tiap surat bisa disesuaikan di halaman Riwayat Penyuratan.
                 </p>
-                {nomorDiabaikan(maksTerpakaiTahun, nomorMulai) && (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
-                    Nomor {nomorMulai} sudah terpakai tahun ini. Penomoran tetap dilanjutkan
-                    dari {nomorPertama(maksTerpakaiTahun, nomorMulai)} agar tidak ganda.
-                  </p>
-                )}
                 {/* Penyebab keluhan "sudah diisi 7 tapi nomornya tetap dari 1":
                     nomor yang terlanjur dipesan bersifat permanen, jadi isian ini
                     tidak berlaku bagi mitra yang sudah punya nomor. */}
@@ -478,6 +513,20 @@ export default function GenerateKontrak() {
                     </p>
                   </div>
                 )}
+                {mitraBerubah.length > 0 && (
+                  <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-md">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-300 shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800 dark:text-amber-300">
+                      <p className="font-medium">
+                        {mitraBerubah.length} surat sudah terbit tetapi isinya tidak lagi sesuai data sekarang.
+                      </p>
+                      <p>
+                        Honor atau muatannya berubah, atau ada kegiatan baru yang masuk setelah surat dibuat.
+                        Klik lencana &quot;Berubah&quot; pada barisnya untuk melihat apa yang berbeda.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {mitraTanpaMAK > 0 && (
                   <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-md">
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-300 shrink-0 mt-0.5" />
@@ -519,10 +568,27 @@ export default function GenerateKontrak() {
                           <TableCell className="text-sm">{labelRentang(m.jangkaWaktuMulai ?? undefined, m.jangkaWaktuSelesai ?? undefined)}</TableCell>
                           <TableCell className="font-semibold">{formatRupiah(m.totalHonor)}</TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm" disabled={!bolehMengubah || sedangGenerate || !template}
-                              onClick={() => unduhSatu(m)}>
-                              <FileDown className="w-4 h-4 mr-1" />PDF
-                            </Button>
+                            {/* Peringatan diletakkan di kolom aksi, di bawah tombol
+                                PDF, bukan menempel pada nama mitra: ia adalah
+                                TINDAKAN yang perlu diambil, dan menaruhnya di kolom
+                                nama membuat kolom itu berantakan. */}
+                            <div className="flex flex-col items-start gap-1">
+                              <Button variant="outline" size="sm" disabled={!bolehMengubah || sedangGenerate || !template}
+                                onClick={() => unduhSatu(m)}>
+                                <FileDown className="w-4 h-4 mr-1" />PDF
+                              </Button>
+                              {(m.perubahan?.length ?? 0) > 0 && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-amber-400 text-amber-800 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                                  onClick={() => setSuratDiperiksa(m)}
+                                >
+                                  <AlertTriangle className="w-4 h-4 mr-1" />
+                                  Berubah
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -541,7 +607,6 @@ export default function GenerateKontrak() {
               dataMitra={dataMitra}
               memuatMitra={memuatMitra}
               bolehMengubah={bolehMengubah}
-              username={user?.username}
               onPindahKeTabSpk={() => setTabAktif("generate")}
               onSukses={description => setSuccessModal({ isOpen: true, description })}
               onGagal={(title, message) => setAlertModal({ isOpen: true, title, message })}
@@ -558,6 +623,68 @@ export default function GenerateKontrak() {
         ringkasan={ringkasanNomor}
         sedangProses={aturUlangNomor.isPending}
       />
+
+      {/* Apa yang berbeda sejak surat terbit.
+          "Abaikan dulu" sengaja TIDAK menyimpan apa pun: peringatannya harus
+          tetap ada selama isinya belum diselaraskan, karena yang dipastikan ke
+          ketua tim adalah datanya, bukan peringatannya. */}
+      <Dialog open={suratDiperiksa !== null} onOpenChange={buka => { if (!buka) setSuratDiperiksa(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Perubahan pada surat {suratDiperiksa?.nomorSurat || suratDiperiksa?.nama}
+            </DialogTitle>
+            <DialogDescription>
+              Berikut yang berbeda antara isi surat saat terbit dan data {suratDiperiksa?.nama} sekarang.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-72 overflow-y-auto space-y-3">
+            {(suratDiperiksa?.perubahan ?? []).map((p, i) => (
+              <div key={i} className="rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className={
+                      p.jenis === "baru" ? "border-green-300 text-green-700 dark:border-green-800 dark:text-green-300"
+                      : p.jenis === "hilang" ? "border-red-300 text-red-700 dark:border-red-800 dark:text-red-300"
+                      : "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300"
+                    }
+                  >
+                    {p.jenis === "baru" ? "Kegiatan baru"
+                      : p.jenis === "hilang" ? "Tidak ada lagi"
+                      : p.jenis === "total" ? "Total berubah" : "Berubah"}
+                  </Badge>
+                  <span className="text-sm font-medium">{p.judul}</span>
+                </div>
+                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                  {p.rincian.map((r, j) => <li key={j}>{r}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Memperbarui kontrak menyelaraskan isinya dengan data sekarang dan TIDAK mengubah nomor
+            surat. Berkas PDF yang sudah dicetak perlu dicetak ulang setelahnya.
+          </p>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSuratDiperiksa(null)}>
+              Abaikan Dulu
+            </Button>
+            <Button
+              disabled={!bolehMengubah || !suratDiperiksa?.suratId || perbaruiKontrak.isPending}
+              onClick={() => suratDiperiksa?.suratId && perbaruiKontrak.mutate(suratDiperiksa.suratId)}
+            >
+              {perbaruiKontrak.isPending
+                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                : <RotateCcw className="w-4 h-4 mr-2" />}
+              Perbarui Kontrak
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SuccessModal
         isOpen={successModal.isOpen}

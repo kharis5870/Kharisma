@@ -3,15 +3,22 @@
  *
  * MASALAH YANG DISELESAIKAN
  * Batas SBML berlaku per mitra per BULAN, sedangkan periode honor sebuah
- * kegiatan bisa melintasi beberapa bulan (mis. 15 Februari - 15 Maret). Selama
- * ini honor sebuah alokasi dianggap utuh di setiap bulan yang beririsan,
- * sehingga satu honor 3 juta terbaca 3 juta di Februari DAN 3 juta di Maret:
- * rekap tahunan jadi dobel, dan batas bulanan terhitung dua kali.
+ * kegiatan bisa melintasi beberapa bulan (mis. 15 Januari - 15 Februari).
+ * Harus ada keputusan berapa yang jatuh di tiap bulan, dan keputusan itu
+ * diambil PER ALOKASI PPL: mitra yang kuotanya masih longgar cukup dibebankan
+ * ke satu bulan, sementara mitra yang hampir mentok perlu dipecah.
  *
- * Modul ini memutuskan berapa rupiah yang jatuh di tiap bulan, dengan tiga cara
- * yang dipilih PER ALOKASI PPL — karena keputusannya memang per orang: mitra
- * yang kuotanya masih longgar cukup dibebankan ke satu bulan, sementara mitra
- * yang hampir mentok perlu dipecah.
+ * YANG DIBAGI ADALAH MUATAN, BUKAN RUPIAH
+ * Begitulah tim keuangan membuat Surat PK untuk honor lintas bulan: target
+ * 10 responden dipecah menjadi SPK bulan pertama 5 responden dan SPK bulan
+ * kedua 5 responden, masing-masing dengan jangka waktunya sendiri.
+ *
+ * Versi pertama modul ini membagi rupiah, dan hasilnya tidak bisa ditulis di
+ * Surat PK — "volume 3, harga Rp 1.599.999, nilai Rp 2.595.000" tidak mungkin
+ * benar. Sekarang yang dibagi adalah UNIT beban kerja (dokumen, responden),
+ * dan rupiah setiap bulan mengikutinya: jumlah = volume x harga satuan. Karena
+ * itu jumlah seluruh bulan selalu PERSIS sama dengan honor alokasinya —
+ * tidak ada pembulatan rupiah yang bisa menguapkan atau menciptakan uang.
  *
  * MURNI. Hanya angka, string, dan `Date` — tanpa impor apa pun, supaya bisa
  * dipakai klien (untuk pratinjau di layar) DAN server (untuk hasil yang
@@ -22,13 +29,13 @@
  * tersedia saat `vite.config.ts` memuat kode server lewat Node.
  */
 
-/** Cara membagi honor satu alokasi ke bulan-bulan yang dilaluinya. */
+/** Cara membagi muatan satu alokasi ke bulan-bulan yang dilaluinya. */
 export type MetodePembebanan =
-  /** Seluruh honor jatuh di satu bulan yang dipilih pengguna. */
+  /** Seluruh muatan jatuh di satu bulan yang dipilih pengguna. Satu Surat PK. */
   | "bulan_tertentu"
-  /** Dibagi menurut jumlah hari periode yang jatuh di tiap bulan. */
+  /** Muatan dibagi menurut jumlah hari periode yang jatuh di tiap bulan. */
   | "prorata"
-  /** Bulan pertama diisi sampai mentok batas SBML, sisanya melimpah ke bulan berikutnya. */
+  /** Bulan pertama diisi sebanyak muatan yang masih muat sebelum batas SBML, sisanya ke bulan berikutnya. */
   | "luber";
 
 export const METODE_PEMBEBANAN: MetodePembebanan[] = [
@@ -40,24 +47,31 @@ export const METODE_PEMBEBANAN: MetodePembebanan[] = [
 /** Label siap tampil. Ditaruh di sini supaya klien dan pesan galat server sama. */
 export const LABEL_METODE: Record<MetodePembebanan, string> = {
   bulan_tertentu: "Bebankan ke satu bulan",
-  prorata: "Bagi menurut jumlah hari",
-  luber: "Penuhi batas bulan pertama, sisanya ke bulan berikutnya",
+  prorata: "Bagi muatan menurut jumlah hari",
+  luber: "Penuhi batas bulan pertama, sisa muatan ke bulan berikutnya",
 };
 
 export const PENJELASAN_METODE: Record<MetodePembebanan, string> = {
   bulan_tertentu:
-    "Seluruh honor dihitung di satu bulan yang Anda pilih. Dipakai bila kuota mitra di bulan itu masih longgar.",
+    "Seluruh muatan dan honornya dihitung di satu bulan yang Anda pilih, dengan satu Surat PK. Dipakai bila kuota mitra di bulan itu masih longgar.",
   prorata:
-    "Honor dibagi menurut banyaknya hari periode yang jatuh di tiap bulan. Periode yang melintasi dua bulan dengan porsi hari seimbang praktis terbagi dua.",
+    "Muatan dibagi menurut banyaknya hari periode yang jatuh di tiap bulan, dibulatkan ke unit utuh. Tiap bulan mendapat Surat PK sendiri.",
   luber:
-    "Bulan pertama diisi sampai batas SBML mitra tercapai, kelebihannya baru dilimpahkan ke bulan berikutnya, dan seterusnya.",
+    "Bulan pertama diisi sebanyak muatan yang masih muat sebelum batas SBML mitra tercapai; sisanya dipindah ke bulan berikutnya. Tiap bulan mendapat Surat PK sendiri.",
 };
 
 /** Kunci bulan 'MM-YYYY', sama dengan format kolom `bulanHonor*` di database. */
 export type KunciBulan = string;
 
-/** Rupiah yang dibebankan per bulan. Kuncinya 'MM-YYYY'. */
-export type PembebananPerBulan = Record<KunciBulan, number>;
+/** Bagian satu bulan: berapa unit muatan, dan berapa rupiahnya. */
+export interface BagianBulan {
+  volume: number;
+  /** Selalu `volume x harga satuan`. */
+  jumlah: number;
+}
+
+/** Pembebanan per bulan. Kuncinya 'MM-YYYY'. */
+export type PembebananPerBulan = Record<KunciBulan, BagianBulan>;
 
 const duaDigit = (n: number): string => String(n).padStart(2, "0");
 
@@ -65,13 +79,17 @@ const duaDigit = (n: number): string => String(n).padStart(2, "0");
 export const kunciBulan = (tanggal: Date): KunciBulan =>
   `${duaDigit(tanggal.getMonth() + 1)}-${tanggal.getFullYear()}`;
 
+/** 'YYYY-MM-DD' dari sebuah tanggal lokal. */
+const keTeks = (d: Date): string =>
+  `${d.getFullYear()}-${duaDigit(d.getMonth() + 1)}-${duaDigit(d.getDate())}`;
+
 /** Membaca 'YYYY-MM-DD' menjadi Date lokal tengah malam. Mengembalikan null bila tidak sah. */
 export const bacaTanggal = (nilai: string | Date | null | undefined): Date | null => {
   if (!nilai) return null;
   if (nilai instanceof Date) return isNaN(nilai.getTime()) ? null : nilai;
   // Sengaja dipecah manual, bukan `new Date(teks)`: string 'YYYY-MM-DD'
-  // ditafsirkan sebagai UTC oleh peramban, sehingga di zona WIB tanggal 1
-  // menjadi tanggal 30 bulan sebelumnya — bulan pembebanannya ikut meleset.
+  // ditafsirkan sebagai UTC oleh peramban, sehingga di zona barat tanggal 1
+  // menjadi tanggal terakhir bulan sebelumnya — bulan pembebanannya meleset.
   const cocok = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(nilai));
   if (!cocok) return null;
   const [, th, bl, tg] = cocok;
@@ -82,7 +100,7 @@ export const bacaTanggal = (nilai: string | Date | null | undefined): Date | nul
 /**
  * Daftar bulan yang dilalui sebuah periode, berurutan.
  *
- * Periode 15 Feb - 15 Mar menghasilkan ['02-2026', '03-2026']. Periode dalam
+ * Periode 15 Jan - 15 Feb menghasilkan ['01-2026', '02-2026']. Periode dalam
  * satu bulan menghasilkan satu elemen — dan itu penanda bahwa layar TIDAK perlu
  * menawarkan pilihan metode apa pun.
  */
@@ -124,35 +142,62 @@ export const hariPerBulan = (
 };
 
 /**
- * Membagi `total` menurut bobot, tanpa kehilangan atau menciptakan rupiah.
- *
- * Pembulatan ke bawah untuk semua bagian, lalu SISA pembagian ditambahkan satu
- * per satu ke bagian berbobot terbesar. Tanpa ini, honor 1.000.000 yang dibagi
- * ke tiga bulan menjadi 333.333 x 3 = 999.999 — satu rupiah menguap, dan rekap
- * tahunan tidak akan pernah cocok dengan jumlah yang dibayarkan.
+ * Bagian sebuah periode yang jatuh di satu bulan — jangka waktu Surat PK bulan
+ * itu. Periode 15 Jan - 15 Feb pada bulan '01-2026' menghasilkan 15-31 Jan,
+ * pada '02-2026' menghasilkan 1-15 Feb. Mengembalikan null bila periodenya
+ * tidak menyentuh bulan tersebut.
  */
-const bagiTanpaSisa = (
+export const rentangDalamBulan = (
+  mulai: string | Date | null | undefined,
+  selesai: string | Date | null | undefined,
+  bulan: KunciBulan,
+): { mulai: string; selesai: string } | null => {
+  const a = bacaTanggal(mulai);
+  const b = bacaTanggal(selesai);
+  const cocok = /^(\d{2})-(\d{4})$/.exec(bulan);
+  if (!a || !b || b < a || !cocok) return null;
+
+  const awalBulan = new Date(Number(cocok[2]), Number(cocok[1]) - 1, 1);
+  // Hari 0 bulan berikutnya = hari terakhir bulan ini, termasuk tahun kabisat.
+  const akhirBulan = new Date(Number(cocok[2]), Number(cocok[1]), 0);
+  const potongMulai = a > awalBulan ? a : awalBulan;
+  const potongSelesai = b < akhirBulan ? b : akhirBulan;
+  if (potongSelesai < potongMulai) return null;
+  return { mulai: keTeks(potongMulai), selesai: keTeks(potongSelesai) };
+};
+
+/**
+ * Membagi `total` unit menurut bobot, dalam bilangan bulat, tanpa kehilangan
+ * atau menciptakan unit.
+ *
+ * Metode sisa terbesar: tiap bagian dibulatkan ke bawah, lalu sisa unit
+ * diberikan satu per satu ke bagian yang PECAHANNYA paling besar (seri: bulan
+ * yang lebih awal). Memberikannya ke bobot terbesar justru keliru: 10 responden
+ * pada 15 Jan - 15 Feb (17 : 15 hari) akan jadi 6/4, padahal 5,31 : 4,69 jelas
+ * lebih dekat ke 5/5 — dan 5/5 itulah yang dipraktikkan tim keuangan.
+ */
+const bagiUnitTanpaSisa = (
   total: number,
   bobot: Array<{ kunci: KunciBulan; nilai: number }>,
-): PembebananPerBulan => {
+): Record<KunciBulan, number> => {
   const totalBobot = bobot.reduce((j, b) => j + b.nilai, 0);
   if (totalBobot <= 0) return {};
 
-  const hasil: PembebananPerBulan = {};
+  const pecahan = bobot.map((b, urutan) => {
+    const tepat = (total * b.nilai) / totalBobot;
+    return { kunci: b.kunci, bawah: Math.floor(tepat), sisa: tepat - Math.floor(tepat), urutan };
+  });
+
+  const hasil: Record<KunciBulan, number> = {};
   let terbagi = 0;
-  for (const b of bobot) {
-    const bagian = Math.floor((total * b.nilai) / totalBobot);
-    hasil[b.kunci] = bagian;
-    terbagi += bagian;
+  for (const p of pecahan) {
+    hasil[p.kunci] = p.bawah;
+    terbagi += p.bawah;
   }
 
-  let sisa = total - terbagi;
-  const urutBobot = [...bobot].sort((x, y) => y.nilai - x.nilai);
-  let i = 0;
-  while (sisa > 0 && urutBobot.length > 0) {
-    hasil[urutBobot[i % urutBobot.length].kunci] += 1;
-    sisa -= 1;
-    i += 1;
+  const urut = [...pecahan].sort((x, y) => y.sisa - x.sisa || x.urutan - y.urutan);
+  for (let i = 0; i < total - terbagi; i++) {
+    hasil[urut[i % urut.length].kunci] += 1;
   }
   return hasil;
 };
@@ -162,70 +207,83 @@ export interface OpsiPembebanan {
   /** Untuk 'bulan_tertentu'. Diabaikan metode lain. */
   bulanDipilih?: KunciBulan | null;
   /**
-   * Untuk 'luber': sisa kuota SBML mitra di tiap bulan, SETELAH dikurangi honor
-   * dari kegiatan lain. Bulan yang tidak disebut dianggap punya sisa 0.
+   * Untuk 'luber': sisa kuota SBML mitra di tiap bulan dalam RUPIAH, SETELAH
+   * dikurangi honor dari kegiatan lain. Bulan yang tidak disebut dianggap
+   * punya sisa 0.
    */
   sisaKuota?: Record<KunciBulan, number>;
 }
 
 /**
- * Membebankan honor satu alokasi ke bulan-bulannya.
+ * Membebankan muatan satu alokasi ke bulan-bulannya.
  *
- * Selalu mengembalikan pembagian yang jumlahnya PERSIS `totalHonor` — termasuk
- * saat 'luber' kehabisan kuota di semua bulan. Kelebihan yang tidak tertampung
- * sengaja dijatuhkan ke bulan TERAKHIR, bukan dibuang: honornya tetap harus
- * dibayar dan tetap harus terlihat melanggar batas. Membuangnya justru akan
- * menyembunyikan pelanggaran yang ingin ditangkap.
+ * Selalu mengembalikan pembagian yang volumenya menjumlah PERSIS `volume`,
+ * dan setiap bagian bernilai `volume x hargaSatuan` — termasuk saat 'luber'
+ * kehabisan kuota di semua bulan. Muatan yang tidak tertampung sengaja
+ * dijatuhkan ke bulan TERAKHIR, bukan dibuang: pekerjaannya tetap dilakukan,
+ * honornya tetap harus dibayar, dan pelanggaran batasnya tetap harus terlihat.
  */
-export const bebankanHonor = (
-  totalHonor: number,
+export const bebankanVolume = (
+  volume: number,
+  hargaSatuan: number,
   mulai: string | Date | null | undefined,
   selesai: string | Date | null | undefined,
   opsi: OpsiPembebanan,
 ): PembebananPerBulan => {
   const bulan = bulanDilalui(mulai, selesai);
   if (bulan.length === 0) return {};
-  if (totalHonor <= 0) return { [bulan[0]]: 0 };
 
-  // Periode satu bulan: tidak ada yang perlu diputuskan.
-  if (bulan.length === 1) return { [bulan[0]]: totalHonor };
+  const unit = Math.max(0, Math.floor(volume || 0));
+  const harga = Math.max(0, hargaSatuan || 0);
+  const jadi = (per: Record<KunciBulan, number>): PembebananPerBulan => {
+    const hasil: PembebananPerBulan = {};
+    for (const [k, v] of Object.entries(per)) hasil[k] = { volume: v, jumlah: v * harga };
+    return hasil;
+  };
+
+  // Periode satu bulan, atau tidak ada muatan: tidak ada yang perlu diputuskan.
+  if (bulan.length === 1 || unit === 0) return jadi({ [bulan[0]]: unit });
 
   if (opsi.metode === "bulan_tertentu") {
     // Bulan yang dipilih harus benar-benar dilalui periode. Pilihan yang tidak
-    // sah (mis. periodenya diubah setelah bulannya dipilih) jatuh ke bulan
+    // sah (mis. periodenya dipersempit setelah bulannya dipilih) jatuh ke bulan
     // pertama, bukan menghilangkan honornya dari rekap.
     const dipilih =
-      opsi.bulanDipilih && bulan.includes(opsi.bulanDipilih)
-        ? opsi.bulanDipilih
-        : bulan[0];
-    return { [dipilih]: totalHonor };
+      opsi.bulanDipilih && bulan.includes(opsi.bulanDipilih) ? opsi.bulanDipilih : bulan[0];
+    return jadi({ [dipilih]: unit });
   }
 
   if (opsi.metode === "prorata") {
     const hari = hariPerBulan(mulai, selesai);
-    return bagiTanpaSisa(
-      totalHonor,
-      bulan.map(k => ({ kunci: k, nilai: hari[k] ?? 0 })),
-    );
+    return jadi(bagiUnitTanpaSisa(unit, bulan.map(k => ({ kunci: k, nilai: hari[k] ?? 0 }))));
   }
 
-  // 'luber'
-  const hasil: PembebananPerBulan = {};
-  let tersisa = totalHonor;
+  // 'luber': isi bulan demi bulan dengan unit sebanyak yang masih muat.
+  const per: Record<KunciBulan, number> = {};
+  let tersisa = unit;
   bulan.forEach((k, indeks) => {
-    const terakhir = indeks === bulan.length - 1;
-    if (terakhir) {
-      hasil[k] = tersisa;
+    if (indeks === bulan.length - 1) {
+      per[k] = tersisa;
       tersisa = 0;
       return;
     }
     const kuota = Math.max(0, Math.floor(opsi.sisaKuota?.[k] ?? 0));
-    const diambil = Math.min(tersisa, kuota);
-    hasil[k] = diambil;
+    // Harga nol berarti tidak ada rupiah yang bisa melewati batas: seluruh
+    // muatan cukup di bulan pertama.
+    const muat = harga > 0 ? Math.floor(kuota / harga) : tersisa;
+    const diambil = Math.min(tersisa, muat);
+    per[k] = diambil;
     tersisa -= diambil;
   });
-  return hasil;
+  return jadi(per);
 };
+
+/** Jumlah volume dan rupiah seluruh bulan. */
+export const totalPembebanan = (p: PembebananPerBulan): BagianBulan =>
+  Object.values(p).reduce(
+    (t, b) => ({ volume: t.volume + b.volume, jumlah: t.jumlah + b.jumlah }),
+    { volume: 0, jumlah: 0 },
+  );
 
 /**
  * Batas SBML untuk sebuah rentang filter di halaman Manajemen Honor.

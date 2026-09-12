@@ -21,8 +21,18 @@ import { HALAMAN_APLIKASI } from "@/lib/halaman";
  * value, tanpa onChange, tanpa handler apa pun. Pengguna mengetik lalu tidak
  * terjadi apa-apa.
  *
+ * Hanya menampilkan tiga hal: KEGIATAN, MITRA, dan HALAMAN yang boleh dibuka
+ * peran pengguna. Ketua tim dan daftar pengguna sengaja tidak lagi dicari:
+ * hasilnya mengarah ke Manajemen Admin, halaman khusus admin, dan dulu kelompok
+ * ketua tim bahkan tampil untuk semua peran — non-admin yang mengklik nama
+ * seperti "Rossi Bartega" dibawa ke halaman yang tidak boleh ia buka.
+ *
+ * Hasil tidak lagi membuka halaman lain begitu saja: kegiatan membawa ke
+ * Dashboard dan mitra ke Daftar PPL, dengan `?sorot=<id>` supaya barisnya
+ * digulir ke tengah layar dan disorot.
+ *
  * Tidak ada permintaan jaringan baru:
- * - mitra, ketua tim, dan pengguna sudah dimuat `AdminProvider` di semua rute;
+ * - mitra sudah dimuat `AdminProvider` di semua rute;
  * - daftar kegiatan memakai kunci query `['kegiatan']` yang SAMA dengan
  *   Dashboard, jadi cache-nya dipakai bersama, bukan diambil dua kali.
  */
@@ -30,7 +40,7 @@ export default function PencarianGlobal() {
   const [buka, setBuka] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { userList, ketuaTimList, pplAdminList } = useAdmin();
+  const { pplAdminList } = useAdmin();
 
   const { data: kegiatanList = [] } = useQuery({
     queryKey: ['kegiatan'],
@@ -77,19 +87,20 @@ export default function PencarianGlobal() {
       </Button>
 
       <CommandDialog open={buka} onOpenChange={setBuka}>
-        <CommandInput placeholder="Cari kegiatan, mitra, ketua tim, pengguna, atau halaman..." />
+        <CommandInput placeholder="Cari kegiatan, mitra, atau halaman..." />
         <CommandList>
           <CommandEmpty>Tidak ada hasil.</CommandEmpty>
 
           {kegiatanList.length > 0 && (
             <CommandGroup heading="Kegiatan">
-              {kegiatanList.slice(0, 40).map(k => (
+              {/* Kegiatan arsip tidak tampil di Dashboard, jadi tidak bisa disorot di sana. */}
+              {kegiatanList.filter(k => !k.isArsip).slice(0, 40).map(k => (
                 <CommandItem
                   key={`keg-${k.id}`}
                   // `value` menentukan apa yang dicocokkan cmdk; sertakan ketua
                   // dan tim supaya bisa dicari lewat itu juga.
                   value={`${k.namaKegiatan} ${k.namaKetua ?? ''} ${k.timKetua ?? ''}`}
-                  onSelect={() => pergi(`/view-documents/${k.id}`)}
+                  onSelect={() => pergi(`/dashboard?sorot=${k.id}`)}
                 >
                   <span className="truncate">{k.namaKegiatan}</span>
                   {k.namaKetua && (
@@ -106,42 +117,10 @@ export default function PencarianGlobal() {
                 <CommandItem
                   key={`ppl-${p.id}`}
                   value={`${p.namaPPL} ${p.id} ${p.alamat ?? ''}`}
-                  onSelect={() => pergi("/daftar-ppl")}
+                  onSelect={() => pergi(`/daftar-ppl?sorot=${encodeURIComponent(p.id)}`)}
                 >
                   <span className="truncate">{p.namaPPL}</span>
                   <span className="ml-2 text-xs text-muted-foreground">· {p.id}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
-
-          {ketuaTimList.length > 0 && (
-            <CommandGroup heading="Ketua Tim">
-              {ketuaTimList.map(kt => (
-                <CommandItem
-                  key={`kt-${kt.id}`}
-                  value={`${kt.nama} ${kt.nip ?? ''} ${kt.tim ?? ''}`}
-                  onSelect={() => pergi("/manajemen-admin")}
-                >
-                  <span className="truncate">{kt.nama}</span>
-                  {kt.tim && <span className="ml-2 text-xs text-muted-foreground">· {kt.tim}</span>}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
-
-          {/* Daftar pengguna hanya berguna bagi admin, dan halaman tujuannya
-              memang khusus admin. */}
-          {user?.role === 'admin' && userList.length > 0 && (
-            <CommandGroup heading="Pengguna">
-              {userList.map(u => (
-                <CommandItem
-                  key={`usr-${u.id}`}
-                  value={`${u.namaLengkap} ${u.username} ${u.role}`}
-                  onSelect={() => pergi("/manajemen-admin")}
-                >
-                  <span className="truncate">{u.namaLengkap}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">· {u.username}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

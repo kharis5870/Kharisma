@@ -3,6 +3,7 @@
 import { RowDataPacket } from 'mysql2';
 import pool from '../db';
 import { AppNotification } from '@shared/api';
+import { suratBerubahSejakTerbit } from './kontrakService';
 
 /**
  * Notifikasi DIHITUNG SAAT DIBACA, tidak disimpan di tabel.
@@ -336,6 +337,52 @@ const qPengingatDokumen = async (userId: string): Promise<AppNotification[]> => 
     })) as AppNotification[];
 };
 
+/**
+ * Surat yang sudah terbit tetapi isinya tidak lagi sesuai (supervisor + admin).
+ *
+ * Inilah yang membuat perubahan setelah penandatanganan tidak lolos diam-diam:
+ * tim keuangan tidak mungkin membuka layar Generate Surat setiap hari untuk
+ * memeriksa apakah ada honor yang direvisi atau kegiatan baru yang masuk.
+ *
+ * SATU notifikasi per SURAT, bukan per baris yang berubah. Sebuah kegiatan yang
+ * muatannya direvisi bisa menyentuh banyak baris sekaligus, dan memecahnya
+ * menjadi banyak notifikasi akan menenggelamkan notifikasi lain — padahal
+ * tindakannya sama: buka suratnya, periksa, perbarui atau batalkan.
+ *
+ * Tidak memakai kueri sendiri melainkan `suratBerubahSejakTerbit`, yang memakai
+ * perhitungan yang sama persis dengan layarnya. Notifikasi yang berhitung
+ * sendiri cepat atau lambat akan berbeda dari yang terlihat di layar, dan
+ * selisih semacam itu sangat sulit dikenali karena keduanya tampak masuk akal.
+ */
+const qSuratBerubah = async (): Promise<AppNotification[]> => {
+    const berubah = await suratBerubahSejakTerbit();
+
+    const perSurat = new Map<number, typeof berubah>();
+    for (const b of berubah) {
+        const kumpulan = perSurat.get(b.suratId);
+        if (kumpulan) kumpulan.push(b); else perSurat.set(b.suratId, [b]);
+    }
+
+    return Array.from(perSurat.values()).map(daftar => {
+        const utama = daftar[0];
+        const lainnya = daftar.length - 1;
+        return {
+            id: `surat-berubah-${utama.suratId}`,
+            kind: 'surat_berubah',
+            severity: 'warning',
+            kegiatanId: utama.kegiatanId ?? 0,
+            namaKegiatan: utama.namaKegiatan,
+            tahap: null,
+            namaDokumen: utama.nomorSurat,
+            actorName: utama.namaPPL,
+            note: lainnya > 0
+                ? `${utama.ringkasan} (dan ${lainnya} perubahan lain)`
+                : utama.ringkasan,
+            occurredAt: utama.occurredAt,
+        } as AppNotification;
+    }).slice(0, 20);
+};
+
 const PERINGKAT = { critical: 0, warning: 1, info: 2 } as const;
 
 export const getNotificationsFor = async (
@@ -351,7 +398,7 @@ export const getNotificationsFor = async (
 
     const tugas: Promise<AppNotification[]>[] = [];
     if (adalahKetuaTim) tugas.push(qDitolak(userId), qTenggat(userId), qMandek(userId));
-    if (adalahPenyetuju) tugas.push(qMenunggu(), qDiunggahUlang(), qBelumDiisiKeuangan());
+    if (adalahPenyetuju) tugas.push(qMenunggu(), qDiunggahUlang(), qBelumDiisiKeuangan(), qSuratBerubah());
     // TANPA syarat peran: pengingat ditujukan ke ketua tim DAN pembuat
     // kegiatan, dan pembuat kegiatan bisa siapa saja — semua pengguna boleh
     // membuat kegiatan. Penyaringnya ada di dalam query, bukan di sini.

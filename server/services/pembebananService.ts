@@ -21,7 +21,7 @@
 
 import { PoolConnection } from 'mysql2/promise';
 import {
-    bebankanHonor,
+    bebankanVolume,
     bulanDilalui,
     kunciBulan,
     type KunciBulan,
@@ -77,13 +77,19 @@ export const rentangHonorTahap = (data: any, tahap: Tahap): RentangHonor => {
 export interface AlokasiUntukPembebanan {
     ppl_master_id: string;
     tahap: Tahap;
-    totalHonor: number;
+    /**
+     * Unit beban kerja alokasi ini (dokumen, responden). INILAH yang dibagi ke
+     * bulan-bulan, bukan rupiahnya — Surat PK dipecah per bulan menurut muatan.
+     */
+    volume: number;
+    /** Harga satuan tahap ini, dalam rupiah. Rupiah tiap bulan = volume x harga. */
+    hargaSatuan: number;
     metode: MetodePembebanan;
     bulanDipilih: KunciBulan | null;
 }
 
 export interface HasilPembebanan {
-    /** Rupiah per bulan, jumlahnya persis `totalHonor`. */
+    /** Volume dan rupiah per bulan; volumenya menjumlah persis beban kerja alokasi. */
     perBulan: PembebananPerBulan;
     /** Bulan yang totalnya (bersama kegiatan lain) melewati batas SBML. */
     bulanMelanggar: Array<{ bulan: KunciBulan; total: number }>;
@@ -119,15 +125,15 @@ export const hitungPembebanan = async (
     const sisaKuota: Record<KunciBulan, number> = {};
     for (const k of bulan) sisaKuota[k] = Math.max(0, batas - honorLain[k]);
 
-    const perBulan = bebankanHonor(alokasi.totalHonor, rentang.mulai, rentang.selesai, {
+    const perBulan = bebankanVolume(alokasi.volume, alokasi.hargaSatuan, rentang.mulai, rentang.selesai, {
         metode: alokasi.metode,
         bulanDipilih: alokasi.bulanDipilih,
         sisaKuota,
     });
 
     const bulanMelanggar: HasilPembebanan['bulanMelanggar'] = [];
-    for (const [k, jumlah] of Object.entries(perBulan)) {
-        const total = (honorLain[k] ?? 0) + jumlah;
+    for (const [k, bagian] of Object.entries(perBulan)) {
+        const total = (honorLain[k] ?? 0) + bagian.jumlah;
         if (total > batas) bulanMelanggar.push({ bulan: k, total });
     }
 
@@ -149,18 +155,23 @@ export const simpanPembebanan = async (
 ): Promise<void> => {
     await koneksi.execute('DELETE FROM ppl_honor_bulan WHERE ppl_id = ?', [pplId]);
 
-    const baris = Object.entries(perBulan).filter(([, jumlah]) => Number.isFinite(jumlah));
+    const baris = Object.entries(perBulan)
+        .filter(([, b]) => Number.isFinite(b.volume) && Number.isFinite(b.jumlah));
     if (baris.length === 0) return;
 
+    // Volume ikut disimpan: Surat PK tiap bulan mencetak berapa unit yang
+    // dikerjakan di bulan itu, bukan hanya rupiahnya.
     await koneksi.query(
-        'INSERT INTO ppl_honor_bulan (ppl_id, bulan, jumlah) VALUES ?',
-        [baris.map(([bulan, jumlah]) => [pplId, bulan, Math.round(jumlah)])],
+        'INSERT INTO ppl_honor_bulan (ppl_id, bulan, volume, jumlah) VALUES ?',
+        [baris.map(([bulan, b]) => [pplId, bulan, Math.round(b.volume), Math.round(b.jumlah)])],
     );
 };
 
 /**
- * Galat batas honor, bentuknya sama persis dengan yang dilempar
- * `validatePplHonor` supaya route dan layar tidak perlu tahu ada dua sumber.
+ * Galat batas honor. Bentuknya — `statusCode` 409 dan
+ * `details.code = 'HONOR_LIMIT_EXCEEDED'` — WAJIB dipertahankan: halaman Input
+ * dan Edit Kegiatan membaca kode itu untuk memunculkan dialog "lanjutkan
+ * saja" (`bypassHonorLimit`), bukan pesan galat biasa.
  */
 export const galatBatasHonor = (
     pplMasterId: string,

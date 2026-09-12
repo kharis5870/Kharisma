@@ -24,10 +24,17 @@ import { useQuery } from "@tanstack/react-query";
 import { PMLAdminData } from "@shared/api";
 import { apiClient } from "@/lib/apiClient";
 import { useHalamanAman } from "@/hooks/useHalamanAman";
+import { kueriPeriode, rentangPeriode, LABEL_PERIODE, URUTAN_PERIODE, type KunciPeriode } from "@/lib/periodePreset";
 
 // Fungsi untuk mengambil data dari API yang baru kita buat
-const fetchPMLs = async (): Promise<PMLAdminData[]> => {
-    return apiClient.get<PMLAdminData[]>('/pml');
+/**
+ * Tanpa periode, seluruh riwayat pengawasan ikut terhitung. Dengan periode,
+ * jumlah kegiatan, jumlah mitra, dan total muatan hanya mencakup kegiatan yang
+ * honornya jatuh pada rentang itu — itulah yang dibutuhkan saat menilai beban
+ * seorang PML pada bulan berjalan atau bulan depan.
+ */
+const fetchPMLs = async (periode: KunciPeriode): Promise<PMLAdminData[]> => {
+    return apiClient.get<PMLAdminData[]>(`/pml${kueriPeriode(rentangPeriode(periode))}`);
 };
 
 const ActivityDetailModal = ({ isOpen, onClose, pmlData }: { 
@@ -74,9 +81,12 @@ const ActivityDetailModal = ({ isOpen, onClose, pmlData }: {
 };
 
 export default function DaftarPML() {
+    const [periodeFilter, setPeriodeFilter] = useState<KunciPeriode>('semua');
     const { data: pmlList = [], isLoading } = useQuery({ 
-        queryKey: ['pmlAdmin'], 
-        queryFn: fetchPMLs 
+        // Periode ikut di dalam kunci: tanpa itu, mengganti periode akan
+        // menampilkan hasil periode sebelumnya dari cache.
+        queryKey: ['pmlAdmin', periodeFilter], 
+        queryFn: () => fetchPMLs(periodeFilter) 
     });
     
     const [searchTerm, setSearchTerm] = useState("");
@@ -163,6 +173,19 @@ export default function DaftarPML() {
                     <CardHeader>
                         <div className="flex justify-between items-center">
                             <CardTitle>Semua PML ({pmlList.length})</CardTitle>
+                            <div className="flex items-center gap-3">
+                            {/* Menyaring ANGKA-ANGKANYA, bukan daftar PML-nya: PML
+                                yang tidak mengawasi apa pun pada periode ini tetap
+                                tampil dengan 0, karena justru merekalah yang dicari
+                                saat membagi beban pengawasan. */}
+                            <Select value={periodeFilter} onValueChange={v => setPeriodeFilter(v as KunciPeriode)}>
+                                <SelectTrigger className="w-[170px]"><SelectValue placeholder="Periode..." /></SelectTrigger>
+                                <SelectContent>
+                                    {URUTAN_PERIODE.map(k => (
+                                        <SelectItem key={k} value={k}>{LABEL_PERIODE[k]}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <div className="w-64">
                                 <div className="relative">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -174,6 +197,7 @@ export default function DaftarPML() {
                                         className="pl-10"
                                     />
                                 </div>
+                            </div>
                             </div>
                         </div>
                     </CardHeader>
@@ -191,13 +215,24 @@ export default function DaftarPML() {
                                     <TableHead className="w-[200px]">
                                         <button onClick={() => handleSort('totalKegiatan')} className="flex items-center gap-1">Jumlah Kegiatan {getSortIcon('totalKegiatan')}</button>
                                     </TableHead>
+                                    {/* Dua ukuran beban yang berbeda dan sama-sama perlu:
+                                        berapa ORANG yang harus didampingi, dan seberapa
+                                        BESAR pekerjaannya. Seorang PML bisa mengawasi
+                                        sedikit mitra dengan muatan sangat besar, atau
+                                        sebaliknya — satu angka saja menyembunyikan itu. */}
+                                    <TableHead className="w-[160px] text-center">
+                                        <button onClick={() => handleSort('jumlahMitra')} className="flex items-center justify-center gap-1 w-full">Jumlah Mitra {getSortIcon('jumlahMitra')}</button>
+                                    </TableHead>
+                                    <TableHead className="w-[160px] text-center">
+                                        <button onClick={() => handleSort('totalMuatan')} className="flex items-center justify-center gap-1 w-full">Total Muatan {getSortIcon('totalMuatan')}</button>
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center">Memuat...</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center">Memuat...</TableCell></TableRow>
                                 ) : paginatedData.length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Tidak ada data PML</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Tidak ada data PML</TableCell></TableRow>
                                 ) : (
                                     paginatedData.map((pml, index) => (
                                         <TableRow key={pml.id}>
@@ -214,6 +249,13 @@ export default function DaftarPML() {
                                                     {pml.totalKegiatan} Kegiatan
                                                 </Button>
                                                 </TableCell>
+                                            <TableCell className="text-center">{pml.jumlahMitra}</TableCell>
+                                            <TableCell className="text-center">
+                                                {/* Satuannya bisa berbeda antar kegiatan
+                                                    (dokumen, responden), jadi angkanya
+                                                    sengaja tidak diberi satuan. */}
+                                                {pml.totalMuatan.toLocaleString('id-ID')}
+                                            </TableCell>
                                         </TableRow>
                                     ))
                                 )}

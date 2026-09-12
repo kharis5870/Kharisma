@@ -49,6 +49,23 @@ import { cn } from "@/lib/utils";
 const fetchKecamatan = async (): Promise<Kecamatan[]> => apiClient.get('/alamat/kecamatan');
 const fetchDesa = async (kecamatanId: string): Promise<Desa[]> => apiClient.get(`/alamat/desa?kecamatanId=${kecamatanId}`);
 
+/**
+ * Pesan galat form di atas dialog.
+ *
+ * Didefinisikan di tingkat modul, bukan di dalam `ManajemenAdmin`: komponen
+ * yang didefinisikan di dalam komponen lain dianggap tipe BARU pada setiap
+ * render induknya, sehingga React membongkar dan memasangnya ulang terus.
+ */
+const FormError = ({ message }: { message: string | null }) => {
+  if (!message) return null;
+  return (
+    <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-md">
+      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-300" />
+      <p className="text-sm text-red-700 dark:text-red-300">{message}</p>
+    </div>
+  );
+};
+
 export default function ManajemenAdmin() {
   const {
     userList,
@@ -376,15 +393,6 @@ export default function ManajemenAdmin() {
     setPagination(prev => ({ ...prev, [tab]: { currentPage: 1, rowsPerPage: newSize } }));
   };
 
-  const FormError = ({ message }: { message: string | null }) => {
-    if (!message) return null;
-    return (
-        <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-md">
-            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-300" />
-            <p className="text-sm text-red-700 dark:text-red-300">{message}</p>
-        </div>
-    );
-  };
   
   return (
     <Layout>

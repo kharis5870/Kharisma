@@ -9,7 +9,6 @@ import { wajibPenilaiMitra } from '../auth/kepemilikan';
 const router = express.Router();
 
 // Rute untuk mendapatkan daftar semua mitra yang perlu dinilai
-// Jika Anda punya middleware, tambahkan seperti ini: router.get('/', authenticateToken, async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const tahun = req.query.tahun ? parseInt(req.query.tahun as string) : undefined;

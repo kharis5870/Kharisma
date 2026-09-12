@@ -28,7 +28,7 @@ import { apiClient } from "@/lib/apiClient";
 import { DateRangePicker, type RentangTanggal } from "@/components/ui/date-range-picker";
 import { labelRentang } from "@/lib/honorPeriode";
 import {
-  format, startOfMonth, endOfMonth, subMonths,
+  format, startOfMonth, endOfMonth, addMonths,
   startOfQuarter, endOfQuarter, startOfYear, endOfYear,
 } from "date-fns";
 import { useHalamanAman } from "@/hooks/useHalamanAman";
@@ -43,13 +43,16 @@ const rentangBulanIni = (): RentangTanggal => ({
 
 const presetRentang: { label: string; hitung: () => RentangTanggal }[] = [
     { label: "Bulan Ini", hitung: rentangBulanIni },
+    // "Bulan Depan", bukan "Bulan Lalu": kegiatan biasanya diinput di akhir
+    // bulan untuk dijalankan awal bulan berikutnya, jadi yang perlu dipantau
+    // sebelum menambah alokasi adalah beban honor bulan DEPAN.
     {
-        label: "Bulan Lalu",
+        label: "Bulan Depan",
         hitung: () => {
-            const lalu = subMonths(new Date(), 1);
+            const depan = addMonths(new Date(), 1);
             return {
-                mulai: format(startOfMonth(lalu), FORMAT_TANGGAL),
-                selesai: format(endOfMonth(lalu), FORMAT_TANGGAL),
+                mulai: format(startOfMonth(depan), FORMAT_TANGGAL),
+                selesai: format(endOfMonth(depan), FORMAT_TANGGAL),
             };
         },
     },
@@ -362,7 +365,7 @@ export default function ManajemenHonor() {
               ) : (
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-bps-blue-50 text-bps-blue-700 font-semibold">Rp {globalSettings.batasHonorBulananGlobal.toLocaleString('id-ID')}</Badge>
-                  {user?.role === 'admin' && (
+                  {(user?.role === 'admin' || user?.role === 'supervisor') && (
                     <Button size="sm" variant="outline" onClick={() => { setTempGlobalLimit(globalSettings.batasHonorBulananGlobal); setIsEditingGlobalLimit(true); }} className="h-6 w-6 p-0" disabled={isLoadingHonorLimit}><Edit className="w-3 h-3" /></Button>
                   )}
                 </div>

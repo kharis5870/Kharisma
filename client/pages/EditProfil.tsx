@@ -15,7 +15,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Info, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 
-const gantiPassword = async (payload: { username: string; passwordLama: string; passwordBaru: string }) =>
+// Username TIDAK dikirim: server mengganti password milik pemilik token sesi.
+const gantiPassword = async (payload: { passwordLama: string; passwordBaru: string }) =>
   apiClient.put('/auth/password', payload);
 
 export default function EditProfil() {
@@ -59,7 +60,7 @@ export default function EditProfil() {
       return setGalat('Password baru harus berbeda dari password lama.');
     }
 
-    mutation.mutate({ username: user!.username, passwordLama, passwordBaru });
+    mutation.mutate({ passwordLama, passwordBaru });
   };
 
   const inisial = user?.namaLengkap?.charAt(0)?.toUpperCase()

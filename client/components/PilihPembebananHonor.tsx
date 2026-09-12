@@ -21,7 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import type { OpsiBulan } from "@/lib/honorPeriode";
-import type { MetodePembebanan } from "@shared/pembebananHonor";
+import { LABEL_METODE, PENJELASAN_METODE, type MetodePembebanan } from "@shared/pembebananHonor";
 
 /** Nilai bersandi untuk satu baris pilihan. */
 const SANDI_PRORATA = "prorata";
@@ -73,13 +73,16 @@ export default function PilihPembebananHonor({
               Seluruhnya di {o.label}
             </SelectItem>
           ))}
-          <SelectItem value={SANDI_PRORATA}>Bagi menurut jumlah hari</SelectItem>
-          <SelectItem value={SANDI_LUBER}>Penuhi batas bulan pertama, sisanya ke bulan berikutnya</SelectItem>
+          <SelectItem value={SANDI_PRORATA}>{LABEL_METODE.prorata}</SelectItem>
+          <SelectItem value={SANDI_LUBER}>{LABEL_METODE.luber}</SelectItem>
         </SelectContent>
       </Select>
       <p className="text-xs text-muted-foreground">
-        Periode honor tahap ini melintasi {opsiBulan.length} bulan. Batas SBML dihitung
-        per bulan, jadi tiap mitra bisa diatur sendiri.
+        {/* Penjelasan metode yang sedang dipilih — terutama bahwa memecah
+            muatan berarti satu Surat PK per bulan, hal yang tidak kelihatan
+            dari label pilihannya saja. */}
+        {metode ? PENJELASAN_METODE[metode]
+          : `Periode honor tahap ini melintasi ${opsiBulan.length} bulan. Batas SBML dihitung per bulan, jadi tiap mitra bisa diatur sendiri.`}
       </p>
     </div>
   );

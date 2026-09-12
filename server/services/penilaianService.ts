@@ -6,6 +6,45 @@ import { RekapPenilaian, PenilaianRequest } from '../../shared/api';
 import db from '../db';
 
 /**
+ * Bulan acuan penilaian satu alokasi PPL: bulan PERTAMA honornya dibebankan.
+ *
+ * Dulu triwulan ditentukan HANYA dari kolom `bulanHonor*` milik tahap. Sejak
+ * bulan pembebanan dipilih per alokasi (lihat `ppl_honor_bulan`), kolom itu
+ * sengaja dibiarkan kosong untuk periode honor lintas bulan — dan
+ * `BETWEEN` atas NULL bernilai NULL, sehingga mitranya HILANG dari daftar
+ * penilaian dan tidak pernah bisa dinilai.
+ *
+ * SATU triwulan per alokasi, bukan setiap triwulan yang disentuh honornya:
+ * `penilaian_mitra` punya kunci unik (pplId, kegiatanId), jadi satu alokasi
+ * memang hanya dinilai sekali. Memunculkannya di dua triwulan akan membuat
+ * nilai yang sama terhitung dua kali di rekap kedua triwulan itu.
+ *
+ * Urutan cadangan: bulan pertama yang benar-benar menanggung honor, lalu bulan
+ * pertama mana pun (alokasi berhonor nol tetap perlu dinilai), lalu kolom
+ * `bulanHonor*` lama untuk data yang belum punya baris pembebanan.
+ *
+ * `STR_TO_DATE` sebelum `MIN`: kunci 'MM-YYYY' tidak bisa diurutkan sebagai
+ * teks — '12-2025' dianggap lebih besar dari '01-2026'.
+ */
+const BULAN_ACUAN_PENILAIAN = `COALESCE(
+    (SELECT MIN(STR_TO_DATE(CONCAT('01-', b.bulan), '%d-%m-%Y'))
+       FROM ppl_honor_bulan b WHERE b.ppl_id = p.id AND b.jumlah > 0),
+    (SELECT MIN(STR_TO_DATE(CONCAT('01-', b.bulan), '%d-%m-%Y'))
+       FROM ppl_honor_bulan b WHERE b.ppl_id = p.id),
+    STR_TO_DATE(CONCAT('01-', CASE p.tahap
+        WHEN 'listing' THEN k.bulanHonorListing
+        WHEN 'pencacahan' THEN k.bulanHonorPencacahan
+        WHEN 'pengolahan-analisis' THEN k.bulanHonorPengolahan
+    END), '%d-%m-%Y')
+)`;
+
+/** Parameter: (tahun, bulanMulai, bulanSelesai) — urutannya sama di kedua pemakai. */
+const FILTER_TRIWULAN = `(
+    YEAR(${BULAN_ACUAN_PENILAIAN}) = ?
+    AND MONTH(${BULAN_ACUAN_PENILAIAN}) BETWEEN ? AND ?
+)`;
+
+/**
  * Mengambil daftar gabungan PPL dari sebuah kegiatan beserta data penilaiannya (jika ada).
  */
 export const getPenilaianList = async (tahun?: number, triwulan?: number) => {
@@ -18,27 +57,10 @@ export const getPenilaianList = async (tahun?: number, triwulan?: number) => {
         const bulanSelesai = triwulan * 3;
 
         // Logika CASE untuk memilih kolom bulan_honor yang relevan berdasarkan tahap PPL
-        const dynamicMonthFilter = `
-            (
-                CAST(SUBSTRING_INDEX(
-                    CASE
-                        WHEN p.tahap = 'listing' THEN k.bulanHonorListing
-                        WHEN p.tahap = 'pencacahan' THEN k.bulanHonorPencacahan
-                        WHEN p.tahap = 'pengolahan-analisis' THEN k.bulanHonorPengolahan
-                    END,
-                '-', 1) AS UNSIGNED) BETWEEN ? AND ?
-            ) AND (
-                CAST(SUBSTRING_INDEX(
-                    CASE
-                        WHEN p.tahap = 'listing' THEN k.bulanHonorListing
-                        WHEN p.tahap = 'pencacahan' THEN k.bulanHonorPencacahan
-                        WHEN p.tahap = 'pengolahan-analisis' THEN k.bulanHonorPengolahan
-                    END,
-                '-', -1) AS UNSIGNED) = ?
-            )
-        `;
-        whereClauses.push(dynamicMonthFilter);
-        params.push(bulanMulai, bulanSelesai, tahun);
+        // Lihat BULAN_ACUAN_PENILAIAN untuk alasan triwulan tidak lagi diambil
+        // dari kolom `bulanHonor*` saja.
+        whereClauses.push(FILTER_TRIWULAN);
+        params.push(tahun, bulanMulai, bulanSelesai);
     }
     
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -138,26 +160,9 @@ export const getRekapPenilaian = async (tahun: number, triwulan: number): Promis
         JOIN ppl_master pm ON p.ppl_master_id = pm.id
         LEFT JOIN penilaian_mitra pn ON p.id = pn.pplId -- Gunakan LEFT JOIN agar yang belum dinilai tetap terhitung
         WHERE
-            -- ✔️ GANTI LOGIKA FILTER DENGAN YANG INI
-            (
-                CAST(SUBSTRING_INDEX(
-                    CASE
-                        WHEN p.tahap = 'listing' THEN k.bulanHonorListing
-                        WHEN p.tahap = 'pencacahan' THEN k.bulanHonorPencacahan
-                        WHEN p.tahap = 'pengolahan-analisis' THEN k.bulanHonorPengolahan
-                    END,
-                '-', -1) AS UNSIGNED) = ?
-            )
-            AND
-            (
-                CAST(SUBSTRING_INDEX(
-                    CASE
-                        WHEN p.tahap = 'listing' THEN k.bulanHonorListing
-                        WHEN p.tahap = 'pencacahan' THEN k.bulanHonorPencacahan
-                        WHEN p.tahap = 'pengolahan-analisis' THEN k.bulanHonorPengolahan
-                    END,
-                '-', 1) AS UNSIGNED) BETWEEN ? AND ?
-            )
+            -- Triwulan dari bulan pertama honor alokasi itu dibebankan;
+            -- lihat BULAN_ACUAN_PENILAIAN.
+            ${FILTER_TRIWULAN}
         GROUP BY
             p.ppl_master_id, pm.namaPPL
         ORDER BY

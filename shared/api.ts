@@ -1,4 +1,5 @@
 import type { MetodePembebanan } from './pembebananHonor';
+import type { BarisIsiSurat, PerubahanIsi } from './penomoranSurat';
 
 // shared/api.ts
 
@@ -116,6 +117,18 @@ export interface PMLAdminData {
     namaPML: string;
     posisi: 'Pendataan' | 'Pengolahan' | 'Pendataan/Pengolahan';
     totalKegiatan: number;
+    /**
+     * Banyaknya mitra BERBEDA yang diawasi, bukan banyaknya alokasi. Seorang
+     * mitra yang diawasi PML ini pada dua kegiatan tetap dihitung satu orang —
+     * yang ditanyakan adalah berapa orang yang harus ia dampingi.
+     */
+    jumlahMitra: number;
+    /**
+     * Total muatan seluruh alokasi yang diawasi, dijumlahkan dari beban kerja
+     * tiap alokasi. Satuannya bisa berbeda antar kegiatan (dokumen, responden),
+     * jadi angka ini adalah ukuran beban kasar, bukan jumlah yang bersatuan.
+     */
+    totalMuatan: number;
     kecamatanId?: number | null;
     desaId?: number | null;
     namaKecamatan?: string;
@@ -287,6 +300,14 @@ export interface UraianTugasKontrak {
 
 /** Satu baris tabel lampiran Surat PK. */
 export interface BarisKontrak {
+  /**
+   * Penanda stabil satu baris: `${kegiatanId}-${jenisPekerjaan}`.
+   *
+   * Dipakai membandingkan isi surat sekarang dengan salinan isi saat surat
+   * terbit. Uraian tugas TIDAK bisa jadi penanda karena justru itu salah satu
+   * hal yang boleh berubah.
+   */
+  kunci?: string;
   uraianTugas: string;
   jangkaWaktuMulai?: string | null;
   jangkaWaktuSelesai?: string | null;
@@ -306,6 +327,12 @@ export interface DataKontrakMitra {
   totalHonor: number;
   jangkaWaktuMulai?: string | null;
   jangkaWaktuSelesai?: string | null;
+  /**
+   * Id baris `kontrak_mitra` suratnya. Terisi hanya bila suratnya sudah
+   * pernah digenerate, dan dipakai untuk tindakan yang menyasar SATU surat
+   * (memperbarui isinya, membatalkannya) tanpa perlu menebaknya dari periode.
+   */
+  suratId?: number;
   /** Terisi setelah nomor dipesan lewat POST /kontrak/nomor. */
   nomorUrut?: number;
   nomorSurat?: string;
@@ -318,6 +345,64 @@ export interface DataKontrakMitra {
    */
   nomorBast?: string;
   tanggalBast?: string;
+  /**
+   * Perbedaan antara isi surat saat TERBIT dan data sekarang: honor berubah,
+   * muatan berubah, atau ada kegiatan baru yang masuk setelah surat dibuat.
+   *
+   * Kosong berarti surat masih sesuai. Terisi berarti layar harus memperingatkan
+   * tim keuangan, karena surat yang sudah ditandatangani tidak lagi
+   * mencerminkan pekerjaan yang sebenarnya.
+   */
+  perubahan?: PerubahanIsi[];
+}
+
+/**
+ * Satu surat sebagaimana tampil di halaman Riwayat Penyuratan.
+ *
+ * Surat batal IKUT terbawa — justru itu gunanya halaman ini: menjawab
+ * "nomor 005 ke mana" tanpa harus membuka database. Karena itu `status`,
+ * `catatan`, dan `dibatalkanPada` ada di sini, bukan hanya di tabel.
+ */
+export interface RiwayatSuratItem {
+  id: number;
+  nomorUrut: number;
+  nomorSurat: string;
+  nomorBast?: string | null;
+  tanggalSurat: string;
+  tanggalBast?: string | null;
+  pplMasterId: string;
+  namaPPL: string;
+  periodeMulai: string;
+  periodeSelesai: string;
+  totalHonor: number;
+  status: 'aktif' | 'batal';
+  catatan?: string | null;
+  dibatalkanPada?: string | null;
+  dibatalkanOleh?: string | null;
+  generatedBy?: string | null;
+  /**
+   * Isi surat: satu baris per kegiatan x tahap, beserta muatan dan honornya.
+   *
+   * Diambil dari salinan isi saat terbit bila ada, supaya yang tampil adalah
+   * apa yang BENAR-BENAR tertulis di surat, bukan keadaan data hari ini. Untuk
+   * surat lama yang terbit sebelum salinan isi disimpan, diisi dari data
+   * sekarang — satu-satunya sumber yang tersisa.
+   */
+  baris: BarisIsiSurat[];
+  /**
+   * Perbedaan antara isi surat saat terbit dan data sekarang. Kosong berarti
+   * surat masih sesuai; terisi berarti surat perlu dikonfirmasi ulang — itulah
+   * yang ditampilkan sebagai status "Butuh Konfirmasi".
+   */
+  perubahan?: PerubahanIsi[];
+}
+
+/** Ringkasan satu tahun penyuratan, untuk kepala halaman Riwayat Penyuratan. */
+export interface RiwayatSuratTahun {
+  tahun: number;
+  surat: RiwayatSuratItem[];
+  /** Nomor yang tidak dipegang surat mana pun — bekas surat yang dihapus. */
+  celah: number[];
 }
 
 /** Jawaban `GET /kontrak/nomor-terpakai`. */
@@ -404,7 +489,8 @@ export type NotificationKind =
   | 'deadline_overdue'      // ketua tim: lewat tenggat, dokumen wajib belum disetujui
   | 'progress_stale'        // ketua tim: tidak ada pembaruan > 2 hari
   | 'document_keuangan_kosong'  // supervisor/admin: dokumen keuangan belum diisi
-  | 'document_reminder';        // ketua tim & pembuat kegiatan: diingatkan tim keuangan
+  | 'document_reminder'         // ketua tim & pembuat kegiatan: diingatkan tim keuangan
+  | 'surat_berubah';            // supervisor/admin: isi surat yang sudah terbit tidak lagi sesuai
 
 export type NotificationSeverity = 'critical' | 'warning' | 'info';
 

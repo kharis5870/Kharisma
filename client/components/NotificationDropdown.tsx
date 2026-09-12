@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -60,6 +61,13 @@ const META: Record<NotificationKind, { icon: React.ElementType; chip: string; gr
     icon: FileSignature, grup: 'Perlu diisi',
     chip: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
   },
+  // Dikelompokkan "Perlu diperbaiki": surat yang sudah ditandatangani tetapi
+  // isinya tidak lagi sesuai harus diselaraskan sebelum pembayaran, bukan
+  // sekadar diketahui.
+  surat_berubah: {
+    icon: FileSignature, grup: 'Perlu diperbaiki',
+    chip: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  },
   progress_stale: {
     icon: Clock, grup: 'Informasi',
     chip: 'bg-muted text-muted-foreground',
@@ -73,6 +81,12 @@ const tujuanNotifikasi = (n: AppNotification): string => {
   switch (n.kind) {
     case 'progress_stale':
       return `/dashboard`;
+    // Surat tidak dibereskan dari halaman dokumen, melainkan dari layar tempat
+    // suratnya dibuat. Langsung ke tab "Generate SPK", bukan tab pengaturan
+    // uraian: di tab itulah peringatan per mitra dan tombol "Perbarui Kontrak"
+    // berada, jadi pengguna tidak perlu menebak harus pindah ke mana.
+    case 'surat_berubah':
+      return `/generate-kontrak?tab=generate`;
     default:
       // Termasuk document_rejected: dulu diarahkan ke Edit Kegiatan, padahal
       // halaman itu tidak pernah menampilkan alasan penolakan. View Documents
@@ -97,6 +111,8 @@ const judulNotifikasi = (n: AppNotification) => {
       return <>Dokumen <span className="font-bold">{n.namaDokumen}</span> menunggu diisi tim keuangan.</>;
     case 'document_reminder':
       return <>Tim keuangan mengingatkan: link dokumen <span className="font-bold">{n.namaDokumen}</span> belum diisi.</>;
+    case 'surat_berubah':
+      return <>Isi surat <span className="font-bold">{n.namaDokumen}</span> untuk {n.actorName} tidak lagi sesuai data sekarang.</>;
     case 'progress_stale':
       return <>Tidak ada pembaruan progress selama {n.daysLeft} hari.</>;
   }
@@ -113,7 +129,10 @@ export default function NotificationDropdown() {
     // lain akan menampilkan cache notifikasi pengguna sebelumnya.
     queryKey: ['notifications', user?.id, user?.role],
     queryFn: () => apiClient.get<AppNotification[]>(
-      `/notifikasi?userId=${encodeURIComponent(user!.id)}&role=${user!.role}`),
+      // Tanpa query parameter: server membaca identitas dan peran dari token
+      // sesi. Mengirim userId/role di URL dulu justru celah untuk membaca
+      // notifikasi orang lain, dan kini tidak dibaca sama sekali.
+      '/notifikasi'),
     enabled: !!user?.id,
     staleTime: 60_000,
     refetchInterval: 120_000, // dinaikkan dari 60s: querynya lebih berat sekarang
@@ -130,7 +149,9 @@ export default function NotificationDropdown() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const notifications = data ?? [];
+  // Dibungkus useMemo: `data ?? []` membuat array BARU di setiap render saat
+  // data belum ada, sehingga pengelompokan di bawah ikut dihitung ulang terus.
+  const notifications = useMemo(() => data ?? [], [data]);
 
   const terkelompok = useMemo(() => {
     return URUTAN_GRUP
@@ -150,14 +171,20 @@ export default function NotificationDropdown() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <Button variant="ghost" size="icon" className="relative rounded-full" onClick={bukaLonceng}>
-        <Bell className="w-5 h-5" />
-        {notifications.length > 0 && (
-          <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center bg-destructive text-destructive-foreground text-xs border-2 border-card">
-            {notifications.length > 9 ? '9+' : notifications.length}
-          </Badge>
-        )}
-      </Button>
+      {/* Keterangan saat disorot, sama seperti ikon Pengaturan profil di sebelahnya. */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="relative rounded-full" onClick={bukaLonceng} aria-label="Notifikasi">
+            <Bell className="w-5 h-5" />
+            {notifications.length > 0 && (
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center bg-destructive text-destructive-foreground text-xs border-2 border-card">
+                {notifications.length > 9 ? '9+' : notifications.length}
+              </Badge>
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Notifikasi</TooltipContent>
+      </Tooltip>
 
       {isOpen && (
         <Card className="absolute right-0 top-full mt-2 w-96 max-h-[80vh] overflow-hidden flex flex-col shadow-lg border z-50">
