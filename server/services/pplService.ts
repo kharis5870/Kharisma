@@ -8,7 +8,17 @@ interface PPLMasterPacket extends PPLMaster, RowDataPacket {}
 
 // Fungsi ini tetap ada untuk manajemen data master PPL
 export const getAllMasterPPL = async (): Promise<PPLMaster[]> => {
-    const [rows] = await db.query<PPLMasterPacket[]>('SELECT id, namaPPL, posisi FROM ppl_master ORDER BY namaPPL ASC');
+    // SATU-SATUNYA kueri mitra yang menyaring `aktif`, dan itu disengaja.
+    //
+    // Daftar ini mengisi pemilih mitra di Input dan Edit Kegiatan, yaitu tempat
+    // alokasi BARU dibuat — mitra yang sudah berhenti tidak boleh bisa diberi
+    // pekerjaan lagi. Sebaliknya Daftar PPL (getPplAdminData) sengaja TIDAK
+    // menyaring, dan seluruh kueri honor, kontrak, serta penilaian menunjuk
+    // `ppl.ppl_master_id`, bukan tabel ini: pekerjaan yang sudah terjadi harus
+    // tetap terbaca apa pun status orangnya sekarang. Menyeragamkan penyaring
+    // ini ke kueri lain akan menghapus sejarah dari layar.
+    const [rows] = await db.query<PPLMasterPacket[]>(
+        'SELECT id, namaPPL, posisi FROM ppl_master WHERE aktif = 1 ORDER BY namaPPL ASC');
     return rows;
 };
 
@@ -40,6 +50,7 @@ export const getPplAdminData = async (periode?: PeriodeFilter): Promise<PPLAdmin
     const query = `
         SELECT
             pm.id,
+            pm.sobat_id,
             pm.namaPPL,
             pm.posisi,
             pm.kecamatan_id,
@@ -48,6 +59,8 @@ export const getPplAdminData = async (periode?: PeriodeFilter): Promise<PPLAdmin
             desa.nama AS namaDesa,
             pm.alamat,
             pm.noTelepon,
+            pm.aktif,
+            DATE_FORMAT(pm.nonaktifSejak, '%Y-%m-%d') AS nonaktifSejak,
             COUNT(x.id) AS totalKegiatan,
             GROUP_CONCAT(DISTINCT
                 CONCAT_WS(';;',
@@ -77,10 +90,15 @@ export const getPplAdminData = async (periode?: PeriodeFilter): Promise<PPLAdmin
     
     return rows.map(row => ({
         id: row.id,
+        sobatId: row.sobat_id ?? null,
         namaPPL: row.namaPPL,
         posisi: row.posisi,
         alamat: row.alamat,
         noTelepon: row.noTelepon,
+        // Daftar PPL sengaja memuat mitra nonaktif juga, jadi statusnya ikut
+        // dikirim supaya layar bisa menandainya alih-alih menyembunyikannya.
+        aktif: Number(row.aktif) === 1,
+        nonaktifSejak: row.nonaktifSejak ?? null,
         kecamatanId: row.kecamatan_id,
         desaId: row.desa_id, 
         namaKecamatan: row.namaKecamatan, 
@@ -94,16 +112,20 @@ export const getPplAdminData = async (periode?: PeriodeFilter): Promise<PPLAdmin
 };
 
 export const createMasterPPL = async (ppl: PPLAdminData): Promise<PPLAdminData> => {
-    const { id, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId  } = ppl;
-    const query = 'INSERT INTO ppl_master (id, namaPPL, posisi, alamat, noTelepon, kecamatan_id, desa_id) VALUES (?, ?, ?, ?, ?, ?, ?)';
-    await db.execute(query, [id, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId]);
+    const { id, sobatId, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId  } = ppl;
+    const query = 'INSERT INTO ppl_master (id, sobat_id, namaPPL, posisi, alamat, noTelepon, kecamatan_id, desa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+    // String kosong DISIMPAN SEBAGAI NULL: indeks uniknya mengabaikan NULL,
+    // tetapi menganggap '' sebagai nilai biasa — mitra kedua yang dikosongkan
+    // akan ditolak sebagai kembar kalau dibiarkan ''.
+    await db.execute(query, [id, sobatId?.trim() || null, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId]);
     return ppl;
 };
 
 export const updateMasterPPL = async (originalId: string, pplData: PPLAdminData): Promise<PPLAdminData> => {
-    const { namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId } = pplData;
-    const query = 'UPDATE ppl_master SET namaPPL = ?, posisi = ?, alamat = ?, noTelepon = ?, kecamatan_id = ?, desa_id = ? WHERE id = ?';
-    await db.execute(query, [namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId, originalId]);
+    const { sobatId, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId } = pplData;
+    const query = 'UPDATE ppl_master SET sobat_id = ?, namaPPL = ?, posisi = ?, alamat = ?, noTelepon = ?, kecamatan_id = ?, desa_id = ? WHERE id = ?';
+    // Lihat createMasterPPL: kosong harus menjadi NULL, bukan ''.
+    await db.execute(query, [sobatId?.trim() || null, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId, originalId]);
     return pplData;
 };
 

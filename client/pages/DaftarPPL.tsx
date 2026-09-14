@@ -109,6 +109,18 @@ const PPLInfoModal = ({ isOpen, onClose, pplData }: { isOpen: boolean, onClose: 
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
+                    {/* Penanda orang ini di aplikasi SOBAT. Kosong berarti mitra
+                        ini belum pernah dicocokkan dengan data SOBAT — bukan
+                        kesalahan, hanya belum. */}
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="sobatId" className="text-right">ID SOBAT</Label>
+                        <Input
+                            id="sobatId"
+                            value={pplData.sobatId || 'Belum dicocokkan'}
+                            readOnly
+                            className={cn("col-span-3", !pplData.sobatId && "text-muted-foreground")}
+                        />
+                    </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="alamat" className="text-right">Alamat</Label>
                         <Input id="alamat" value={pplData.alamat || '-'} readOnly className="col-span-3" />

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as adminService from '../services/adminService';
+import { terapkanImpor, type PermintaanImpor } from '../services/imporMitraService';
 import { wajibAdmin } from '../auth/middleware';
 
 const router = Router();
@@ -49,6 +50,39 @@ const bacaPeriodeOpsional = (query: any) => {
 };
 
 router.get('/ppl', async (req, res) => res.json(await adminService.getAllPPLAdmin(bacaPeriodeOpsional(req.query))));
+
+/**
+ * POST impor daftar mitra dari berkas SOBAT.
+ *
+ * Berkas Excel-nya dibaca DI LAYAR, bukan di sini: yang dikirim ke server sudah
+ * berupa baris yang terbaca beserta keputusan pengguna untuk tiap baris
+ * (tambah / perbarui / lewati). Dengan begitu layar pemetaan kolom dan dialog
+ * duplikat bisa berjalan sebelum apa pun menyentuh database.
+ *
+ * `pratinjau: true` hanya menghitung dan tidak menulis apa pun — dipakai untuk
+ * memperlihatkan ringkasan sebelum pengguna menyetujui.
+ */
+router.post('/ppl/impor', wajibAdmin, async (req, res) => {
+    try {
+        const { baris, keputusan, nonaktifkan, pratinjau } = req.body ?? {};
+        if (!Array.isArray(baris) || !Array.isArray(keputusan)) {
+            return res.status(400).json({ message: 'baris dan keputusan harus berupa daftar.' });
+        }
+        if (nonaktifkan !== undefined && !Array.isArray(nonaktifkan)) {
+            return res.status(400).json({ message: 'nonaktifkan harus berupa daftar id mitra.' });
+        }
+        const permintaan: PermintaanImpor = {
+            baris, keputusan, nonaktifkan,
+            // Bawaannya PRATINJAU: permintaan yang lupa menyebutkan niatnya
+            // tidak boleh diam-diam menulis ke daftar mitra.
+            pratinjau: pratinjau !== false,
+        };
+        res.json(await terapkanImpor(permintaan));
+    } catch (error: any) {
+        console.error('Error impor mitra:', error);
+        res.status(500).json({ message: error.message || 'Gagal mengimpor daftar mitra.' });
+    }
+});
 router.post('/ppl', wajibAdmin, async (req, res) => res.status(201).json(await adminService.createPPLAdmin(req.body)));
 router.put('/ppl/:id', wajibAdmin, async (req, res) => res.json(await adminService.updatePPLAdmin(req.params.id, req.body)));
 router.delete('/ppl/:id', wajibAdmin, async (req, res) => {

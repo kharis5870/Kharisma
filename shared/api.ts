@@ -442,6 +442,25 @@ export interface KetuaTimData {
 
 export interface PPLAdminData {
     id: string;
+    /**
+     * Penanda orang ini di aplikasi SOBAT, dipakai MENGENALI mitra saat
+     * mengimpor Excel dari sana.
+     *
+     * Sengaja terpisah dari `id`: `id` (PPL117) adalah nomor kursi milik
+     * aplikasi ini — bekas baris terhapus dipakai ulang (lihat idOtomatis.ts),
+     * jadi ia tidak bisa menjadi penanda orang antar tahun. Kosong berarti
+     * mitra ini belum pernah dicocokkan dengan data SOBAT.
+     */
+    sobatId?: string | null;
+    /**
+     * Masih menjadi mitra. Mitra yang berhenti DINONAKTIFKAN, tidak dihapus —
+     * menghapusnya akan menghanguskan surat perjanjiannya dan memutus alokasi
+     * kegiatannya. Daftar PPL tetap menampilkannya dengan penanda; yang
+     * menyembunyikannya hanya pemilih mitra saat membuat alokasi baru.
+     */
+    aktif?: boolean;
+    /** Tanggal ia berhenti menjadi mitra, bila sudah nonaktif. */
+    nonaktifSejak?: string | null;
     namaPPL: string;
     posisi: 'Pendataan' | 'Pengolahan' | 'Pendataan/Pengolahan';
     totalKegiatan: number;

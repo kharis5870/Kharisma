@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
+import AlertModal from "@/components/AlertModal";
+import ImporMitraDialog from "@/components/ImporMitraDialog";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useAdmin } from "@/contexts/AdminContext";
 import { UserData, KetuaTimData, PPLAdminData, Kecamatan, Desa, DAFTAR_TIM } from "@shared/api";
@@ -96,6 +98,10 @@ export default function ManajemenAdmin() {
   const [showEditKetuaTimModal, setShowEditKetuaTimModal] = useState(false);
   const [showDeleteKetuaTimModal, setShowDeleteKetuaTimModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showImporMitra, setShowImporMitra] = useState(false);
+  // Kegagalan impor perlu tempat tampil tersendiri: `formError` lingkupnya di
+  // dalam dialog form, dan impor berjalan di dialognya sendiri.
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
   const [successMessage, setSuccessMessage] = useState("");
   
   const [formError, setFormError] = useState<string | null>(null);
@@ -529,6 +535,10 @@ export default function ManajemenAdmin() {
                         <CardTitle>Daftar PPL</CardTitle>
                         <div className="flex gap-4">
                             <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" /><Input type="text" placeholder="Cari PPL..." value={pplSearchTerm} onChange={(e) => setPplSearchTerm(e.target.value)} className="pl-10"/></div></div>
+                            {/* Impor massal diletakkan berdampingan dengan penambahan
+                                satuan: keduanya cara menambah mitra, dan halaman
+                                inilah tempat data mitra dikelola. */}
+                            <Button variant="outline" onClick={() => setShowImporMitra(true)}>Impor dari Excel</Button>
                             <Button onClick={openAddPPLModal} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah PPL</Button>
                         </div>
                     </div>
@@ -579,6 +589,24 @@ export default function ManajemenAdmin() {
         </Tabs>
         
         <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} title="Berhasil!" description={successMessage} onAction={() => setShowSuccessModal(false)} />
+
+        {/* Impor massal mitra dari berkas SOBAT. Daftar mitra tersimpan dioper
+            apa adanya: dialognya memakai daftar itu untuk mencocokkan orang dan
+            untuk menyusun daftar "tidak ada di berkas", sehingga tidak perlu
+            mengambil data sendiri. */}
+        <ImporMitraDialog
+            isOpen={showImporMitra}
+            onClose={() => setShowImporMitra(false)}
+            pplList={pplAdminList}
+            onSelesai={(pesan) => { setSuccessMessage(pesan); setShowSuccessModal(true); }}
+            onGagal={(title, message) => setAlertModal({ isOpen: true, title, message })}
+        />
+        <AlertModal
+            isOpen={alertModal.isOpen}
+            onClose={() => setAlertModal({ isOpen: false, title: "", message: "" })}
+            title={alertModal.title}
+            description={alertModal.message}
+        />
         <ConfirmationModal isOpen={showDeleteUserModal} onClose={() => setShowDeleteUserModal(false)} onConfirm={handleDeleteUser} title="Konfirmasi Hapus User" description={`Apakah Anda yakin ingin menghapus user "${deleteUserName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         <ConfirmationModal isOpen={showDeleteKetuaTimModal} onClose={() => setShowDeleteKetuaTimModal(false)} onConfirm={handleDeleteKetuaTim} title="Konfirmasi Hapus Ketua Tim" description={`Apakah Anda yakin ingin menghapus ketua tim "${deleteKetuaTimName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         <ConfirmationModal isOpen={showDeletePPLModal} onClose={() => setShowDeletePPLModal(false)} onConfirm={handleDeletePPL} title="Konfirmasi Hapus PPL" description={`Apakah Anda yakin ingin menghapus PPL "${deletePPLName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
@@ -631,6 +659,14 @@ export default function ManajemenAdmin() {
             <div className="space-y-2">
                 <Label htmlFor="newPPLTelepon">No. Telepon *</Label>
                 <Input id="newPPLTelepon" value={newPPLData.noTelepon} onChange={(e) => setNewPPLData(prev => ({ ...prev, noTelepon: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="Masukkan no. telepon"/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="newPPLSobatId">ID SOBAT</Label>
+                <Input id="newPPLSobatId" value={newPPLData.sobatId ?? ''} onChange={(e) => setNewPPLData(prev => ({ ...prev, sobatId: e.target.value }))} placeholder="Kosongkan bila belum diketahui"/>
+                <p className="text-xs text-muted-foreground">
+                    Penanda orang ini di aplikasi SOBAT. Dipakai mencocokkan mitra saat mengimpor
+                    berkas Excel dari sana, dan biasanya terisi sendiri lewat impor.
+                </p>
             </div>
             
             {/* Dropdown Kecamatan & Desa */}
@@ -704,6 +740,15 @@ export default function ManajemenAdmin() {
                 </Select>
             </div>
               <div className="space-y-2"><Label htmlFor="editPplTelepon">No. Telepon *</Label><Input id="editPplTelepon" value={editPPLData.noTelepon} onChange={e => setEditPPLData({...editPPLData, noTelepon: e.target.value.replace(/[^0-9]/g, '')})} /></div>
+              <div className="space-y-2">
+                <Label htmlFor="editPplSobatId">ID SOBAT</Label>
+                <Input id="editPplSobatId" value={editPPLData.sobatId ?? ''} onChange={e => setEditPPLData({...editPPLData, sobatId: e.target.value})} placeholder="Kosongkan bila belum diketahui" />
+                <p className="text-xs text-muted-foreground">
+                  Penanda orang ini di aplikasi SOBAT, dipakai mencocokkan mitra saat mengimpor
+                  berkas Excel. Biasanya terisi sendiri lewat impor; isi manual hanya bila perlu
+                  membetulkan pencocokan yang keliru.
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                 <div className="space-y-2">
                     <Label htmlFor="editPplKecamatan">Kecamatan</Label>

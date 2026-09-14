@@ -16,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // FIX: Added DialogFooter back
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Edit, RefreshCw, Trash2, Activity, FileText, AlertTriangle, Search, Filter, BarChart, Layers, ClipboardCheck, Archive, ArchiveRestore, ChevronUp, ChevronDown, History } from "lucide-react";
+import { Eye, Edit, RefreshCw, Trash2, Activity, FileText, AlertTriangle, Search, Filter, BarChart, Layers, ClipboardCheck, Archive, ArchiveRestore, ChevronUp, ChevronDown, History, Minus, Plus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan, PPL, Dokumen, ProgressType } from "@shared/api";
 import { cn } from "@/lib/utils";
@@ -196,26 +196,75 @@ const PPLUpdateCard = ({ ppl, handleUpdatePPL, user, revertNonce, progressErrors
     // memasang yang baru. Akibatnya fokus hilang di tiap ketikan dan
     // onBlur TIDAK PERNAH menyala — perpindahan progress tidak tersimpan
     // sehingga tahap sebelumnya (mis. Open) tidak ikut berkurang.
+    /**
+     * Menambah atau mengurangi satu, LANGSUNG tersimpan.
+     *
+     * Panah bawaan `<input type="number">` sengaja tidak dipakai: klik panah
+     * dan ketikan memicu `onChange` yang sama persis, dan tidak ada cara andal
+     * lintas peramban untuk membedakan keduanya. Padahal keduanya memang harus
+     * berbeda — menambah satu per satu ingin langsung terlihat berpindah,
+     * sedangkan angka yang diketik baru boleh disimpan setelah selesai diketik
+     * (kalau tidak, mengetik "12" akan tersimpan dulu sebagai "1").
+     *
+     * Nilai barunya dikirim LANGSUNG ke handleUpdatePPL, bukan lewat state
+     * lokal: setState tidak berlaku seketika, dan nilai tersimpannya toh datang
+     * kembali lewat `ppl.progress` — jalur itulah yang membuat tahap tetangga
+     * ikut menyesuaikan (menambah 'approved' mengurangi 'diperiksa').
+     */
+    const ubahSatu = (field: EditableProgressKey, delta: number) => {
+        const sekarang = Number(localProgress[field] ?? 0);
+        const baru = Math.max(0, sekarang + delta);
+        if (baru === sekarang) return;
+        handleUpdatePPL(ppl.id!, field, String(baru));
+    };
+
     const kotakProgress = (field: EditableProgressKey, label: string) => {
         const galat = progressErrors[kunciGalat(ppl.id!, field)];
+        const nilai = Number(localProgress[field] ?? 0);
         return (
             <div key={field}>
                 <Label className="text-xs text-muted-foreground capitalize">{label}</Label>
-                <Input
-                    type="number"
-                    min="0"
-                    value={localProgress[field] ?? 0}
-                    onChange={e => handleLocalChange(field, e.target.value)}
-                    onBlur={() => handleBlur(field)}
-                    disabled={!isAuthorized}
-                    aria-invalid={!!galat}
-                    aria-errormessage={galat ? `err-${ppl.id}-${field}` : undefined}
-                    title={!isAuthorized ? "Hanya PML yang bersangkutan atau Admin yang dapat mengubah progress" : ""}
-                    className={cn(
-                        "mt-1 text-center",
-                        galat && "border-destructive ring-1 ring-destructive focus-visible:ring-destructive"
-                    )}
-                />
+                <div className="mt-1 flex items-center gap-1">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-7 shrink-0"
+                        disabled={!isAuthorized || nilai <= 0}
+                        onClick={() => ubahSatu(field, -1)}
+                        aria-label={`Kurangi ${label}`}
+                    >
+                        <Minus className="w-3 h-3" />
+                    </Button>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={localProgress[field] ?? 0}
+                        onChange={e => handleLocalChange(field, e.target.value)}
+                        onBlur={() => handleBlur(field)}
+                        disabled={!isAuthorized}
+                        aria-invalid={!!galat}
+                        aria-errormessage={galat ? `err-${ppl.id}-${field}` : undefined}
+                        title={!isAuthorized ? "Hanya PML yang bersangkutan atau Admin yang dapat mengubah progress" : ""}
+                        className={cn(
+                            // Panah bawaan disembunyikan supaya hanya ada SATU cara
+                            // menambah satu per satu — yang tersimpan seketika.
+                            "text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+                            galat && "border-destructive ring-1 ring-destructive focus-visible:ring-destructive"
+                        )}
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-7 shrink-0"
+                        disabled={!isAuthorized}
+                        onClick={() => ubahSatu(field, 1)}
+                        aria-label={`Tambah ${label}`}
+                    >
+                        <Plus className="w-3 h-3" />
+                    </Button>
+                </div>
                 {galat && (
                     <p id={`err-${ppl.id}-${field}`} className="mt-1 text-xs text-red-600 dark:text-red-400">
                         {galat}
