@@ -94,3 +94,13 @@ export const SELESAI_SESUAI_TAHAP = `CASE p.tahap
     WHEN 'pencacahan' THEN DATE_FORMAT(${pencacahanRange.selesai}, '%Y-%m-%d')
     WHEN 'pengolahan-analisis' THEN DATE_FORMAT(${pengolahanRange.selesai}, '%Y-%m-%d')
 END`;
+
+/**
+ * Jenis pekerjaan honor dari tahap sebuah baris `ppl`.
+ *
+ * Tahap pada tabel `ppl` bernama 'pengolahan-analisis', sedangkan
+ * `honorarium_kegiatan.jenis_pekerjaan` dan `ppl_honorarium.jenis_pekerjaan`
+ * memakai 'pengolahan'. Dulu CASE ini ditulis ulang di kontrakService dan
+ * pmlService; sekarang satu sumber.
+ */
+export const JENIS_DARI_TAHAP = `CASE p.tahap WHEN 'pengolahan-analisis' THEN 'pengolahan' ELSE p.tahap END`;

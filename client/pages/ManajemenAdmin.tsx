@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from "react";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import AlertModal from "@/components/AlertModal";
+import { periksaPassword, PANJANG_MIN_PASSWORD } from "@shared/aturanPassword";
+import { UserX } from "lucide-react";
 import ImporMitraDialog from "@/components/ImporMitraDialog";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useAdmin } from "@/contexts/AdminContext";
@@ -81,6 +83,7 @@ export default function ManajemenAdmin() {
     pplAdminList,
     addPPLAdmin,
     removePPLAdmin,
+    ubahAktifPPLAdmin,
     updatePPLAdmin
   } = useAdmin();
   
@@ -170,7 +173,7 @@ export default function ManajemenAdmin() {
 
   const isValidUserId = (id: string) => id.trim().length >= 1;
   const isValidUsername = (username: string) => username.trim().length >= 3;
-  const isValidPassword = (password?: string) => !password || password.trim().length >= 6;
+
   const isValidNamaLengkap = (nama: string) => nama.trim().length >= 2;
   const isValidNip = (nip: string) => nip.trim().length >= 10;
   const isValidTelepon = (telepon: string) => /^\d{10,}$/.test(telepon.trim());
@@ -188,7 +191,7 @@ export default function ManajemenAdmin() {
     const { id, username, password, namaLengkap, role, isPML } = newUserData;
     if (!isValidUserId(id)) { setFormError("ID User harus diisi!"); return; }
     if (!isValidUsername(username)) { setFormError("Username harus minimal 3 karakter!"); return; }
-    if (!password || !isValidPassword(password)) { setFormError("Password harus minimal 6 karakter!"); return; }
+    { const galatPassword = periksaPassword(password, username); if (galatPassword) { setFormError(galatPassword); return; } }
     if (!isValidNamaLengkap(namaLengkap)) { setFormError("Nama lengkap harus minimal 2 karakter!"); return; }
     if (isDuplicateUserId(id)) { setFormError("ID User sudah ada!"); return; }
     if (isDuplicateUsername(username)) { setFormError("Username sudah ada!"); return; }
@@ -205,7 +208,7 @@ export default function ManajemenAdmin() {
     if (!editUserData) return;
     const { username, password, namaLengkap } = editUserData;
     if (!isValidUsername(username)) { setFormError("Username harus minimal 3 karakter!"); return; }
-    if (!isValidPassword(password)) { setFormError("Password baru harus minimal 6 karakter!"); return; }
+    if (password) { const galatPassword = periksaPassword(password, username); if (galatPassword) { setFormError(galatPassword); return; } }
     if (!isValidNamaLengkap(namaLengkap)) { setFormError("Nama lengkap harus minimal 2 karakter!"); return; }
     if (isDuplicateUsername(username, editUserData.id)) { setFormError("Username sudah ada!"); return; }
     
@@ -215,7 +218,16 @@ export default function ManajemenAdmin() {
     setShowSuccessModal(true);
   };
   
-  const handleDeleteUser = () => { removeUser(deleteUserId); setShowDeleteUserModal(false); setSuccessMessage(`User "${deleteUserName}" berhasil dihapus!`); setShowSuccessModal(true); };
+  // Hasil server DITUNGGU sebelum menyatakan berhasil: penghapusan bisa ditolak
+  // (mis. user masih menjadi PML bagi mitra), dan pesan "berhasil" yang muncul
+  // lebih dulu akan menyesatkan.
+  const handleDeleteUser = () => {
+    setShowDeleteUserModal(false);
+    removeUser(deleteUserId, {
+      onSuccess: () => { setSuccessMessage(`User "${deleteUserName}" berhasil dihapus!`); setShowSuccessModal(true); },
+      onError: (e) => setAlertModal({ isOpen: true, title: "User Tidak Dihapus", message: e.message }),
+    });
+  };
   
   const handleAddKetuaTim = () => {
     setFormError(null);
@@ -303,11 +315,29 @@ export default function ManajemenAdmin() {
     setShowSuccessModal(true);
   };
   
+  // Sama seperti handleDeleteUser: mitra yang sudah punya alokasi atau surat
+  // kontrak DITOLAK dihapus server, jadi hasilnya harus ditunggu.
   const handleDeletePPL = () => {
-    removePPLAdmin(deletePPLId);
     setShowDeletePPLModal(false);
-    setSuccessMessage(`PPL "${deletePPLName}" berhasil dihapus!`);
-    setShowSuccessModal(true);
+    removePPLAdmin(deletePPLId, {
+      onSuccess: () => { setSuccessMessage(`PPL "${deletePPLName}" berhasil dihapus!`); setShowSuccessModal(true); },
+      onError: (e) => setAlertModal({ isOpen: true, title: "Mitra Tidak Dihapus", message: e.message }),
+    });
+  };
+
+  // Pengganti hapus bagi mitra yang sudah punya riwayat: mitra nonaktif tidak
+  // bisa dipilih di kegiatan baru, tetapi honor dan suratnya tetap utuh.
+  const handleUbahAktifPPL = (ppl: PPLAdminData) => {
+    const aktifkan = ppl.aktif === false;
+    ubahAktifPPLAdmin({ id: ppl.id, aktif: aktifkan }, {
+      onSuccess: () => {
+        setSuccessMessage(aktifkan
+          ? `Mitra "${ppl.namaPPL}" diaktifkan kembali.`
+          : `Mitra "${ppl.namaPPL}" dinonaktifkan. Riwayat honor dan surat kontraknya tetap utuh.`);
+        setShowSuccessModal(true);
+      },
+      onError: (e) => setAlertModal({ isOpen: true, title: "Gagal Mengubah Status Mitra", message: e.message }),
+    });
   };
 
   // ID dibuat otomatis, mengisi nomor bekas penghapusan lebih dulu. ID di sini
@@ -560,7 +590,7 @@ export default function ManajemenAdmin() {
                                 {paginatedPPL.map(ppl => (
                                     <TableRow key={ppl.id}>
                                         <TableCell className="font-medium truncate">{ppl.id}</TableCell>
-                                        <TableCell className="font-medium truncate">{ppl.namaPPL}</TableCell>
+                                        <TableCell className="font-medium truncate">{ppl.namaPPL}{ppl.aktif === false && <Badge variant="outline" className="ml-2 text-xs">Nonaktif</Badge>}</TableCell>
                                         <TableCell>
                                             <Badge className={cn("font-semibold", GAYA_POSISI_PPL[ppl.posisi] ?? NADA_STATUS.netral)}>{ppl.posisi}</Badge>
                                         </TableCell>
@@ -568,6 +598,7 @@ export default function ManajemenAdmin() {
                                         <TableCell className="truncate">{ppl.noTelepon}</TableCell>
                                         <TableCell className="flex gap-2">
                                             <Button variant="outline" size="sm" onClick={() => openEditPPLModal(ppl)} className="text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:text-blue-300"><Edit className="w-4 h-4"/></Button>
+                                            <Button variant="outline" size="sm" onClick={() => handleUbahAktifPPL(ppl)} title={ppl.aktif === false ? "Aktifkan kembali" : "Nonaktifkan"} aria-label={ppl.aktif === false ? "Aktifkan kembali" : "Nonaktifkan"} className="text-amber-600 dark:text-amber-300 hover:text-amber-700">{ppl.aktif === false ? <UserCheck className="w-4 h-4"/> : <UserX className="w-4 h-4"/>}</Button>
                                             <Button variant="outline" size="sm" onClick={() => openDeletePPLModal(ppl)} className="text-red-600 dark:text-red-300 hover:text-red-700 dark:text-red-300"><Trash2 className="w-4 h-4"/></Button>
                                         </TableCell>
                                     </TableRow>
@@ -611,7 +642,7 @@ export default function ManajemenAdmin() {
         <ConfirmationModal isOpen={showDeleteKetuaTimModal} onClose={() => setShowDeleteKetuaTimModal(false)} onConfirm={handleDeleteKetuaTim} title="Konfirmasi Hapus Ketua Tim" description={`Apakah Anda yakin ingin menghapus ketua tim "${deleteKetuaTimName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         <ConfirmationModal isOpen={showDeletePPLModal} onClose={() => setShowDeletePPLModal(false)} onConfirm={handleDeletePPL} title="Konfirmasi Hapus PPL" description={`Apakah Anda yakin ingin menghapus PPL "${deletePPLName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         
-        {showAddUserModal && <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Tambah User Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newUserId">ID User</Label><Input id="newUserId" value={newUserData.id} readOnly className="bg-muted text-muted-foreground"/><p className="text-xs text-muted-foreground">Dibuat otomatis.</p></div><div className="space-y-2"><Label htmlFor="newUsername">Username *</Label><Input id="newUsername" value={newUserData.username} onChange={(e) => setNewUserData(prev => ({ ...prev, username: e.target.value }))} placeholder="Masukkan username"/></div><div className="space-y-2"><Label htmlFor="newPassword">Password *</Label><div className="relative"><Input id="newPassword" type={showPassword ? "text" : "password"} value={newUserData.password} onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))} placeholder="Masukkan password (minimal 6 karakter)"/><Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div><div className="space-y-2"><Label htmlFor="newNamaLengkap">Nama Lengkap *</Label><Input id="newNamaLengkap" value={newUserData.namaLengkap} onChange={(e) => setNewUserData(prev => ({ ...prev, namaLengkap: e.target.value }))} placeholder="Masukkan nama lengkap"/></div><div className="space-y-2"><Label htmlFor="newRole">Role *</Label><Select value={newUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setNewUserData(prev => ({ ...prev, role: value }))}><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+        {showAddUserModal && <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Tambah User Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newUserId">ID User</Label><Input id="newUserId" value={newUserData.id} readOnly className="bg-muted text-muted-foreground"/><p className="text-xs text-muted-foreground">Dibuat otomatis.</p></div><div className="space-y-2"><Label htmlFor="newUsername">Username *</Label><Input id="newUsername" value={newUserData.username} onChange={(e) => setNewUserData(prev => ({ ...prev, username: e.target.value }))} placeholder="Masukkan username"/></div><div className="space-y-2"><Label htmlFor="newPassword">Password *</Label><div className="relative"><Input id="newPassword" type={showPassword ? "text" : "password"} value={newUserData.password} onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))} placeholder={`Masukkan password (minimal ${PANJANG_MIN_PASSWORD} karakter)`}/><Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div><div className="space-y-2"><Label htmlFor="newNamaLengkap">Nama Lengkap *</Label><Input id="newNamaLengkap" value={newUserData.namaLengkap} onChange={(e) => setNewUserData(prev => ({ ...prev, namaLengkap: e.target.value }))} placeholder="Masukkan nama lengkap"/></div><div className="space-y-2"><Label htmlFor="newRole">Role *</Label><Select value={newUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setNewUserData(prev => ({ ...prev, role: value }))}><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
   <div className="space-y-0.5">
     <Label htmlFor="isPML-new">Status PML</Label>
     <p className="text-[0.8rem] text-muted-foreground">Aktifkan jika user ini adalah seorang PML.</p>

@@ -1,12 +1,11 @@
 // client/pages/InputKegiatan.tsx
 
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import { periksaKelengkapanAlokasi, teksPeringatan, type KelompokPeringatan, type TahapAlokasi } from "@/lib/kelengkapanAlokasi";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import PilihPembebananHonor from "@/components/PilihPembebananHonor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,19 +13,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Link2, X, Lock, Users, XCircle, ChevronsUpDown, Check, Loader2, History, Search, MessageSquare } from "lucide-react";
+import { Loader2, History, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import useInputKegiatanStore, { HonorariumSettings, TahapHonor } from "@/stores/useInputKegiatanStore";
+import useInputKegiatanStore, { TahapHonor } from "@/stores/useInputKegiatanStore";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { bulanDalamRentang, keTeksTanggal, keTanggal, pembebananBelumLengkap, labelRentang } from "@/lib/honorPeriode";
+import { bulanDalamRentang, keTeksTanggal, keTanggal, pembebananBelumLengkap } from "@/lib/honorPeriode";
 import { Badge } from "@/components/ui/badge";
-import { PPLMaster, KetuaTim, Kegiatan, UserData, PPL, HonorariumDetail, Dokumen } from "@shared/api";
+import { PPLMaster, KetuaTim, Kegiatan, PPL, Dokumen } from "@shared/api";
 import { periksaTautan } from "@shared/tautanDokumen";
 import AlertModal from "@/components/AlertModal";
 import { apiClient } from "@/lib/apiClient";
@@ -39,457 +36,16 @@ type DateFieldName =
 
 // formatHonor/parseHonor kini dipakai bersama dari @/lib/angka - sebelumnya
 // disalin identik di sini dan di EditActivity.tsx.
-import { formatHonor, parseHonor, sanitizeJumlah, parseHonorNumber } from "@/lib/angka";
-
+import { formatHonor, parseHonor, parseHonorNumber } from "@/lib/angka";
+import { AlokasiPPLContent } from "@/components/input-kegiatan/AlokasiPPLContent";
+import { DokumenContent } from "@/components/input-kegiatan/DokumenContent";
 
 const createActivity = async (data: any): Promise<Kegiatan> => {
     return apiClient.post<Kegiatan>('/kegiatan', data);
 }
 
-const fetchPPLs = async (): Promise<PPLMaster[]> => {
-    return apiClient.get<PPLMaster[]>('/ppl');
-};
-
 const fetchKetuaTim = async (): Promise<KetuaTim[]> => {
     return apiClient.get<KetuaTim[]>('/ketua-tim');
-};
-
-const fetchPMLs = async (): Promise<UserData[]> => {
-    return apiClient.get<UserData[]>('/admin/pml');
-};
-
-const PPLAllocationItem = React.memo(({ ppl, index, onRemove, pmlList, pplList, store, existingPplIds, tahap, opsiBulan }: any) => {
-    const { updatePPL, updatePPLBebanKerja } = store.getState();
-    const [openPPL, setOpenPPL] = useState(false);
-    const [openPML, setOpenPML] = useState(false);
-    
-    const honorDetail = ppl.honorarium[0];
-    const jenisPekerjaan = honorDetail.jenis_pekerjaan;
-    
-    const [localBebanKerja, setLocalBebanKerja] = useState(honorDetail.bebanKerja);
-
-    useEffect(() => {
-        setLocalBebanKerja(honorDetail.bebanKerja);
-    }, [honorDetail.bebanKerja]);
-
-    const handleBebanKerjaBlur = () => {
-        updatePPLBebanKerja(ppl.id, jenisPekerjaan, localBebanKerja);
-    };
-
-    const totalHonorPPL = ppl.honorarium?.reduce((sum: number, h: HonorariumDetail) => sum + parseInt(h.besaranHonor || '0'), 0) || 0;
-    const selectedPML = pmlList.find((pml: UserData) => pml.namaLengkap === ppl.namaPML);
-    const selectedPPL = pplList.find((p: PPLMaster) => String(p.id) === ppl.ppl_master_id);
-    
-    const availablePplList = useMemo(() => {
-        return pplList.filter((p: PPLMaster) => {
-            // Logika 1: Jangan tampilkan PPL yang sudah dialokasikan di tahap ini
-            const isAlreadySelected = existingPplIds.includes(String(p.id));
-            if (isAlreadySelected && p.id !== selectedPPL?.id) {
-                return false;
-            }
-
-            // ✔️ LOGIKA FILTER UTAMA BERDASARKAN POSISI
-            if (tahap === 'listing' || tahap === 'pencacahan') {
-                return p.posisi === 'Pendataan' || p.posisi === 'Pendataan/Pengolahan';
-            }
-            if (tahap === 'pengolahan-analisis') {
-                return p.posisi === 'Pengolahan' || p.posisi === 'Pendataan/Pengolahan';
-            }
-            return false; // Tahap tidak valid, sembunyikan semua
-        });
-    }, [pplList, existingPplIds, selectedPPL, tahap]);
-
-    const getBebanKerjaLabel = () => {
-        switch(jenisPekerjaan) {
-            case 'listing': return 'Beban Kerja Listing';
-            case 'pencacahan': return 'Beban Kerja Pencacahan';
-            case 'pengolahan': return 'Beban Kerja Pengolahan';
-            default: return 'Beban Kerja';
-        }
-    };
-
-    return (
-        <div className="p-4 border rounded-lg space-y-4 bg-muted">
-            <div className="flex justify-between items-center">
-                <h4 className="font-medium">{ppl.namaPPL || `Alokasi Baru ${index + 1}`}</h4>
-                {/* Merah baru muncul penuh saat disorot: ikon tempat sampah
-                    yang selalu menyala merah di setiap kartu membuat seluruh
-                    daftar alokasi terlihat penuh peringatan. Latar merah muda
-                    saat disorot juga menegaskan sasaran kliknya — targetnya
-                    kecil dan berdempetan dengan judul kartu. */}
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={onRemove}
-                    title="Hapus alokasi PPL ini"
-                    aria-label={`Hapus alokasi ${ppl.namaPPL || `Alokasi Baru ${index + 1}`}`}
-                    className="text-muted-foreground transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/60 dark:hover:text-red-400"
-                >
-                    <Trash2 className="w-4 h-4"/>
-                </Button>
-            </div>
-            <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Pilih PPL *</Label>
-                        <Popover open={openPPL} onOpenChange={setOpenPPL}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" aria-expanded={openPPL} className="w-full justify-between">
-                                    {selectedPPL ? selectedPPL.namaPPL : "Pilih PPL..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Cari PPL..." />
-                                    <CommandEmpty>PPL tidak ditemukan atau sudah dialokasikan.</CommandEmpty>
-                                    <CommandGroup>
-                                        <CommandList>
-                                            {availablePplList.map((p: PPLMaster) => (
-                                                <CommandItem key={p.id} value={`${p.id} ${p.namaPPL}`} onSelect={() => {
-                                                    updatePPL(ppl.id, 'ppl_master_id', String(p.id));
-                                                    updatePPL(ppl.id, 'namaPPL', p.namaPPL);
-                                                    setOpenPPL(false);
-                                                }}>
-                                                    <Check className={cn("mr-2 h-4 w-4", ppl.ppl_master_id === String(p.id) ? "opacity-100" : "opacity-0")} />
-                                                    <div className="flex flex-col">
-                                                        <span>{p.namaPPL}</span>
-                                                        <span className="text-xs text-muted-foreground">ID: {p.id}</span>
-                                                    </div>
-                                                </CommandItem>
-                                            ))}
-                                        </CommandList>
-                                    </CommandGroup>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                    <div className="space-y-2">
-                         <Label>Nama PML *</Label>
-                            <Popover open={openPML} onOpenChange={setOpenPML}>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" role="combobox" aria-expanded={openPML} className="w-full justify-between">
-                                        {selectedPML ? `${selectedPML.namaLengkap}` : "Pilih PML..."}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                    <Command>
-                                        <CommandInput placeholder="Cari PML..." />
-                                        <CommandEmpty>PML tidak ditemukan.</CommandEmpty>
-                                        <CommandGroup>
-                                            <CommandList>
-                                                {pmlList.map((pml: UserData) => (
-                                                    <CommandItem key={pml.id} value={`${pml.id} ${pml.namaLengkap}`} onSelect={() => {
-                                                        updatePPL(ppl.id, 'namaPML', pml.namaLengkap);
-                                                        updatePPL(ppl.id, 'pml_id', pml.id);  
-                                                        setOpenPML(false);
-                                                    }}>
-                                                        <Check className={cn("mr-2 h-4 w-4", String(ppl.pml_id) === String(pml.id) ? "opacity-100" : "opacity-0")} />
-                                                        <div className="flex flex-col">
-                                                            <span>{pml.namaLengkap}</span>
-                                                            <span className="text-xs text-muted-foreground">ID: {pml.id}</span>
-                                                        </div>
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandList>
-                                        </CommandGroup>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-                    <div className="space-y-2">
-                        <Label>{getBebanKerjaLabel()}</Label>
-                        <Input type="number" min="1" inputMode="numeric" placeholder="Jumlah..." value={localBebanKerja} onChange={(e) => setLocalBebanKerja(sanitizeJumlah(e.target.value))} onBlur={handleBebanKerjaBlur} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Total Honor (Rp)</Label>
-                        <Input value={formatHonor(totalHonorPPL)} readOnly className="bg-muted font-bold"/>
-                    </div>
-                    <PilihPembebananHonor
-                        opsiBulan={opsiBulan ?? []}
-                        metode={ppl.metodePembebanan}
-                        bulanDipilih={ppl.bulanPembebananDipilih}
-                        onChange={(metode, bulan) => {
-                            updatePPL(ppl.id, 'metodePembebanan', metode);
-                            updatePPL(ppl.id, 'bulanPembebananDipilih', bulan);
-                        }}
-                    />
-                </div>
-            </div>
-        </div>
-    );
-});
-
-const AlokasiPPLContent = ({ tahap, title }: { tahap: PPL['tahap'], title: string }) => {
-    const store = useInputKegiatanStore();
-    
-    // Nama kolom di store/DB memakai akhiran "Pengolahan", sedangkan tahap
-    // di sisi PPL bernama "pengolahan-analisis".
-    const tahapHonor: TahapHonor =
-        tahap === 'listing' ? 'Listing' : tahap === 'pencacahan' ? 'Pencacahan' : 'Pengolahan';
-
-    const rentangHonor = {
-        mulai: store[`tanggalMulaiHonor${tahapHonor}`],
-        selesai: store[`tanggalSelesaiHonor${tahapHonor}`],
-    };
-
-    // Rentang honor memang boleh berbeda dari jadwal pendataan, tapi yang jauh
-    // lebih sering terjadi adalah salah pilih tanggal. Diberi tanda kuning.
-    const mulaiPendataan = keTeksTanggal(store.tanggalMulaiPengumpulanData);
-    const selesaiPendataan = keTeksTanggal(store.tanggalSelesaiPengumpulanData);
-    const bedaDenganPendataan = Boolean(
-        rentangHonor.mulai && rentangHonor.selesai && mulaiPendataan && selesaiPendataan
-        && (rentangHonor.mulai !== mulaiPendataan || rentangHonor.selesai !== selesaiPendataan));
-
-    // Kalau rentang menyentuh lebih dari satu bulan, pengguna harus memilih
-    // salah satunya sebagai bulan pembebanan: HONOR_LIMIT berlaku per bulan,
-    // jadi honor tidak boleh dihitung di dua bulan sekaligus.
-    const opsiBulanPembebanan = useMemo(
-        () => bulanDalamRentang(rentangHonor.mulai, rentangHonor.selesai),
-        [rentangHonor.mulai, rentangHonor.selesai],
-    );
-
-    const pplForStage = store.pplAllocations.filter(p => p.tahap === tahap);
-    const storeActions = useInputKegiatanStore.getState();
-
-    const { data: pplList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
-    const { data: pmlList = [] } = useQuery({ queryKey: ['pmls'], queryFn: fetchPMLs });
-    const [showClearConfirmModal, setShowClearConfirmModal] = useState<{isOpen: boolean; tahap: PPL['tahap'] | null}>({isOpen: false, tahap: null});
-    /**
-     * Alokasi PPL yang menunggu konfirmasi hapus; null = tidak ada.
-     *
-     * Satu kartu alokasi memuat PPL, PML, beban kerja, dan honor yang sudah
-     * diketik, dan tidak ada urungkan — salah klik berarti mengetik ulang
-     * semuanya. Namanya ikut disimpan supaya dialognya bisa menyebut kartu
-     * mana yang akan hilang; di tahap yang ramai, kartunya mirip semua.
-     */
-    const [konfirmasiHapusPPL, setKonfirmasiHapusPPL] = useState<{ id: string; nama: string } | null>(null);
-    
-    const honorSettings = store.honorariumSettings;
-    
-    const getHonorSettingsKey = (): keyof typeof honorSettings | null => {
-        if (tahap === 'listing') return 'pengumpulan-data-listing';
-        if (tahap === 'pencacahan') return 'pengumpulan-data-pencacahan';
-        if (tahap === 'pengolahan-analisis') return 'pengolahan-analisis';
-        return null;
-    }
-    const honorSettingKey = getHonorSettingsKey();
-
-    const handleClearPPLs = () => {
-       storeActions.clearPPLsByTahap(tahap);
-       setShowClearConfirmModal({isOpen: false, tahap: null});
-    }
-
-    // FIX: Menambahkan tipe eksplisit untuk 'field'
-    /**
-     * Pengaturan honor langsung disetor ke store setiap diketik, sama seperti
-     * di Edit Kegiatan. `updateHonorariumSetting` sekaligus menghitung ulang
-     * honor setiap alokasi, jadi total honor mitra di bawahnya ikut berubah
-     * seketika — tidak lagi menunggu kotaknya ditinggalkan.
-     */
-    const handleSettingChange = (field: keyof HonorariumSettings, value: string) => {
-        if (!honorSettingKey) return;
-        storeActions.updateHonorariumSetting(honorSettingKey, field, value);
-    };
-
-    // FIX: Menambahkan tipe eksplisit untuk 'field'
-    
-
-
-    return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle>Alokasi PPL & PML ({title})</CardTitle>
-                        <CardDescription>Atur honorarium, bulan pembayaran, lalu alokasikan PPL.</CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                       {pplForStage.length > 0 && (
-                           <Button type="button" variant="destructive" size="sm" onClick={() => setShowClearConfirmModal({isOpen: true, tahap})}>
-                               <XCircle className="w-4 h-4 mr-2" />
-                               Clear PPL
-                           </Button>
-                       )}
-                       <Button variant="outline" size="sm" asChild>
-                           <Link 
-                               to="/daftar-ppl"
-                               state={{ 
-                                   from: 'input-kegiatan',
-                                   tahap: tahap,
-                                   existingPplIds: pplForStage.map(p => p.ppl_master_id).filter(Boolean)
-                               }}
-                           >
-                               <Users className="w-4 h-4 mr-2" />
-                               Pilih dari Daftar PPL
-                           </Link>
-                       </Button>
-                   </div>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/40 space-y-4">
-                    <h4 className="font-medium text-foreground">Pengaturan Honorarium & Pembayaran</h4>
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label>Satuan Beban Kerja</Label>
-                            <Input placeholder="Contoh: Dokumen" value={honorSettingKey ? honorSettings[honorSettingKey].satuanBebanKerja : ''} onChange={e => handleSettingChange('satuanBebanKerja', e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Harga per Satuan (Rp)</Label>
-                            <Input placeholder="Contoh: 15000" value={honorSettingKey ? formatHonor(honorSettings[honorSettingKey].hargaSatuan) : ''} onChange={e => handleSettingChange('hargaSatuan', e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                           <Label>Rentang Tanggal Honor *</Label>
-                           <DateRangePicker
-                               value={rentangHonor}
-                               onChange={({ mulai, selesai }) => storeActions.setRentangHonor(tahapHonor, mulai, selesai)}
-                               defaultMonth={store.tanggalMulaiPersiapan}
-                               placeholder="Pilih rentang..."
-                           />
-                            {bedaDenganPendataan && (
-                                <p className="text-xs text-amber-700 dark:text-amber-300">
-                                    Berbeda dengan jadwal pendataan ({labelRentang(mulaiPendataan, selesaiPendataan)}).
-                                    Pastikan ini disengaja, bukan salah pilih tanggal.
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {opsiBulanPembebanan.length > 1 && (
-                        <p className="text-sm text-muted-foreground">
-                            Rentang honor melintasi {opsiBulanPembebanan.length} bulan. Pilihan bulannya
-                            ada di tiap kartu alokasi PPL di bawah &mdash; batas honor dihitung per mitra
-                            per bulan, jadi tiap mitra bisa berbeda.
-                        </p>
-                    )}
-
-                    {opsiBulanPembebanan.length === 1 && (
-                        <div className="text-sm text-muted-foreground">
-                            Dibebankan pada bulan{' '}
-                            <Badge variant="outline" className="font-medium">{opsiBulanPembebanan[0].label}</Badge>
-                        </div>
-                    )}
-                </div>
-
-                <div className="space-y-4">
-                    {pplForStage.map((ppl, index) => {
-                       const existingPplIdsForCurrentStage = pplForStage
-                           .map(p => p.ppl_master_id)
-                           .filter(id => id && id !== ppl.ppl_master_id) as string[];
-
-                       return (
-                           <PPLAllocationItem 
-                               key={ppl.id} 
-                               tahap={tahap}
-                               opsiBulan={opsiBulanPembebanan}
-                               ppl={ppl} 
-                               index={index} 
-                               onRemove={() => setKonfirmasiHapusPPL({ id: ppl.id, nama: ppl.namaPPL || '' })} 
-                               pmlList={pmlList} 
-                               pplList={pplList} 
-                               store={useInputKegiatanStore} 
-                               existingPplIds={existingPplIdsForCurrentStage}
-                           />
-                       );
-                    })}
-                    <Button type="button" variant="outline" onClick={() => storeActions.addPPL(tahap)} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2"/>Tambah Alokasi PPL Manual</Button>
-                </div>
-                <ConfirmationModal
-                   isOpen={konfirmasiHapusPPL !== null}
-                   onClose={() => setKonfirmasiHapusPPL(null)}
-                   onConfirm={() => {
-                       if (konfirmasiHapusPPL) storeActions.removePPL(konfirmasiHapusPPL.id);
-                       setKonfirmasiHapusPPL(null);
-                   }}
-                   title="Hapus Alokasi PPL?"
-                   description={`Alokasi ${konfirmasiHapusPPL?.nama || 'ini'} beserta PML, beban kerja, dan honor yang sudah diisi akan dihapus dari daftar.`}
-                   confirmLabel="Ya, Hapus"
-                   cancelLabel="Batal"
-                   variant="danger"
-                   icon={<Trash2 className="w-6 h-6" />}
-                />
-                <ConfirmationModal
-                   isOpen={showClearConfirmModal.isOpen && showClearConfirmModal.tahap === tahap}
-                   onClose={() => setShowClearConfirmModal({isOpen: false, tahap: null})}
-                   onConfirm={handleClearPPLs}
-                   title="Hapus Semua PPL?"
-                   description={`Anda akan menghapus semua (${pplForStage.length}) alokasi PPL di tahap ini. Aksi ini tidak dapat dibatalkan.`}
-                   confirmLabel="Ya, Hapus Semua"
-                   variant="danger"
-                 />
-            </CardContent>
-        </Card>
-    );
-};
-
-/**
- * Dokumen dan catatan satu tahap.
- *
- * "Tambah Catatan" dulu hanya ada di Edit Kegiatan, sehingga catatan tahap baru
- * bisa ditulis SETELAH kegiatannya tersimpan. Sekarang disamakan: catatan bisa
- * langsung ditulis saat kegiatan dibuat, dan tampil paling atas seperti di
- * halaman Edit.
- */
-const DokumenContent = ({ tipe, title }: { tipe: Dokumen['tipe'], title: string }) => {
-    const documents = useInputKegiatanStore(state => state.documents.filter(d => d.tipe === tipe));
-    const { addDocumentLink, addCatatan, removeDocument, updateDocument } = useInputKegiatanStore.getState();
-    const catatan = documents.filter(d => d.jenis === 'catatan');
-    const dokumen = documents.filter(d => d.jenis !== 'catatan');
-
-    return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                    <CardTitle>Dokumen {title}</CardTitle>
-                    <div className="flex items-center gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => addCatatan(tipe)} className="flex items-center gap-2">
-                            <MessageSquare className="w-4 h-4" />Tambah Catatan
-                        </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => addDocumentLink(tipe)} className="flex items-center gap-2">
-                            <Plus className="w-4 h-4" />Tambah Dokumen Pendukung
-                        </Button>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {catatan.map(doc => (
-                    <div key={doc.id} className="flex items-start gap-3 p-3 border rounded-lg bg-yellow-50 dark:bg-yellow-950/40">
-                        <MessageSquare className="w-5 h-5 text-yellow-700 dark:text-yellow-300 mt-1 flex-shrink-0" />
-                        <div className="flex-grow space-y-1">
-                            <Label className="font-semibold text-yellow-800 dark:text-yellow-300">Catatan</Label>
-                            <Textarea
-                                placeholder="Tulis catatan untuk tahap ini..."
-                                value={doc.nama}
-                                rows={3}
-                                onChange={(e) => updateDocument(doc.id, 'nama', e.target.value)}
-                            />
-                        </div>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.id)} title="Hapus Catatan">
-                            <X className="w-4 h-4 text-muted-foreground"/>
-                        </Button>
-                    </div>
-                ))}
-                {dokumen.map(doc => (
-                    <div key={doc.id} className={cn("flex items-center gap-3 p-3 border rounded-lg", doc.isWajib ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800" : "bg-muted/50")}>
-                        <div className="flex-grow space-y-2">
-                            {doc.isWajib ? <Label className="font-semibold">{doc.nama}</Label> : <Input placeholder="Nama Dokumen Pendukung" value={doc.nama} onChange={(e) => updateDocument(doc.id, 'nama', e.target.value)} />}
-                            <div className="flex items-center gap-2">
-                                <Link2 className="w-4 h-4 text-muted-foreground"/>
-                                <Input placeholder="https://drive.google.com/..." value={doc.link} onChange={(e) => updateDocument(doc.id, 'link', e.target.value)} />
-                            </div>
-                        </div>
-                        {!doc.isWajib ? (<Button type="button" variant="ghost" size="icon" onClick={() => removeDocument(doc.id)} className="self-center"><X className="w-4 h-4 text-muted-foreground"/></Button>) : (<div className="self-center p-2" title="Dokumen Wajib"><Lock className="w-4 h-4 text-muted-foreground"/></div>)}
-                    </div>
-                ))}
-            </CardContent>
-        </Card>
-    );
 };
 
 export default function InputKegiatan() {
@@ -796,7 +352,6 @@ export default function InputKegiatan() {
           tanggalSelesaiHonorPengolahan: store.tanggalSelesaiHonorPengolahan,
           bypassHonorLimit: bypassHonorLimit
         };
-
 
         // Peringatan, bukan larangan: kegiatan boleh disimpan setengah jadi, tapi
         // beban kerja 0, mitra tanpa PML, atau pengaturan honor yang kosong hampir

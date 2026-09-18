@@ -5,7 +5,8 @@ import { getRiwayatKegiatan } from '../services/riwayatService';
 // memuat kode server lewat Node, dan ini nilai runtime (bukan tipe) sehingga
 // tidak terhapus saat kompilasi. Lihat catatan yang sama di kontrakService.ts.
 import { periksaTautan } from '../../shared/tautanDokumen';
-import { pesanGalatSql, statusGalatSql } from '../../shared/pesanGalatSql';
+import { statusGalatSql } from '../../shared/pesanGalatSql';
+import { kirimGalat, galatUntukKlien } from './utilRoute';
 import { wajibAdmin, wajibKeuangan } from '../auth/middleware';
 import {
   wajibPemilikKegiatan, wajibPmlMitra, wajibBolehMenambahDokumen,
@@ -19,6 +20,7 @@ import {
   updateKegiatan,
   updatePplProgress,
   deleteKegiatan,
+  keterikatanKegiatan,
   updateDocumentStatus,
   updateSingleDocument,
   createSingleDocument,
@@ -152,7 +154,7 @@ router.put('/:id', wajibPemilikKegiatan(dariParamId), async (req, res) => {
         // bisa memicunya, sekaligus tidak memberi tahu apa yang harus
         // diperbaiki. Kode yang sebetulnya kesalahan masukan dibalas 400.
         res.status(statusGalatSql(error.code)).json({
-            message: pesanGalatSql(error.code, error.message || 'Gagal menyimpan kegiatan.'),
+            message: galatUntukKlien(error, 'Gagal menyimpan kegiatan.').message,
             code: error.code,
         });
     }
@@ -177,12 +179,11 @@ router.put('/ppl/:pplId/progress', wajibPmlMitra, async (req, res) => {
         res.json(updatedPpl);
     } catch (error) {
         console.error("Error updating PPL progress:", error);
-        // Pesan dari service diteruskan apa adanya dengan status 400. Sebelumnya
-        // ditelan jadi 500 dengan teks generik, sehingga penjelasan sebenarnya
-        // (mis. "Total progres melebihi beban kerja") tidak pernah sampai ke
-        // pengguna dan mereka hanya melihat "Gagal memperbarui progress PPL".
-        const pesan = error instanceof Error ? error.message : 'Gagal memperbarui progress PPL';
-        res.status(400).json({ message: pesan });
+        // Status dan pesan mengikuti aturan kirimGalat: galat validasi dari
+        // service ("Total progres melebihi beban kerja", 400; alokasi tidak
+        // ditemukan, 404) sampai apa adanya ke layar, sedangkan galat tak terduga
+        // dibalas 500 dengan pesan umum.
+        kirimGalat(res, error, 'Gagal memperbarui progress PPL');
     }
 });
 
@@ -252,7 +253,7 @@ router.post('/dokumen', wajibBolehMenambahDokumen(dariBodyDokumen), async (req, 
         res.status(201).json(newDocument);
     } catch (error: any) {
         console.error("Error creating single document:", error);
-        res.status(500).json({ message: error.message || 'Gagal membuat dokumen baru.' });
+        kirimGalat(res, error, 'Gagal membuat dokumen baru.');
     }
 });
 
@@ -272,7 +273,7 @@ router.put('/dokumen/:id', wajibBolehMenyuntingDokumen, async (req, res) => {
         res.json(updatedDocument);
     } catch (error: any) {
         console.error("Error updating single document:", error);
-        res.status(500).json({ message: error.message || 'Gagal memperbarui dokumen.' });
+        kirimGalat(res, error, 'Gagal memperbarui dokumen.');
     }
 });
 
@@ -298,7 +299,7 @@ router.put('/dokumen/:id/nama', wajibBolehMengelolaDokumen, async (req, res) => 
         res.json(await ubahNamaDokumen(Number(req.params.id), nama, req.user!.username));
     } catch (error: any) {
         console.error('Error renaming document:', error);
-        res.status(500).json({ message: error.message || 'Gagal mengganti nama dokumen.' });
+        kirimGalat(res, error, 'Gagal mengganti nama dokumen.');
     }
 });
 
@@ -319,9 +320,7 @@ router.post('/dokumen/:id/pengingat', wajibKeuangan, async (req, res) => {
         res.json(await kirimPengingatDokumen(Number(req.params.id), req.user!.username));
     } catch (error: any) {
         console.error('Error sending document reminder:', error);
-        res.status(error.statusCode ?? 500).json({
-            message: error.message || 'Gagal mengirim pengingat.',
-        });
+        kirimGalat(res, error, 'Gagal mengirim pengingat.');
     }
 });
 
@@ -341,7 +340,7 @@ router.put('/dokumen/:id/penanggung-jawab', wajibKeuangan, async (req, res) => {
         res.json(dokumen);
     } catch (error: any) {
         console.error('Error updating penanggung jawab dokumen:', error);
-        res.status(500).json({ message: error.message || 'Gagal mengubah penanggung jawab dokumen.' });
+        kirimGalat(res, error, 'Gagal mengubah penanggung jawab dokumen.');
     }
 });
 
@@ -361,7 +360,7 @@ router.put('/:id/arsip', wajibAdmin, async (req, res) => {
         res.json(updated);
     } catch (error: any) {
         console.error("Error updating arsip status:", error);
-        res.status(500).json({ message: error.message || 'Gagal memperbarui status arsip.' });
+        kirimGalat(res, error, 'Gagal memperbarui status arsip.');
     }
 });
 
@@ -385,9 +384,26 @@ router.delete('/:id/urungkan', async (req, res) => {
     }
 });
 
+/**
+ * Hapus permanen sebuah kegiatan — hanya bila belum punya alokasi mitra atau
+ * penilaian. Kegiatan yang sudah berjalan diarsipkan, bukan dihapus; lihat
+ * `keterikatanKegiatan` untuk apa saja yang akan ikut hilang.
+ */
 router.delete('/:id', wajibAdmin, async (req, res) => {
     try {
-        const success = await deleteKegiatan(parseInt(req.params.id));
+        const id = parseInt(req.params.id);
+        const terikat = await keterikatanKegiatan(id);
+        if (terikat.alokasi > 0 || terikat.penilaian > 0) {
+            const jejak = [
+                terikat.alokasi > 0 ? `${terikat.alokasi} alokasi mitra (beserta honor dan progresnya)` : null,
+                terikat.penilaian > 0 ? `${terikat.penilaian} penilaian mitra` : null,
+            ].filter(Boolean).join(' dan ');
+            return res.status(409).json({
+                message: `Kegiatan ini tidak bisa dihapus karena sudah punya ${jejak}. Menghapusnya akan ikut menghapus semua data itu beserta riwayat perubahannya. Arsipkan kegiatan ini sebagai gantinya.`,
+                details: { code: 'KEGIATAN_TERIKAT', ...terikat },
+            });
+        }
+        const success = await deleteKegiatan(id);
         if (success) {
             res.status(204).send();
         } else {
@@ -412,7 +428,7 @@ router.delete('/dokumen/:id', wajibBolehMengelolaDokumen, async (req, res) => {
             res.status(404).json({ message: 'Dokumen tidak ditemukan.' });
         }
     } catch (error: any) {
-        res.status(500).json({ message: error.message });
+        kirimGalat(res, error, 'Gagal menghapus dokumen.');
     }
 });
 

@@ -50,19 +50,25 @@ const bacaToken = (req: Request): string | null => {
  * Sengaja membaca database tiap permintaan, bukan memercayai peran yang
  * disimpan di token: dengan begini menurunkan peran atau menghapus akun
  * langsung berlaku, tidak menunggu tokennya kedaluwarsa.
+ *
+ * `tokenVersi` ikut dibaca untuk mencabut sesi yang terbit sebelum password
+ * diganti, tetapi TIDAK ikut dipasang di `req.user`.
  */
-const cariPengguna = async (id: string): Promise<PenggunaPermintaan | null> => {
+const cariPengguna = async (id: string): Promise<{ pengguna: PenggunaPermintaan; tokenVersi: number } | null> => {
     const [rows] = await db.query<RowDataPacket[]>(
-        'SELECT id, username, nama_lengkap, role, isPML FROM users WHERE id = ? LIMIT 1', [id]
+        'SELECT id, username, nama_lengkap, role, isPML, tokenVersi FROM users WHERE id = ? LIMIT 1', [id]
     );
     const u = rows[0];
     if (!u) return null;
     return {
-        id: u.id,
-        username: u.username,
-        namaLengkap: u.nama_lengkap,
-        role: u.role,
-        isPML: Boolean(u.isPML),
+        pengguna: {
+            id: u.id,
+            username: u.username,
+            namaLengkap: u.nama_lengkap,
+            role: u.role,
+            isPML: Boolean(u.isPML),
+        },
+        tokenVersi: Number(u.tokenVersi) || 0,
     };
 };
 
@@ -75,12 +81,25 @@ export const wajibLogin = async (req: Request, res: Response, next: NextFunction
         return res.status(401).json({ message: 'Sesi tidak valid atau sudah berakhir. Silakan login kembali.' });
     }
 
-    const pengguna = await cariPengguna(isi.sub);
-    if (!pengguna) {
+    // Dijaga try/catch: middleware ini async dan dipasang untuk SELURUH API.
+    // Galat database di sini (mis. MySQL sedang dimulai ulang) tanpa penangkap
+    // menjadi unhandled rejection yang menghentikan proses server.
+    let hasil: Awaited<ReturnType<typeof cariPengguna>>;
+    try {
+        hasil = await cariPengguna(isi.sub);
+    } catch (error) {
+        return next(error);
+    }
+    if (!hasil) {
         return res.status(401).json({ message: 'Akun tidak ditemukan. Silakan login kembali.' });
     }
 
-    req.user = pengguna;
+    // Token yang terbit sebelum password akun ini diganti sudah dicabut.
+    if ((isi.v ?? 0) !== hasil.tokenVersi) {
+        return res.status(401).json({ message: 'Sesi ini sudah dicabut karena password akun diganti. Silakan login kembali.' });
+    }
+
+    req.user = hasil.pengguna;
     next();
 };
 

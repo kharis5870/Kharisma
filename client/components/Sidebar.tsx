@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Users, FileText, Settings, LogOut, PlusCircle, Menu, ArrowLeft, Star, FileSignature, History } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
-import favicon from '/favicon.ico';
+import logoK from '/logo-k.png';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/stores/useSidebarStore';
@@ -269,9 +269,9 @@ const Sidebar: React.FC = () => {
       >
         <div className={"p-4 h-[68px] flex items-center justify-between border-b border-sidebar-border"}>
           <div className={`flex items-center min-w-0 ${isExpanded ? '' : 'pointer-events-none'}`}>
-            <img src={favicon} alt="Kharisma Logo" className={`w-8 h-8 transition-all duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`} />
+            <img src={logoK} alt="Logo SIKAMI" className={`w-8 h-8 rounded-md bg-white transition-all duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0'}`} />
             <span className={cn('font-bold text-2xl whitespace-nowrap transition-all duration-300', isExpanded ? 'ml-2 opacity-100' : 'w-0 opacity-0', 'text-sidebar-foreground')}>
-              Kharisma
+              SIKAMI
             </span>
           </div>
           <button onClick={toggleSidebar} className={"p-2 rounded-lg flex-shrink-0 text-sidebar-foreground/60 hover:bg-sidebar-accent"}>

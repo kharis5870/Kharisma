@@ -26,11 +26,16 @@ import { FRASA_KONFIRMASI_ATUR_ULANG, ringkasNomorPeriode } from "@shared/aturUl
 import { unduhKontrak, kontrakKeBlob, namaBerkasKontrak } from "@/lib/kontrakPdf";
 import { unduhBlob, exportToExcel, type KolomEkspor } from "@/lib/exportUtils";
 import TabBast from "@/components/kontrak/TabBast";
+import KepalaUrut from "@/components/kontrak/KepalaUrut";
+import KotakCari from "@/components/KotakCari";
+import PaginasiTabel from "@/components/PaginasiTabel";
+import { usePaginasiTabel } from "@/hooks/usePaginasiTabel";
+import { cariMitraSurat } from "@/lib/cariSurat";
+import { urutkanSurat, ubahUrutan, URUTAN_SURAT_AWAL, type UrutanSurat, type KolomUrutSurat } from "@/lib/urutSurat";
 import DialogAturUlangNomor from "@/components/kontrak/DialogAturUlangNomor";
 import SuccessModal from "@/components/SuccessModal";
 import AlertModal from "@/components/AlertModal";
-
-const FORMAT_TANGGAL = "yyyy-MM-dd";
+import { FORMAT_TANGGAL } from "@/lib/honorPeriode";
 
 const LABEL_TAHAP: Record<string, string> = {
   listing: "Listing",
@@ -176,6 +181,19 @@ export default function GenerateKontrak() {
   /** Ringkasan nomor periode yang sedang tampil, untuk dialog atur ulang. */
   const ringkasanNomor = useMemo(() => ringkasNomorPeriode(dataMitra), [dataMitra]);
 
+  // Urutan tabel Generate SPK; awalnya nomor surat dari kecil ke besar. Hanya
+  // tampilan tabel dan rekap Excel yang mengikutinya. Pemberian nomor saat
+  // "Generate Semua" tetap memakai `dataMitra` (urut nama), supaya mengurutkan
+  // tabel tidak mengubah siapa mendapat nomor berapa.
+  const [urutanSpk, setUrutanSpk] = useState<UrutanSurat>(URUTAN_SURAT_AWAL);
+  const mitraTerurut = useMemo(() => urutkanSurat(dataMitra, urutanSpk), [dataMitra, urutanSpk]);
+  const urutSpk = (kolom: KolomUrutSurat) => setUrutanSpk(kini => ubahUrutan(kini, kolom));
+  // Pencarian dan halaman tabel. Keduanya hanya menyaring TAMPILAN: "Generate
+  // Semua (ZIP)" tetap membuat surat untuk seluruh mitra periode ini.
+  const [cariSpk, setCariSpk] = useState("");
+  const mitraTersaring = useMemo(() => cariMitraSurat(mitraTerurut, cariSpk), [mitraTerurut, cariSpk]);
+  const paginasiSpk = usePaginasiTabel(mitraTersaring, 10, cariSpk);
+
   /**
    * Mitra yang suratnya SUDAH terbit tetapi isinya tidak lagi sesuai data
    * sekarang — honor direvisi, muatan bertambah, atau ada kegiatan baru yang
@@ -270,7 +288,8 @@ export default function GenerateKontrak() {
       judul: "Rekap Surat Perjanjian Kerja",
       subJudul: `Periode ${labelRentang(rentang.mulai, rentang.selesai)} · Tanggal surat ${tanggalSurat}`,
       kolom,
-      baris: dataMitra,
+      // Mengikuti pencarian dan urutan tabel yang sedang tampil (semua halaman).
+      baris: mitraTersaring,
       namaFile: `rekap-spk-${rentang.mulai}-sd-${rentang.selesai}`,
     });
   };
@@ -537,14 +556,22 @@ export default function GenerateKontrak() {
                   </div>
                 )}
 
+                <KotakCari
+                  id="cariSpk"
+                  nilai={cariSpk}
+                  onUbah={setCariSpk}
+                  placeholder="Cari nama mitra atau nomor surat..."
+                  className="sm:w-80"
+                />
+
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[8%]">No. Surat</TableHead>
-                      <TableHead className="w-[26%]">Nama Mitra</TableHead>
-                      <TableHead className="w-[10%]">Baris</TableHead>
-                      <TableHead className="w-[20%]">Jangka Waktu</TableHead>
-                      <TableHead className="w-[18%]">Total Honor</TableHead>
+                      <TableHead className="w-[8%]"><KepalaUrut label="No. Surat" kolom="nomor" urutan={urutanSpk} onUrut={urutSpk} /></TableHead>
+                      <TableHead className="w-[26%]"><KepalaUrut label="Nama Mitra" kolom="nama" urutan={urutanSpk} onUrut={urutSpk} /></TableHead>
+                      <TableHead className="w-[10%]"><KepalaUrut label="Baris" kolom="baris" urutan={urutanSpk} onUrut={urutSpk} /></TableHead>
+                      <TableHead className="w-[20%]"><KepalaUrut label="Jangka Waktu" kolom="jangkaWaktu" urutan={urutanSpk} onUrut={urutSpk} /></TableHead>
+                      <TableHead className="w-[18%]"><KepalaUrut label="Total Honor" kolom="totalHonor" urutan={urutanSpk} onUrut={urutSpk} /></TableHead>
                       <TableHead className="w-[18%]">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -555,8 +582,12 @@ export default function GenerateKontrak() {
                       <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Tidak ada mitra dengan honor pada periode ini.
                       </TableCell></TableRow>
+                    ) : mitraTersaring.length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        Tidak ada mitra yang cocok dengan &quot;{cariSpk}&quot;.
+                      </TableCell></TableRow>
                     ) : (
-                      dataMitra.map(m => (
+                      paginasiSpk.dataHalaman.map(m => (
                         <TableRow key={m.pplMasterId}>
                           <TableCell>
                             {m.nomorUrut
@@ -595,6 +626,7 @@ export default function GenerateKontrak() {
                     )}
                   </TableBody>
                 </Table>
+                {dataMitra.length > 0 && <PaginasiTabel paginasi={paginasiSpk} />}
               </CardContent>
             </Card>
           </TabsContent>

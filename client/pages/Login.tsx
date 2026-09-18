@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, LogIn, Eye, EyeOff } from "lucide-react";
 import SuccessModal from "@/components/SuccessModal";
 import { apiClient } from "@/lib/apiClient";
-import favicon from "/favicon.ico";
+import logoSikami from "/logo-sikami.png";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -87,17 +87,14 @@ export default function Login() {
         */}
         <Card className="overflow-hidden border-0 shadow-2xl">
           <div className="bg-gradient-to-br from-bps-blue-600 to-bps-blue-800 dark:from-bps-blue-800 dark:to-bps-blue-900 px-8 py-9 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25 backdrop-blur-sm">
-              <img src={favicon} alt="Logo Kharisma" className="h-9 w-9" />
+            {/* Logo lengkap SIKAMI sudah memuat nama dan kepanjangannya, jadi
+                keduanya tidak ditulis ulang sebagai teks. Latar logonya terang,
+                karena itu diletakkan di kotak putih: tetap rapi di atas kepala
+                biru, di mode terang maupun gelap. */}
+            <h1 className="sr-only">SIKAMI — Sistem Informasi Kegiatan dan Mitra</h1>
+            <div className="mx-auto w-full max-w-[300px] rounded-2xl bg-white px-5 py-4 shadow-lg ring-1 ring-white/40">
+              <img src={logoSikami} alt="SIKAMI — Sistem Informasi Kegiatan dan Mitra" className="block h-auto w-full" />
             </div>
-
-            <h1 className="text-3xl font-bold tracking-tight text-white">Kharisma.</h1>
-
-            {/* Kepanjangan akronim: dibuat kecil dan renggang supaya terbaca
-                sebagai keterangan, bukan bersaing dengan judul. */}
-            <p className="mx-auto mt-2 max-w-xs text-[11px] leading-relaxed tracking-wide text-white/70">
-              Knowledge Hub for Activity Reporting and Integrated Statistical Monitoring Application
-            </p>
 
             {/* Pemisah tipis: memberi jeda visual tanpa menambah garis tegas. */}
             <div className="mx-auto my-4 h-px w-16 bg-white/25" />
@@ -187,7 +184,7 @@ export default function Login() {
         </Card>
 
         <div className="mt-6 text-center text-xs text-muted-foreground">
-          <p>Sistem Manajemen Kegiatan BPS</p>
+          <p>SIKAMI · Sistem Informasi Kegiatan dan Mitra</p>
           <p className="mt-1">
             © 2025 BPS Kabupaten Bengkulu Selatan · dikembangkan oleh Kharis Batubara
           </p>

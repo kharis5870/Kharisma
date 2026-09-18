@@ -24,10 +24,10 @@ import {
 import { penandaTidakDikenal, polaTanpaNomor } from '../../shared/nomorSurat';
 import { konfirmasiAturUlangSah } from '../../shared/aturUlangNomor';
 import { wajibKeuangan } from '../auth/middleware';
+import { FORMAT_TANGGAL, kirimGalat } from './utilRoute';
 
 const router = Router();
 
-const FORMAT_TANGGAL = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Membaca dan memvalidasi pasangan tanggalMulai/tanggalSelesai dari query. */
 const bacaPeriode = (query: any): { mulai: string; selesai: string } | { error: string } => {
@@ -54,7 +54,7 @@ router.get('/template', async (_req, res) => {
         res.json(template);
     } catch (error: any) {
         console.error('Error fetching template surat:', error);
-        res.status(500).json({ message: error.message || 'Gagal memuat template surat.' });
+        kirimGalat(res, error, 'Gagal memuat template surat.');
     }
 });
 
@@ -101,7 +101,7 @@ router.put('/template/:id', wajibKeuangan, async (req, res) => {
         res.json(template);
     } catch (error: any) {
         console.error('Error updating template surat:', error);
-        res.status(500).json({ message: error.message || 'Gagal menyimpan template surat.' });
+        kirimGalat(res, error, 'Gagal menyimpan template surat.');
     }
 });
 
@@ -113,7 +113,7 @@ router.get('/uraian', async (req, res) => {
         res.json(await getUraianTugas(periode.mulai, periode.selesai));
     } catch (error: any) {
         console.error('Error fetching uraian tugas:', error);
-        res.status(500).json({ message: error.message || 'Gagal memuat uraian tugas.' });
+        kirimGalat(res, error, 'Gagal memuat uraian tugas.');
     }
 });
 
@@ -128,7 +128,7 @@ router.put('/uraian', wajibKeuangan, async (req, res) => {
         res.json({ tersimpan });
     } catch (error: any) {
         console.error('Error saving uraian tugas:', error);
-        res.status(500).json({ message: error.message || 'Gagal menyimpan uraian tugas.' });
+        kirimGalat(res, error, 'Gagal menyimpan uraian tugas.');
     }
 });
 
@@ -140,14 +140,14 @@ router.get('/data', async (req, res) => {
         res.json(await getDataKontrak(periode.mulai, periode.selesai));
     } catch (error: any) {
         console.error('Error fetching data kontrak:', error);
-        res.status(500).json({ message: error.message || 'Gagal memuat data kontrak.' });
+        kirimGalat(res, error, 'Gagal memuat data kontrak.');
     }
 });
 
 // POST pesan nomor urut surat (idempoten per mitra per periode)
 router.post('/nomor', wajibKeuangan, async (req, res) => {
     try {
-        const { periodeMulai, periodeSelesai, tanggalSurat, daftarMitra, nomorMulai } = req.body;
+        const { periodeMulai, periodeSelesai, tanggalSurat, daftarMitra } = req.body;
         // Identitas diambil dari token (req.user), BUKAN dari badan permintaan.
         // Nama pengguna yang dikirim klien tidak membuktikan apa pun.
         const username = req.user!.username;
@@ -160,11 +160,11 @@ router.post('/nomor', wajibKeuangan, async (req, res) => {
         if (!Array.isArray(daftarMitra) || daftarMitra.length === 0) {
             return res.status(400).json({ message: 'daftarMitra tidak boleh kosong.' });
         }
-        const hasil = await pesanNomorKontrak(periodeMulai, periodeSelesai, tanggalSurat, daftarMitra, username, nomorMulai);
+        const hasil = await pesanNomorKontrak(periodeMulai, periodeSelesai, tanggalSurat, daftarMitra, username);
         res.json(hasil);
     } catch (error: any) {
         console.error('Error reserving nomor kontrak:', error);
-        res.status(500).json({ message: error.message || 'Gagal memesan nomor surat.' });
+        kirimGalat(res, error, 'Gagal memesan nomor surat.');
     }
 });
 
@@ -195,7 +195,7 @@ router.post('/bast/nomor', wajibKeuangan, async (req, res) => {
         res.json(hasil);
     } catch (error: any) {
         console.error('Error reserving nomor BAST:', error);
-        res.status(500).json({ message: error.message || 'Gagal menetapkan nomor BAST.' });
+        kirimGalat(res, error, 'Gagal menetapkan nomor BAST.');
     }
 });
 
@@ -216,7 +216,7 @@ router.get('/nomor-terpakai', async (req, res) => {
         res.json({ tahun, maksTerpakai: await getMaksNomorUrut(tahun) });
     } catch (error: any) {
         console.error('Error fetching maks nomor urut:', error);
-        res.status(500).json({ message: error.message || 'Gagal memuat nomor terpakai.' });
+        kirimGalat(res, error, 'Gagal memuat nomor terpakai.');
     }
 });
 
@@ -258,7 +258,7 @@ router.post('/nomor/atur-ulang', wajibKeuangan, aturUlangLimiter, async (req, re
         res.json(hasil);
     } catch (error: any) {
         console.error('Error atur ulang nomor:', error);
-        res.status(500).json({ message: error.message || 'Gagal mengatur ulang nomor surat.' });
+        kirimGalat(res, error, 'Gagal mengatur ulang nomor surat.');
     }
 });
 
@@ -290,7 +290,7 @@ router.get('/riwayat', wajibKeuangan, async (req, res) => {
         res.json(await getRiwayatSurat(tahun));
     } catch (error: any) {
         console.error('Error fetching riwayat surat:', error);
-        res.status(500).json({ message: error.message || 'Gagal memuat riwayat surat.' });
+        kirimGalat(res, error, 'Gagal memuat riwayat surat.');
     }
 });
 
@@ -317,7 +317,7 @@ router.put('/surat/:id/nomor', wajibKeuangan, async (req, res) => {
         res.json(hasil);
     } catch (error: any) {
         console.error('Error ubah nomor surat:', error);
-        res.status(500).json({ message: error.message || 'Gagal mengubah nomor surat.' });
+        kirimGalat(res, error, 'Gagal mengubah nomor surat.');
     }
 });
 
@@ -337,7 +337,7 @@ router.post('/surat/:id/batal', wajibKeuangan, async (req, res) => {
         res.json({ ok: true });
     } catch (error: any) {
         console.error('Error batalkan surat:', error);
-        res.status(500).json({ message: error.message || 'Gagal membatalkan surat.' });
+        kirimGalat(res, error, 'Gagal membatalkan surat.');
     }
 });
 
@@ -352,7 +352,7 @@ router.put('/surat/:id/catatan', wajibKeuangan, async (req, res) => {
         res.json({ ok: true });
     } catch (error: any) {
         console.error('Error ubah catatan surat:', error);
-        res.status(500).json({ message: error.message || 'Gagal menyimpan catatan.' });
+        kirimGalat(res, error, 'Gagal menyimpan catatan.');
     }
 });
 
@@ -373,7 +373,7 @@ router.delete('/surat/:id', wajibKeuangan, aturUlangLimiter, async (req, res) =>
         res.status(204).send();
     } catch (error: any) {
         console.error('Error hapus surat batal:', error);
-        res.status(500).json({ message: error.message || 'Gagal menghapus surat.' });
+        kirimGalat(res, error, 'Gagal menghapus surat.');
     }
 });
 
@@ -395,7 +395,7 @@ router.post('/nomor/rapikan', wajibKeuangan, aturUlangLimiter, async (req, res) 
         res.json(await rapikanNomorTahun(tahun, pratinjau, req.user!.username));
     } catch (error: any) {
         console.error('Error rapikan nomor surat:', error);
-        res.status(500).json({ message: error.message || 'Gagal merapikan nomor surat.' });
+        kirimGalat(res, error, 'Gagal merapikan nomor surat.');
     }
 });
 
@@ -421,7 +421,7 @@ router.post('/surat/:id/perbarui', wajibKeuangan, async (req, res) => {
         res.json({ ok: true });
     } catch (error: any) {
         console.error('Error perbarui isi surat:', error);
-        res.status(500).json({ message: error.message || 'Gagal memperbarui isi surat.' });
+        kirimGalat(res, error, 'Gagal memperbarui isi surat.');
     }
 });
 

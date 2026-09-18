@@ -6,8 +6,9 @@
 // lalu Export > PNG / PDF.
 //
 // Disusun dari struktur database yang sedang berjalan (mysqldump --no-data),
-// bukan dari rancangan lama. Relasi bertanda "logis" tidak memiliki FOREIGN
-// KEY di database, tetapi secara makna memang merujuk ke tabel tersebut.
+// sampai migrasi 2026-09-24-kunci-nomor-dan-versi.sql. Relasi bertanda
+// "logis" tidak memiliki FOREIGN KEY di database, tetapi secara makna memang
+// merujuk ke tabel tersebut.
 // =====================================================================
 
 Project OPTIMA {
@@ -91,6 +92,10 @@ Enum entitas_riwayat {
   honor
   penilaian
 }
+Enum status_surat {
+  aktif
+  batal
+}
 
 // ------------------------------------------------- Pengguna & wilayah
 Table users {
@@ -100,6 +105,7 @@ Table users {
   nama_lengkap varchar(255) [not null]
   role role_pengguna [not null, default: 'user']
   isPML tinyint(1) [not null, default: 0]
+  tokenVersi int [not null, default: 0, note: 'naik saat ganti password; mencabut sesi lama']
 }
 
 Table ketua_tim {
@@ -122,13 +128,16 @@ Table desa {
 }
 
 Table ppl_master {
-  id varchar(50) [pk, note: 'ID mitra statistik']
+  id varchar(50) [pk, note: 'ID mitra statistik di aplikasi']
+  sobat_id varchar(50) [unique, note: 'ID mitra di aplikasi SOBAT, untuk pencocokan impor']
   namaPPL varchar(255) [not null]
   posisi posisi_mitra [not null, default: 'Pendataan']
   kecamatan_id int [ref: > kecamatan.id]
   desa_id int [ref: > desa.id]
   alamat text
   noTelepon varchar(20)
+  aktif tinyint(1) [not null, default: 1, note: 'mitra berhenti dinonaktifkan, tidak dihapus']
+  nonaktifSejak date
 }
 
 // ------------------------------------------------------------ Kegiatan
@@ -177,6 +186,7 @@ Table kegiatan {
   lastUpdatedBy varchar(50)
   lastEdited datetime
   lastEditedBy varchar(255)
+  versi int [not null, default: 0, note: 'penanda penyuntingan bersamaan']
 }
 
 Table honorarium_kegiatan {
@@ -219,7 +229,8 @@ Table ppl_honor_bulan {
   id int [pk, increment]
   ppl_id int [not null, ref: > ppl.id]
   bulan varchar(7) [not null, note: 'MM-YYYY']
-  jumlah int [not null, default: 0, note: 'honor yang dibebankan ke bulan ini']
+  volume int [not null, default: 0, note: 'unit beban kerja yang jatuh di bulan ini']
+  jumlah int [not null, default: 0, note: 'volume x harga satuan']
   indexes {
     (ppl_id, bulan) [unique]
   }
@@ -311,24 +322,32 @@ Table template_surat {
 }
 
 Table kontrak_mitra {
-  id int [pk, increment]
+  id int [pk, increment, note: 'satu surat SPK/BAST mitra untuk satu bulan']
   ppl_master_id varchar(50) [not null, ref: > ppl_master.id]
-  periode_mulai date [not null]
-  periode_selesai date [not null]
+  periode_mulai date [not null, note: 'tanggal 1 bulan honor']
+  periode_selesai date [not null, note: 'akhir bulan honor']
   nomor_urut int [not null]
   nomor_surat varchar(255) [not null]
   tanggal_surat date [not null]
   nomor_bast varchar(255)
   tanggal_bast date
+  status status_surat [not null, default: 'aktif']
+  catatan text [note: 'wajib diisi saat surat dibatalkan']
+  dibatalkanPada datetime
+  dibatalkanOleh varchar(50)
   total_honor bigint [not null, default: 0]
+  isi_terbit longtext [note: 'JSON salinan isi surat saat terbit/diperbarui']
+  total_volume int
+  jumlah_baris int
+  diperbaruiPada datetime
+  diperbaruiOleh varchar(50)
   template_id int [ref: > template_surat.id]
   generatedAt timestamp
   generatedBy varchar(50)
   bastGeneratedAt timestamp
   bastGeneratedBy varchar(50)
-  indexes {
-    (ppl_master_id, periode_mulai, periode_selesai) [unique]
-  }
+  kunci_aktif varchar(120) [unique, note: 'kolom turunan: mitra|periode; NULL bila batal']
+  kunci_nomor varchar(24) [unique, note: 'kolom turunan: tahun|nomor_urut; NULL bila batal']
 }
 
 Table riwayat_surat {

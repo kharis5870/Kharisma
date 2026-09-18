@@ -1,17 +1,24 @@
 @startuml activity-surat-spk-bast
-' Rincian use case "Membuat SPK" dan "Membuat BAST" (menu Keuangan > Generate Surat).
-' Nomor BAST mengikuti nomor urut SPK mitra yang sama, sehingga BAST
-' tidak dapat dibuat sebelum SPK-nya ada (kontrakService.pesanNomorBast).
+' Rincian use case "Membuat SPK per Bulan" dan "Membuat BAST"
+' (menu Keuangan > Generate Surat).
+'
+' Sesuai kode:
+'  - periode SELALU satu bulan kalender, diturunkan dari pilihan bulan;
+'  - satu surat AKTIF per mitra per bulan (kontrak_mitra.kunci_aktif);
+'  - nomor diberikan di bawah kunci penomoran per tahun, sehingga dua orang
+'    yang menekan Generate bersamaan tidak mendapat nomor kembar;
+'  - nomor BAST mengikuti nomor urut SPK mitra yang sama.
 !include _gaya.iuml
 
 |Tim Keuangan|
 start
 :Membuka menu Generate Surat
-dan memilih periode kontrak;
+dan memilih bulan honor;
 
 |Sistem|
-:Menampilkan mitra yang memiliki honor pada periode
-tersebut beserta rincian kegiatan dan total honornya;
+:Menetapkan periode satu bulan kalender penuh;
+:Menampilkan mitra yang memiliki muatan pada bulan
+tersebut beserta rincian kegiatan, volume, dan honornya;
 
 |Tim Keuangan|
 :Melengkapi uraian tugas dan
@@ -20,13 +27,15 @@ kode beban anggaran (MAK);
 partition "Surat Perjanjian Kerja (SPK)" {
   :Memesan nomor SPK;
   |Sistem|
-  if (Mitra sudah memiliki nomor\npada periode ini?) then (ya)
+  if (Mitra sudah memiliki surat\naktif pada bulan ini?) then (ya)
     :Memakai nomor yang sama;
   else (tidak)
-    :Memberi nomor urut berikutnya
+    :Mengunci penomoran tahun berjalan dan
+    memberi nomor urut berikutnya
     sesuai pola nomor di template;
   endif
-  :Menyimpan data kontrak mitra;
+  :Menyimpan data surat beserta
+  salinan isi surat saat terbit;
   :Menyusun PDF SPK dari template surat;
   |Tim Keuangan|
   :Mengunduh dan mencetak SPK;
@@ -47,12 +56,5 @@ partition "Berita Acara Serah Terima (BAST)" {
   endif
 }
 stop
-
-note right
-  Bila penomoran perlu diulang, Tim Keuangan
-  memakai "Atur Ulang Nomor"; nomor yang
-  terhapus beserta pelakunya dicatat di
-  tabel riwayat_surat.
-end note
 
 @enduml

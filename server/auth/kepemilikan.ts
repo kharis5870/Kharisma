@@ -179,10 +179,16 @@ export const wajibBolehMenyuntingDokumen = async (
 ) => {
     const peran = req.user?.role;
     if (peran === 'admin' || peran === 'supervisor') {
-        const [rows] = await db.query<RowDataPacket[]>(
-            'SELECT penanggungJawab FROM dokumen WHERE id = ? LIMIT 1', [Number(req.params.id)]
-        );
-        if (rows[0]?.penanggungJawab === 'keuangan') return next();
+        // try/catch: middleware async tanpa penangkap membuat galat database
+        // menghentikan seluruh proses server (Express 4 tidak menangkapnya).
+        try {
+            const [rows] = await db.query<RowDataPacket[]>(
+                'SELECT penanggungJawab FROM dokumen WHERE id = ? LIMIT 1', [Number(req.params.id)]
+            );
+            if (rows[0]?.penanggungJawab === 'keuangan') return next();
+        } catch (error) {
+            return next(error);
+        }
     }
     return wajibPemilikKegiatan(dariDokumenParamId)(req, res, next);
 };

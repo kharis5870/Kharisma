@@ -14,10 +14,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Info, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
+import { simpanToken } from "@/lib/tokenSesi";
+import { periksaPassword, PANJANG_MIN_PASSWORD } from "@shared/aturanPassword";
 
 // Username TIDAK dikirim: server mengganti password milik pemilik token sesi.
 const gantiPassword = async (payload: { passwordLama: string; passwordBaru: string }) =>
-  apiClient.put('/auth/password', payload);
+  apiClient.put<{ success: boolean; message: string; token?: string }>('/auth/password', payload);
 
 export default function EditProfil() {
   const { user } = useAuth();
@@ -31,7 +33,11 @@ export default function EditProfil() {
 
   const mutation = useMutation({
     mutationFn: gantiPassword,
-    onSuccess: () => {
+    onSuccess: (hasil) => {
+      // Mengganti password mencabut semua sesi lama akun ini, TERMASUK token
+      // yang sedang dipakai. Server mengirim token pengganti supaya orang yang
+      // baru saja mengganti password tidak ikut terlempar keluar.
+      if (hasil?.token) simpanToken(hasil.token);
       setSukses(true);
       setPasswordLama("");
       setPasswordBaru("");
@@ -50,8 +56,10 @@ export default function EditProfil() {
     if (!passwordLama || !passwordBaru || !konfirmasi) {
       return setGalat('Semua kolom wajib diisi.');
     }
-    if (passwordBaru.length < 6) {
-      return setGalat('Password baru minimal 6 karakter.');
+    // Aturan yang sama persis dengan yang ditegakkan server.
+    const galatPassword = periksaPassword(passwordBaru, user?.username);
+    if (galatPassword) {
+      return setGalat(galatPassword);
     }
     if (passwordBaru !== konfirmasi) {
       return setGalat('Konfirmasi password tidak cocok dengan password baru.');
@@ -126,7 +134,7 @@ export default function EditProfil() {
               <KeyRound className="w-5 h-5" />
               Ganti Password
             </CardTitle>
-            <CardDescription>Minimal 6 karakter dan harus berbeda dari password lama.</CardDescription>
+            <CardDescription>Minimal {PANJANG_MIN_PASSWORD} karakter dan harus berbeda dari password lama.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">

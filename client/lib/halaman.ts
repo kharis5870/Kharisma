@@ -42,5 +42,5 @@ export const judulDariPath = (path: string): string => {
   if (cocok) return cocok.judul;
   if (path.startsWith('/edit-activity')) return 'Edit Kegiatan';
   if (path.startsWith('/view-documents')) return 'Dokumen Kegiatan';
-  return 'Kharisma';
+  return 'SIKAMI';
 };

@@ -1,4 +1,5 @@
 import "./global.css";
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useApplyTheme } from "./hooks/useApplyTheme";
@@ -10,21 +11,54 @@ import { PPLProvider } from "./contexts/PPLContext";
 import { AdminProvider } from "./contexts/AdminContext"; // <-- Impor AdminProvider
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
-import InputKegiatan from "./pages/InputKegiatan";
-import Dashboard from "./pages/Dashboard";
-import ManajemenHonor from "./pages/ManajemenHonor";
-import ManajemenAdmin from "./pages/ManajemenAdmin"; 
-import DaftarPPL from "./pages/DaftarPPL"; 
-import EditActivity from "./pages/EditActivity";
-import ViewDocuments from "./pages/ViewDocuments";
-import PenilaianMitraPage from './pages/PenilaianMitra';
-import NotFound from "./pages/NotFound";
-import DaftarPML from './pages/DaftarPML';
-import RekapPenilaian from "./pages/RekapPenilaian";
-import TemplateSurat from "./pages/TemplateSurat";
-import GenerateKontrak from "./pages/GenerateKontrak";
-import RiwayatSurat from "./pages/RiwayatSurat";
-import EditProfil from "./pages/EditProfil";
+// Halaman selain Login dimuat SAAT DIBUKA, bukan sekaligus di awal. Sebelumnya
+// seluruh aplikasi ada di satu berkas JS 1,3 MB yang harus diunduh lewat VPN
+// sebelum halaman login pun tampil. Login tetap dimuat langsung karena selalu
+// menjadi halaman pertama.
+/**
+ * Seperti lazy(), tetapi pulih sendiri setelah aplikasi di-deploy ulang.
+ *
+ * Nama berkas halaman memuat hash. Tab yang dibuka sebelum deploy masih
+ * menunjuk berkas lama yang sudah dihapus dari server, sehingga membuka halaman
+ * berikutnya gagal dengan layar kosong. Halaman dimuat ulang SEKALI untuk
+ * mengambil versi baru; penanda di sessionStorage mencegah muat ulang berulang
+ * bila penyebabnya ternyata lain (mis. jaringan putus).
+ */
+const KUNCI_MUAT_ULANG = "kharisma-muat-ulang-halaman";
+const halamanLazy = (muat: () => Promise<{ default: React.ComponentType }>) =>
+  lazy(() => muat()
+    .then(modul => { try { sessionStorage.removeItem(KUNCI_MUAT_ULANG); } catch { /* */ } return modul; })
+    .catch(galat => {
+      let sudahDicoba = false;
+      try { sudahDicoba = sessionStorage.getItem(KUNCI_MUAT_ULANG) === "1"; sessionStorage.setItem(KUNCI_MUAT_ULANG, "1"); } catch { /* */ }
+      if (!sudahDicoba) {
+        window.location.reload();
+        return new Promise<never>(() => { /* halaman sedang dimuat ulang */ });
+      }
+      throw galat;
+    }));
+const InputKegiatan = halamanLazy(() => import("./pages/InputKegiatan"));
+const Dashboard = halamanLazy(() => import("./pages/Dashboard"));
+const ManajemenHonor = halamanLazy(() => import("./pages/ManajemenHonor"));
+const ManajemenAdmin = halamanLazy(() => import("./pages/ManajemenAdmin")); 
+const DaftarPPL = halamanLazy(() => import("./pages/DaftarPPL")); 
+const EditActivity = halamanLazy(() => import("./pages/EditActivity"));
+const ViewDocuments = halamanLazy(() => import("./pages/ViewDocuments"));
+const PenilaianMitraPage = halamanLazy(() => import("./pages/PenilaianMitra"));
+const NotFound = halamanLazy(() => import("./pages/NotFound"));
+const DaftarPML = halamanLazy(() => import("./pages/DaftarPML"));
+const RekapPenilaian = halamanLazy(() => import("./pages/RekapPenilaian"));
+const TemplateSurat = halamanLazy(() => import("./pages/TemplateSurat"));
+const GenerateKontrak = halamanLazy(() => import("./pages/GenerateKontrak"));
+const RiwayatSurat = halamanLazy(() => import("./pages/RiwayatSurat"));
+const EditProfil = halamanLazy(() => import("./pages/EditProfil"));
+
+/** Tampil sesaat selama berkas halaman yang baru dibuka diunduh. */
+const MemuatHalaman = () => (
+  <div className="min-h-screen flex items-center justify-center bg-muted">
+    <div className="w-8 h-8 border-4 border-bps-blue-600 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -67,6 +101,7 @@ const App = () => {
             <TooltipProvider delayDuration={200}>
             <BrowserRouter>
               <Toaster />
+              <Suspense fallback={<MemuatHalaman />}>
               <Routes>
                 <Route path="/" element={<Navigate to="/login" replace />} />
                 <Route path="/login" element={<Login />} />
@@ -88,6 +123,7 @@ const App = () => {
 
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
             </BrowserRouter>
             </TooltipProvider>
           </AdminProvider>

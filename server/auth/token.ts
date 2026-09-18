@@ -33,6 +33,13 @@ export interface IsiToken {
     sub: string;
     /** Kedaluwarsa, detik sejak epoch. */
     exp: number;
+    /**
+     * Versi token akun saat token diterbitkan (`users.tokenVersi`). Mengganti
+     * password menaikkan versi di database, sehingga token dengan versi lama
+     * ditolak — sesi yang sudah terbit bisa dicabut, tidak menunggu 12 jam.
+     * Tidak ada = 0, bentuk token sebelum fitur ini.
+     */
+    v?: number;
 }
 
 /** Umur token. Cukup untuk satu hari kerja, tidak lebih. */
@@ -57,8 +64,13 @@ export const buatToken = (
     rahasia: string,
     umurDetik = UMUR_TOKEN_DETIK,
     sekarangDetik = Math.floor(Date.now() / 1000),
+    versi = 0,
 ): string => {
-    const isi: IsiToken = { sub, exp: sekarangDetik + umurDetik };
+    // `v` hanya disertakan bila bukan 0, sehingga token akun yang belum pernah
+    // mengganti password berbentuk persis sama dengan token sebelumnya.
+    const isi: IsiToken = versi > 0
+        ? { sub, exp: sekarangDetik + umurDetik, v: versi }
+        : { sub, exp: sekarangDetik + umurDetik };
     const muatan = b64url(Buffer.from(JSON.stringify(isi), 'utf8'));
     return `${muatan}.${tandaTangan(muatan, rahasia)}`;
 };
@@ -97,6 +109,7 @@ export const verifikasiToken = (
 
     if (typeof isi?.sub !== 'string' || !isi.sub) return null;
     if (typeof isi?.exp !== 'number' || isi.exp <= sekarangDetik) return null;
+    if (isi.v !== undefined && (!Number.isInteger(isi.v) || isi.v < 0)) return null;
 
     return isi;
 };
@@ -116,6 +129,14 @@ export const verifikasiToken = (
 export const ambilRahasia = (): string => {
     const dariEnv = process.env.SESSION_SECRET;
     if (dariEnv && dariEnv.length >= 16) return dariEnv;
+
+    // Di produksi rahasia acak TIDAK diterima: Passenger di cPanel memulai ulang
+    // aplikasi sesering beberapa menit sekali, dan tiap kali itu terjadi semua
+    // orang terlempar keluar di tengah pekerjaan. Lebih baik aplikasi menolak
+    // menyala dengan pesan yang jelas daripada berjalan dalam keadaan itu.
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('[auth] SESSION_SECRET wajib disetel (minimal 16 karakter) di environment produksi. Lihat .env.example.');
+    }
 
     if (dariEnv) {
         console.warn('[auth] SESSION_SECRET terlalu pendek (minimal 16 karakter); memakai rahasia acak.');

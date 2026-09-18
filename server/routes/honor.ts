@@ -1,11 +1,10 @@
 // server/routes/honor.ts
 
 import { Router } from 'express';
-import { getHonorRekap, getHonorDetail } from '../services/honorService';
+import { getHonorRekap } from '../services/honorService';
+import { FORMAT_TANGGAL } from './utilRoute';
 
 const router = Router();
-
-const FORMAT_TANGGAL = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Rekap honor untuk sebuah rentang tanggal.
@@ -57,25 +56,5 @@ router.get('/', async (req, res) => {
         res.status(500).json({ message: 'Error fetching honor data' });
     }
 });
-
-// GET /api/honor/:pplId/detail?tahun=2024
-router.get('/:pplId/detail', async (req, res) => {
-    const { pplId } = req.params; // pplId sekarang adalah ppl_master_id (string)
-    const { tahun } = req.query;
-
-    if (!tahun || typeof tahun !== 'string') {
-        return res.status(400).json({ message: 'Parameter tahun dibutuhkan' });
-    }
-
-    try {
-        // PERBAIKAN: Tidak perlu parseInt untuk pplId karena sudah string
-        const data = await getHonorDetail(pplId, parseInt(tahun));
-        res.json(data);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error fetching honor detail' });
-    }
-});
-
 
 export default router;

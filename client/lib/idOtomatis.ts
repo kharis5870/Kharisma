@@ -10,6 +10,8 @@
  * terisi, penomoran melanjutkan dari yang tertinggi.
  */
 
+import { alokasiIdMitra } from "@shared/terapkanImporMitra";
+
 /** Mengambil angka dari sebuah ID, mis. "USR012" -> 12. Null bila tidak cocok. */
 export const nomorDariId = (id: string, prefiks: string): number | null => {
   const pola = new RegExp(`^${prefiks}(\\d+)$`, 'i');
@@ -30,17 +32,9 @@ export const nomorDariId = (id: string, prefiks: string): number | null => {
  *   nextId(['USR001','USR002'], 'USR')  -> 'USR003'   (melanjutkan)
  *   nextId([], 'USR')                   -> 'USR001'
  */
-export const nextId = (idTerpakai: string[], prefiks: string, lebar = 3): string => {
-  const terpakai = new Set<number>();
-  for (const id of idTerpakai) {
-    const n = nomorDariId(id, prefiks);
-    if (n !== null) terpakai.add(n);
-  }
-
-  let kandidat = 1;
-  while (terpakai.has(kandidat)) kandidat++;
-
-  // Kalau nomornya melampaui lebar yang diminta, biarkan memanjang daripada
-  // memotong digit dan menghasilkan ID yang bertabrakan.
-  return `${prefiks}${String(kandidat).padStart(lebar, '0')}`;
-};
+export const nextId = (idTerpakai: string[], prefiks: string, lebar = 3): string =>
+  // Aturannya satu, dipakai bersama impor mitra yang membutuhkan banyak ID
+  // sekaligus: `alokasiIdMitra` dengan jumlah 1 menghasilkan ID yang sama
+  // persis. Kalau nomornya melampaui lebar yang diminta, ID-nya memanjang
+  // daripada memotong digit dan bertabrakan.
+  alokasiIdMitra(idTerpakai, 1, prefiks, lebar)[0];

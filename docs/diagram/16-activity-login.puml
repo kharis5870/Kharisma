@@ -1,0 +1,75 @@
+@startuml activity-login
+' Rincian use case "Login" dan "Mengganti Kata Sandi".
+' Sesuai authService + auth/middleware + auth/token:
+'   - kata sandi dibandingkan dengan hash bcrypt;
+'   - token ditandatangani HMAC-SHA256, berlaku 12 jam, memuat nomor versi token;
+'   - mengganti kata sandi menaikkan users.tokenVersi sehingga sesi lama gugur;
+'   - percobaan login dibatasi per akun dan per alamat jaringan.
+!include _gaya.iuml
+
+|Pengguna|
+start
+:Membuka halaman masuk;
+:Mengisi nama pengguna dan kata sandi;
+
+|Sistem|
+if (Percobaan masuk\nmasih dalam batas?) then (tidak)
+  :Menolak sementara dan meminta
+  pengguna menunggu beberapa saat;
+  stop
+else (ya)
+endif
+
+:Mencari akun dan membandingkan kata sandi
+dengan sandi tersandi (hash) di basis data;
+
+if (Akun dan kata sandi cocok?) then (tidak)
+  :Menampilkan satu pesan yang sama untuk
+  nama pengguna salah maupun kata sandi salah;
+  stop
+else (ya)
+endif
+
+:Membuat token bertanda tangan berisi id, peran,
+dan nomor versi token, berlaku 12 jam;
+
+|Pengguna|
+:Menyimpan token di peramban
+dan membuka dasbor;
+
+|Sistem|
+:Menampilkan menu sesuai peran;
+note right
+  Menu Manajemen Admin hanya
+  tampil bagi Admin.
+end note
+
+|Pengguna|
+if (Mengganti kata sandi?) then (tidak)
+  :Memakai sistem sampai
+  masa token habis;
+  stop
+else (ya)
+endif
+
+:Membuka halaman Profil dan mengisi kata sandi
+lama, kata sandi baru, dan ulangannya;
+
+|Sistem|
+if (Kata sandi baru memenuhi aturan\n8-72 karakter dan bukan nama pengguna?) then (tidak)
+  :Menolak dan menjelaskan
+  aturan yang dilanggar;
+  stop
+else (ya)
+endif
+
+:Menyimpan sandi baru dalam bentuk hash
+dan menaikkan nomor versi token akun;
+:Menolak seluruh token lama akun tersebut
+sehingga perangkat lain harus masuk kembali;
+
+|Pengguna|
+:Masuk kembali dengan
+kata sandi baru;
+stop
+@enduml

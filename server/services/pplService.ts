@@ -79,7 +79,11 @@ export const getPplAdminData = async (periode?: PeriodeFilter): Promise<PPLAdmin
         LEFT JOIN kecamatan kec ON pm.kecamatan_id = kec.id
         LEFT JOIN desa ON pm.desa_id = desa.id
         GROUP BY
-            pm.id, pm.namaPPL, pm.posisi, pm.alamat, pm.noTelepon, pm.kecamatan_id, pm.desa_id
+            -- Semua kolom non-agregat WAJIB tercantum. MariaDB lokal tidak
+            -- mempersoalkannya, tetapi MySQL 5.7/8 (umum di cPanel) memakai
+            -- ONLY_FULL_GROUP_BY dan menolak kueri ini seluruhnya.
+            pm.id, pm.sobat_id, pm.namaPPL, pm.posisi, pm.alamat, pm.noTelepon,
+            pm.kecamatan_id, pm.desa_id, pm.aktif, pm.nonaktifSejak, kec.nama, desa.nama
         ORDER BY
             pm.namaPPL ASC;
     `;
@@ -117,19 +121,68 @@ export const createMasterPPL = async (ppl: PPLAdminData): Promise<PPLAdminData> 
     // String kosong DISIMPAN SEBAGAI NULL: indeks uniknya mengabaikan NULL,
     // tetapi menganggap '' sebagai nilai biasa — mitra kedua yang dikosongkan
     // akan ditolak sebagai kembar kalau dibiarkan ''.
-    await db.execute(query, [id, sobatId?.trim() || null, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId]);
+    //
+    // Isian opsional yang tidak dikirim (`undefined`) diubah menjadi NULL:
+    // mysql2 MENOLAK undefined sebagai parameter, sehingga menambah mitra tanpa
+    // kecamatan/desa selama ini selalu gagal dengan "Bind parameters must not
+    // contain undefined".
+    await db.execute(query, [id, sobatId?.trim() || null, namaPPL, posisi, alamat ?? null, noTelepon ?? null, kecamatanId ?? null, desaId ?? null]);
     return ppl;
 };
 
 export const updateMasterPPL = async (originalId: string, pplData: PPLAdminData): Promise<PPLAdminData> => {
     const { sobatId, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId } = pplData;
     const query = 'UPDATE ppl_master SET sobat_id = ?, namaPPL = ?, posisi = ?, alamat = ?, noTelepon = ?, kecamatan_id = ?, desa_id = ? WHERE id = ?';
-    // Lihat createMasterPPL: kosong harus menjadi NULL, bukan ''.
-    await db.execute(query, [sobatId?.trim() || null, namaPPL, posisi, alamat, noTelepon, kecamatanId, desaId, originalId]);
+    // Lihat createMasterPPL: kosong harus menjadi NULL (bukan ''), dan
+    // undefined harus menjadi NULL (mysql2 menolaknya).
+    await db.execute(query, [sobatId?.trim() || null, namaPPL, posisi, alamat ?? null, noTelepon ?? null, kecamatanId ?? null, desaId ?? null, originalId]);
     return pplData;
 };
 
+/**
+ * Menonaktifkan atau mengaktifkan kembali seorang mitra.
+ *
+ * Inilah pengganti menghapus bagi mitra yang sudah punya riwayat: mitra
+ * nonaktif hilang dari pilihan alokasi kegiatan baru, tetapi honor, surat
+ * kontrak, dan penilaiannya tetap utuh. Aturannya sama dengan impor mitra.
+ */
+export const ubahStatusAktifMitra = async (id: string, aktif: boolean): Promise<boolean> => {
+    const [result] = await db.execute<OkPacket>(
+        aktif
+            ? 'UPDATE ppl_master SET aktif = 1, nonaktifSejak = NULL WHERE id = ?'
+            : 'UPDATE ppl_master SET aktif = 0, nonaktifSejak = COALESCE(nonaktifSejak, CURDATE()) WHERE id = ?',
+        [id]);
+    return result.affectedRows > 0;
+};
+
+/**
+ * Menghapus mitra — HANYA bila belum punya jejak apa pun.
+ *
+ * Menghapus mitra yang sudah bekerja bukan sekadar membuang satu baris:
+ * database ikut MENGHAPUS surat kontraknya (kontrak_mitra ON DELETE CASCADE)
+ * dan memutus alokasi kegiatannya dari orangnya (ppl.ppl_master_id SET NULL),
+ * sehingga honornya tidak lagi bisa ditelusuri ke siapa pun. Surat yang sudah
+ * ditandatangani dan jadi dasar pembayaran tidak boleh lenyap karena satu klik.
+ *
+ * Mitra salah input yang belum pernah dialokasikan tetap bisa dihapus.
+ */
 export const deleteMasterPPL = async (id: string): Promise<boolean> => {
+    const [[pakai]] = await db.query<RowDataPacket[]>(
+        `SELECT (SELECT COUNT(*) FROM ppl WHERE ppl_master_id = ?) AS alokasi,
+                (SELECT COUNT(*) FROM kontrak_mitra WHERE ppl_master_id = ?) AS surat`,
+        [id, id]);
+    const alokasi = Number(pakai.alokasi);
+    const surat = Number(pakai.surat);
+    if (alokasi > 0 || surat > 0) {
+        const jejak = [
+            alokasi > 0 ? `${alokasi} alokasi kegiatan` : null,
+            surat > 0 ? `${surat} surat kontrak` : null,
+        ].filter(Boolean).join(' dan ');
+        throw Object.assign(
+            new Error(`Mitra ini tidak bisa dihapus karena sudah punya ${jejak}. Menghapusnya akan ikut menghapus surat kontraknya dan memutus riwayat honornya. Nonaktifkan mitra ini sebagai gantinya.`),
+            { statusCode: 409 });
+    }
+
     const query = 'DELETE FROM ppl_master WHERE id = ?';
     const [result] = await db.execute<OkPacket>(query, [id]);
     return result.affectedRows > 0;

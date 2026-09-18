@@ -1,0 +1,73 @@
+@startuml activity-riwayat-surat
+' Rincian use case "Melihat Riwayat Penyuratan", "Memperbarui Isi Surat",
+' "Membatalkan / Menghapus Surat", dan "Mengubah, Merapikan, atau Mengatur
+' Ulang Nomor Surat" (menu Keuangan > Riwayat Penyuratan).
+'
+' Sesuai kode (kontrakPerubahan.ts, notifikasiService.qSuratBerubah):
+'  - surat yang isinya tidak lagi sesuai data memunculkan notifikasi;
+'  - memperbarui isi TIDAK mengganti nomor;
+'  - surat tidak dihapus langsung: dibatalkan dulu dengan catatan, baru
+'    boleh dihapus; penghapusan dicatat di riwayat_surat.
+!include _gaya.iuml
+
+|Tim Keuangan|
+|Sistem|
+start
+:Membandingkan salinan isi setiap surat aktif
+dengan data honor dan muatan terkini;
+if (Isi surat berubah sejak terbit?) then (ya)
+  :Menampilkan notifikasi surat berubah
+  kepada Tim Keuangan;
+else (tidak)
+endif
+
+|Tim Keuangan|
+:Membuka Riwayat Penyuratan
+dan memilih tahun;
+|Sistem|
+:Menampilkan surat aktif, surat batal,
+dan nomor yang kosong;
+
+|Tim Keuangan|
+if (Surat perlu ditindaklanjuti?) then (ya)
+  if (Mitra masih memiliki honor\npada bulan surat?) then (ya)
+    :Memperbarui isi surat;
+    |Sistem|
+    :Menyegarkan isi surat mengikuti data terkini
+    dengan nomor yang sama;
+  else (tidak)
+    |Tim Keuangan|
+    :Membatalkan surat dan
+    menulis catatan alasan;
+    |Sistem|
+    :Mengubah status surat menjadi batal,
+    nomornya tetap tercatat di riwayat;
+    |Tim Keuangan|
+    if (Surat batal perlu dihapus?) then (ya)
+      :Menghapus surat batal;
+      |Sistem|
+      :Menghapus surat dan mencatatnya
+      di riwayat surat;
+    else (tidak)
+    endif
+  endif
+else (tidak)
+endif
+
+|Tim Keuangan|
+if (Penomoran perlu dirapikan?) then (ya)
+  :Meminta pratinjau rapikan nomor
+  untuk satu tahun;
+  |Sistem|
+  :Menampilkan rencana pergeseran nomor
+  tanpa mengubah data;
+  |Tim Keuangan|
+  :Mengetik frasa konfirmasi;
+  |Sistem|
+  :Menerapkan nomor baru dan
+  mencatatnya di riwayat surat;
+else (tidak)
+endif
+stop
+
+@enduml

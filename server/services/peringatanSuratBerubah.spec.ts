@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { bacaSumberLayanan } from "./__uji__/bacaSumberLayanan";
 
 /**
  * Peringatan "isi surat berubah sejak digenerate" harus dihitung di SATU tempat.
@@ -27,7 +27,7 @@ import { readFileSync } from "node:fs";
  */
 
 const bacaTanpaKomentar = (berkas: string): string =>
-  readFileSync(new URL(berkas, import.meta.url), "utf-8")
+  bacaSumberLayanan(berkas)
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n")
     .filter(baris => !baris.trim().startsWith("//"))

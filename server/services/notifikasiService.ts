@@ -135,7 +135,21 @@ const qTenggat = async (userId: string): Promise<AppNotification[]> => {
     }) as AppNotification[];
 };
 
-/** Kegiatan berjalan yang progressnya tidak diperbarui > 2 hari. */
+/**
+ * Kegiatan yang progresnya tidak diperbarui > 2 hari SELAMA MASA PENGUMPULAN DATA.
+ *
+ * Dibatasi ke masa itu karena di situlah progres diisi PML — termasuk untuk
+ * mitra Pengolahan, yang juga bekerja pada masa pendataan. Sebelumnya batasnya
+ * sampai akhir Diseminasi & Evaluasi, sehingga kegiatan yang pendataannya sudah
+ * selesai tetap diperingatkan padahal tidak ada lagi yang bisa diperbarui.
+ *
+ * Dua syarat terakhir menutup peringatan yang tidak bisa ditindaklanjuti:
+ * kegiatan tanpa alokasi mitra, dan kegiatan yang progresnya sudah penuh.
+ *
+ * KEMBARAN di klien: `calculateActivityStatus` di
+ * client/components/dashboard/logikaDashboard.ts memunculkan peringatan yang
+ * sama pada kartu kegiatan — ubah keduanya bersamaan.
+ */
 const qMandek = async (userId: string): Promise<AppNotification[]> => {
     const [rows] = await pool.query<RowDataPacket[]>(`
         SELECT
@@ -153,8 +167,10 @@ const qMandek = async (userId: string): Promise<AppNotification[]> => {
           AND DATEDIFF(CURDATE(), DATE(k.lastUpdated)) > 2
           AND k.tanggalMulaiPengumpulanData IS NOT NULL
           AND CURDATE() >= k.tanggalMulaiPengumpulanData
-          AND (k.tanggalSelesaiDiseminasiEvaluasi IS NULL
-               OR CURDATE() <= k.tanggalSelesaiDiseminasiEvaluasi)
+          AND (k.tanggalSelesaiPengumpulanData IS NULL
+               OR CURDATE() <= k.tanggalSelesaiPengumpulanData)
+          AND k.progressKeseluruhan < 100
+          AND EXISTS (SELECT 1 FROM ppl p WHERE p.kegiatanId = k.id)
         ORDER BY k.lastUpdated ASC
         LIMIT 10
     `, [userId]);

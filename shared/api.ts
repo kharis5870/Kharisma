@@ -164,6 +164,12 @@ export interface Kegiatan {
   namaKegiatan: string;
   ketua_tim_id: string;
   createdBy_userId?: string | null;
+  /**
+   * Naik setiap kegiatan disimpan dari Edit Kegiatan. Halaman Edit mengirim
+   * balik nilai saat dibuka; server menolak (409) bila sudah berbeda, supaya
+   * dua orang yang menyunting bersamaan tidak saling menimpa tanpa tahu.
+   */
+  versi?: number;
   namaKetua?: string;
   /** Tim ketua yang memimpin kegiatan ini, hasil JOIN ke `ketua_tim`. */
   timKetua?: string | null;
@@ -241,6 +247,27 @@ export interface Kegiatan {
   honorariumSettings?: HonorariumSettingsMap;
 }
 
+/** Rincian honor satu kegiatan x tahap seorang mitra dalam rentang yang difilter. */
+export interface RincianHonorKegiatan {
+  /** `${kegiatanId}-${tahap}` */
+  kunci: string;
+  kegiatanId: number;
+  namaKegiatan: string;
+  /** Label tahap: Listing, Pencacahan, atau Pengolahan. */
+  tahap: string;
+  /**
+   * Muatan (unit beban kerja) yang DIBEBANKAN pada bulan-bulan di dalam
+   * rentang — untuk honor lintas bulan, hanya porsi yang jatuh di rentang ini.
+   */
+  muatan: number;
+  satuan: string;
+  hargaSatuan: number;
+  /** Honor kegiatan ini dalam rentang; jumlah seluruhnya = honor mitra. */
+  honor: number;
+  /** Honor per bulan pembebanan ("MM-YYYY") di dalam rentang. */
+  honorPerBulan: Record<string, number>;
+}
+
 export interface PPLHonorData {
   id: string;
   nama: string;
@@ -255,6 +282,8 @@ export interface PPLHonorData {
    * bukan dari total rentang yang bisa mencakup beberapa bulan.
    */
   honorPerBulanPembebanan?: Record<string, number>;
+  /** Rincian beban dan honor per kegiatan, untuk dialog Jumlah Kegiatan. */
+  rincianKegiatan?: RincianHonorKegiatan[];
 }
 
 // ===================== Surat Perjanjian Kerja (Kontrak Mitra) =====================

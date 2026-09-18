@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { bacaSumberLayanan } from "./__uji__/bacaSumberLayanan";
 
 /**
  * Sejak surat punya status aktif/batal, SETIAP kueri yang bertanya "mitra ini
@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
  * terhitung sebagai bukti.
  */
 
-const sumber = readFileSync(new URL("./kontrakService.ts", import.meta.url), "utf-8");
+const sumber = bacaSumberLayanan("kontrakService.ts");
 
 /** Membuang komentar baris dan blok, supaya yang diperiksa hanya kode. */
 const tanpaKomentar = sumber

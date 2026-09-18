@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { bacaSumberLayanan } from "./__uji__/bacaSumberLayanan";
 
 /**
  * Mengunci cara Surat PK dan BAST memecah honor lintas bulan.
@@ -22,7 +21,7 @@ import { fileURLToPath } from "node:url";
  */
 
 const baca = (berkas: string): string =>
-  readFileSync(fileURLToPath(new URL(berkas, import.meta.url)), "utf8")
+  bacaSumberLayanan(berkas)
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "")
     .replace(/^\s*--.*$/gm, "");

@@ -2,54 +2,61 @@ import { Router } from 'express';
 import * as adminService from '../services/adminService';
 import { terapkanImpor, type PermintaanImpor } from '../services/imporMitraService';
 import { wajibAdmin } from '../auth/middleware';
+import { ubahStatusAktifMitra } from '../services/pplService';
+import { versiTokenPengguna } from '../services/authService';
+import { buatToken, RAHASIA_SESI, UMUR_TOKEN_DETIK } from '../auth/token';
+import { tangani, kirimGalat, bacaPeriodeOpsional } from './utilRoute';
 
 const router = Router();
 
 // Mengelola pengguna, ketua tim, dan PPL master adalah wewenang admin.
-// Membacanya tetap terbuka bagi semua yang login: daftar ketua tim dan PPL
-// dipakai halaman Input/Edit Kegiatan dan Daftar PPL, dan kuerinya tidak
+// Membaca daftar ketua tim dan PPL tetap terbuka bagi semua yang login: daftar
+// itu dipakai halaman Input/Edit Kegiatan dan Daftar PPL, dan kuerinya tidak
 // pernah mengembalikan hash password.
+//
+// Daftar AKUN pengguna (username + peran) pengecualiannya: hanya admin. Satu-
+// satunya pemakainya halaman Manajemen Admin, dan daftar username lengkap
+// beserta siapa yang admin adalah peta sasaran bagi orang yang menebak password.
+//
+// Setiap handler async dibungkus `tangani`. Tanpa itu, galat database di sini
+// (mis. menambah pengguna dengan id yang sudah ada) menghentikan SELURUH proses
+// server, bukan hanya menggagalkan satu permintaan. Lihat utilRoute.ts.
 
 
 // User routes
-router.get('/users', async (_req, res) => res.json(await adminService.getAllUsers()));
-router.post('/users', wajibAdmin, async (req, res) => res.status(201).json(await adminService.createUser(req.body)));
-router.put('/users/:id', wajibAdmin, async (req, res) => res.json(await adminService.updateUser(req.params.id, req.body)));
-router.delete('/users/:id', wajibAdmin, async (req, res) => {
+router.get('/users', wajibAdmin, tangani(async (_req, res) => res.json(await adminService.getAllUsers())));
+router.post('/users', wajibAdmin, tangani(async (req, res) => res.status(201).json(await adminService.createUser(req.body))));
+router.put('/users/:id', wajibAdmin, tangani(async (req, res) => {
+    const hasil = await adminService.updateUser(req.params.id, req.body);
+    // Mengganti password mencabut semua sesi akun itu. Bila admin mengganti
+    // password AKUNNYA SENDIRI, sesi yang sedang ia pakai ikut tercabut — jadi
+    // ia diberi token pengganti, bukan tiba-tiba terlempar ke halaman login.
+    if (req.params.id === req.user!.id && req.body?.password) {
+        const versi = await versiTokenPengguna(req.user!.id);
+        return res.json({ ...hasil, token: buatToken(req.user!.id, RAHASIA_SESI, UMUR_TOKEN_DETIK, undefined, versi) });
+    }
+    res.json(hasil);
+}));
+router.delete('/users/:id', wajibAdmin, tangani(async (req, res) => {
     await adminService.deleteUser(req.params.id);
     res.status(204).send();
-});
+}));
 
-router.get('/pml', async (_req, res) => res.json(await adminService.getAllPMLs()));
+router.get('/pml', tangani(async (_req, res) => res.json(await adminService.getAllPMLs())));
 
 // Ketua Tim routes
-router.get('/ketua-tim', async (_req, res) => res.json(await adminService.getAllKetuaTim()));
-router.post('/ketua-tim', wajibAdmin, async (req, res) => res.status(201).json(await adminService.createKetuaTim(req.body)));
-router.put('/ketua-tim/:id', wajibAdmin, async (req, res) => res.json(await adminService.updateKetuaTim(req.params.id, req.body)));
-router.delete('/ketua-tim/:id', wajibAdmin, async (req, res) => {
+router.get('/ketua-tim', tangani(async (_req, res) => res.json(await adminService.getAllKetuaTim())));
+router.post('/ketua-tim', wajibAdmin, tangani(async (req, res) => res.status(201).json(await adminService.createKetuaTim(req.body))));
+router.put('/ketua-tim/:id', wajibAdmin, tangani(async (req, res) => res.json(await adminService.updateKetuaTim(req.params.id, req.body))));
+router.delete('/ketua-tim/:id', wajibAdmin, tangani(async (req, res) => {
     await adminService.deleteKetuaTim(req.params.id);
     res.status(204).send();
-});
+}));
 
 // PPL routes
-const FORMAT_TANGGAL = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * Periode opsional dari query string, untuk menyaring kolom Kegiatan di Daftar
- * PPL menurut rentang honornya.
- *
- * Dianggap TIDAK ADA bila salah satu tanggalnya hilang atau bentuknya tidak
- * sah. Menyaring dengan tanggal yang separuh benar akan menghasilkan daftar
- * yang salah tanpa ada yang menyadarinya — lebih baik menampilkan semuanya.
- */
-const bacaPeriodeOpsional = (query: any) => {
-    const { tanggalMulai, tanggalSelesai } = query;
-    if (!FORMAT_TANGGAL.test(tanggalMulai || '') || !FORMAT_TANGGAL.test(tanggalSelesai || '')) return undefined;
-    if (tanggalMulai > tanggalSelesai) return undefined;
-    return { mulai: tanggalMulai as string, selesai: tanggalSelesai as string };
-};
-
-router.get('/ppl', async (req, res) => res.json(await adminService.getAllPPLAdmin(bacaPeriodeOpsional(req.query))));
+// Periode opsional menyaring kolom Kegiatan di Daftar PPL menurut rentang
+// honornya; aturannya ada di `bacaPeriodeOpsional`.
+router.get('/ppl', tangani(async (req, res) => res.json(await adminService.getAllPPLAdmin(bacaPeriodeOpsional(req.query)))));
 
 /**
  * POST impor daftar mitra dari berkas SOBAT.
@@ -80,14 +87,26 @@ router.post('/ppl/impor', wajibAdmin, async (req, res) => {
         res.json(await terapkanImpor(permintaan));
     } catch (error: any) {
         console.error('Error impor mitra:', error);
-        res.status(500).json({ message: error.message || 'Gagal mengimpor daftar mitra.' });
+        kirimGalat(res, error, 'Gagal mengimpor daftar mitra.');
     }
 });
-router.post('/ppl', wajibAdmin, async (req, res) => res.status(201).json(await adminService.createPPLAdmin(req.body)));
-router.put('/ppl/:id', wajibAdmin, async (req, res) => res.json(await adminService.updatePPLAdmin(req.params.id, req.body)));
-router.delete('/ppl/:id', wajibAdmin, async (req, res) => {
+router.post('/ppl', wajibAdmin, tangani(async (req, res) => res.status(201).json(await adminService.createPPLAdmin(req.body))));
+router.put('/ppl/:id', wajibAdmin, tangani(async (req, res) => res.json(await adminService.updatePPLAdmin(req.params.id, req.body))));
+/**
+ * Nonaktifkan / aktifkan kembali seorang mitra. Pengganti menghapus bagi mitra
+ * yang sudah punya alokasi atau surat kontrak (penghapusannya ditolak).
+ */
+router.put('/ppl/:id/aktif', wajibAdmin, tangani(async (req, res) => {
+    if (typeof req.body?.aktif !== 'boolean') {
+        return res.status(400).json({ message: 'aktif harus bernilai true atau false.' });
+    }
+    const berhasil = await ubahStatusAktifMitra(req.params.id, req.body.aktif);
+    if (!berhasil) return res.status(404).json({ message: 'Mitra tidak ditemukan.' });
+    res.status(204).send();
+}));
+router.delete('/ppl/:id', wajibAdmin, tangani(async (req, res) => {
     await adminService.deletePPLAdmin(req.params.id);
     res.status(204).send();
-});
+}));
 
 export default router;

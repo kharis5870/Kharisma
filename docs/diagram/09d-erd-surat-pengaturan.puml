@@ -23,11 +23,17 @@ entity "kontrak_mitra" as kontrak_mitra {
   tanggal_surat : date
   nomor_bast : varchar(255)
   tanggal_bast : date
+  status : enum (aktif, batal)
+  catatan : text
+  dibatalkanPada / dibatalkanOleh
   total_honor : bigint
+  isi_terbit : longtext
+  total_volume / jumlah_baris : int
+  diperbaruiPada / diperbaruiOleh
   generatedAt / generatedBy
   bastGeneratedAt / bastGeneratedBy
-  ..
-  UQ (ppl_master_id, periode_mulai, periode_selesai)
+  kunci_aktif : varchar(120) <<UQ>>
+  kunci_nomor : varchar(24) <<UQ>>
 }
 
 entity "template_surat" as template_surat {

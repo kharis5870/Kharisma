@@ -12,6 +12,7 @@ entity "users" as users {
   nama_lengkap : varchar(255)
   role : enum
   isPML : tinyint(1)
+  tokenVersi : int
 }
 
 entity "ketua_tim" as ketua_tim {
@@ -36,6 +37,7 @@ entity "kegiatan" as kegiatan {
   bulanHonor / tanggalHonor (3 tahap)
   status : enum
   isArsip : tinyint(1)
+  versi : int
 }
 
 entity "honorarium_kegiatan" as honorarium_kegiatan {
@@ -65,12 +67,15 @@ entity "ppl" as ppl {
 entity "ppl_master" as ppl_master {
   * id : varchar(50) <<PK>>
   --
+  sobat_id : varchar(50) <<UQ>>
   namaPPL : varchar(255)
   posisi : enum
   kecamatan_id : int <<FK>>
   desa_id : int <<FK>>
   alamat : text
   noTelepon : varchar(20)
+  aktif : tinyint(1)
+  nonaktifSejak : date
 }
 
 entity "kecamatan" as kecamatan {

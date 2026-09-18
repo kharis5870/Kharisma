@@ -29,11 +29,13 @@ rectangle "Sistem Informasi OPTIMA" {
     usecase "Login" as UC_LOGIN
     usecase "Melihat Dashboard\nMonitoring" as UC_DASH
     usecase "Membuat Kegiatan &\nAlokasi Mitra" as UC_BUAT
+    usecase "Mengurungkan\nPembuatan Kegiatan" as UC_URUNGKAN
+    usecase "Melihat & Mengekspor\nDaftar Mitra" as UC_DAFTAR
     usecase "Melihat Rekap\nHonor Mitra" as UC_REKHONOR
     usecase "Melihat Rekap &\nPeringkat Penilaian" as UC_REKNILAI
     usecase "Melihat Notifikasi" as UC_NOTIF
     usecase "Melihat Riwayat\nKegiatan" as UC_RIWAYAT
-    usecase "Mengelola Profil &\nKata Sandi" as UC_PROFIL
+    usecase "Mengganti\nKata Sandi" as UC_PROFIL
   }
 
   package "Operasional Kegiatan" {
@@ -46,21 +48,26 @@ rectangle "Sistem Informasi OPTIMA" {
   }
 
   package "Administrasi & Keuangan" {
+    usecase "Mengatur Batas\nHonor Bulanan (SBM)" as UC_BATAS
     usecase "Memverifikasi\nDokumen" as UC_VERIF
     usecase "Menolak Dokumen\ndengan Catatan" as UC_TOLAK
     usecase "Mengirim Pengingat\nDokumen" as UC_INGAT
     usecase "Mengatur Penanggung\nJawab Dokumen" as UC_PJ
     usecase "Mengelola Template\nSurat" as UC_TEMPLATE
-    usecase "Membuat Surat\nPerjanjian Kerja (SPK)" as UC_SPK
+    usecase "Membuat Surat Perjanjian\nKerja (SPK) per Bulan" as UC_SPK
     usecase "Membuat BAST" as UC_BAST
-    usecase "Mengatur Ulang\nNomor Surat" as UC_ATURNOMOR
+    usecase "Melihat Riwayat\nPenyuratan" as UC_RIWSURAT
+    usecase "Memperbarui\nIsi Surat" as UC_PERBARUI
+    usecase "Membatalkan /\nMenghapus Surat" as UC_BATALSURAT
+    usecase "Mengubah, Merapikan, atau\nMengatur Ulang Nomor Surat" as UC_NOMOR
   }
 
-  package "Data Master & Pengaturan" {
+  package "Data Master" {
     usecase "Mengelola Pengguna" as UC_USER
     usecase "Mengelola Ketua Tim" as UC_KT
     usecase "Mengelola Data Mitra" as UC_MITRA
-    usecase "Mengatur Batas\nHonor Bulanan (SBM)" as UC_BATAS
+    usecase "Mengimpor Data Mitra\ndari SOBAT" as UC_IMPOR
+    usecase "Menonaktifkan /\nMengaktifkan Mitra" as UC_NONAKTIF
     usecase "Mengarsipkan /\nMenghapus Kegiatan" as UC_ARSIP
   }
 }
@@ -68,6 +75,7 @@ rectangle "Sistem Informasi OPTIMA" {
 P --> UC_LOGIN
 P --> UC_DASH
 P --> UC_BUAT
+P --> UC_DAFTAR
 P --> UC_REKHONOR
 P --> UC_REKNILAI
 P --> UC_NOTIF
@@ -80,23 +88,29 @@ KT --> UC_DOK
 PML --> UC_PROGRES
 PML --> UC_NILAI
 
+TK --> UC_BATAS
 TK --> UC_VERIF
 TK --> UC_INGAT
 TK --> UC_PJ
 TK --> UC_TEMPLATE
 TK --> UC_SPK
 TK --> UC_BAST
-TK --> UC_ATURNOMOR
+TK --> UC_RIWSURAT
+TK --> UC_PERBARUI
+TK --> UC_BATALSURAT
+TK --> UC_NOMOR
 
 AD --> UC_USER
 AD --> UC_KT
 AD --> UC_MITRA
-AD --> UC_BATAS
+AD --> UC_IMPOR
+AD --> UC_NONAKTIF
 AD --> UC_ARSIP
 
 UC_BUAT ..> UC_SBM : <<include>>
 UC_SUNTING ..> UC_SBM : <<include>>
 UC_KONF ..> UC_SBM : <<extend>>
+UC_URUNGKAN ..> UC_BUAT : <<extend>>
 UC_TOLAK ..> UC_VERIF : <<extend>>
 
 note right of AD

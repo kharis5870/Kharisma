@@ -6,24 +6,26 @@
 |Ketua Tim|
 start
 :Membuat kegiatan: jadwal empat tahap,
-tahap opsional, dan dokumen wajib;
+tahap pengolahan dan diseminasi yang
+dipakai, serta dokumen wajibnya;
 
 repeat
   |Ketua Tim|
-  :Mengalokasikan mitra, PML,
+  :Mengalokasikan mitra aktif, PML,
   beban kerja, dan harga satuan;
   |Sistem|
-  :Membagi honor ke bulan pembebanan
-  dan membandingkan dengan batas SBM;
+  :Membagi muatan ke bulan pembebanan
+  dan membandingkan honor dengan batas SBM;
 repeat while (Melebihi batas SBM dan\nKetua Tim memilih merevisi?) is (ya) not (tidak)
 
 |Sistem|
 :Menyimpan kegiatan, alokasi,
-dan pembebanan honor;
+dan pembebanan honor per bulan;
 
 fork
   |Tim Keuangan|
-  :Membuat SPK mitra (PDF);
+  :Membuat SPK mitra
+  per bulan (PDF);
 fork again
   |PML|
   :Menginput progres

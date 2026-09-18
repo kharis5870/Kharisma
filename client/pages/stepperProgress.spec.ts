@@ -22,7 +22,12 @@ import { readFileSync } from "node:fs";
  */
 
 const sumber = (() => {
-  const mentah = readFileSync(new URL("./Dashboard.tsx", import.meta.url), "utf-8");
+  // Kartu progres dipisah dari Dashboard.tsx ke komponennya sendiri; keduanya
+  // dibaca supaya aturan di bawah tetap berlaku di mana pun kodenya berada.
+  const mentah = [
+    "./Dashboard.tsx",
+    "../components/dashboard/PPLUpdateCard.tsx",
+  ].map(berkas => readFileSync(new URL(berkas, import.meta.url), "utf-8")).join("\n");
   return mentah
     .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
     .replace(/\/\*[\s\S]*?\*\//g, "")

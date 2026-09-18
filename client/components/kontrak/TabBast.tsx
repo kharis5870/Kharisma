@@ -25,12 +25,16 @@ import { format } from "date-fns";
 import type { DataKontrakMitra, TemplateSurat } from "@shared/api";
 import { apiClient } from "@/lib/apiClient";
 import { DatePicker } from "@/components/ui/date-picker";
-import { labelRentang } from "@/lib/honorPeriode";
+import { labelRentang, FORMAT_TANGGAL } from "@/lib/honorPeriode";
 import { unduhBast, bastKeBlob, namaBerkasBast } from "@/lib/bastPdf";
 import { unduhBlob, exportToExcel, type KolomEkspor } from "@/lib/exportUtils";
 import type { RentangTanggal } from "@/components/ui/date-range-picker";
-
-const FORMAT_TANGGAL = "yyyy-MM-dd";
+import KepalaUrut from "@/components/kontrak/KepalaUrut";
+import KotakCari from "@/components/KotakCari";
+import PaginasiTabel from "@/components/PaginasiTabel";
+import { usePaginasiTabel } from "@/hooks/usePaginasiTabel";
+import { cariMitraSurat } from "@/lib/cariSurat";
+import { urutkanSurat, ubahUrutan, URUTAN_SURAT_AWAL, type UrutanSurat, type KolomUrutSurat } from "@/lib/urutSurat";
 
 interface Props {
   rentang: RentangTanggal;
@@ -56,6 +60,18 @@ export default function TabBast({
 
   const mitraSiap = useMemo(() => dataMitra.filter(m => !!m.nomorSurat), [dataMitra]);
   const mitraTanpaSpk = useMemo(() => dataMitra.filter(m => !m.nomorSurat), [dataMitra]);
+
+  // Urutan tabel BAST; awalnya nomor dari kecil ke besar (nomor BAST mengikuti
+  // nomor SPK, jadi urutannya sama). Hanya tampilan tabel dan rekap Excel yang
+  // mengikutinya.
+  const [urutanBast, setUrutanBast] = useState<UrutanSurat>(URUTAN_SURAT_AWAL);
+  const mitraTerurut = useMemo(() => urutkanSurat(dataMitra, urutanBast), [dataMitra, urutanBast]);
+  const urutBast = (kolom: KolomUrutSurat) => setUrutanBast(kini => ubahUrutan(kini, kolom));
+  // Pencarian dan halaman tabel. Keduanya hanya menyaring TAMPILAN: "Generate
+  // Semua BAST (ZIP)" tetap membuat BAST untuk seluruh mitra yang siap.
+  const [cariBast, setCariBast] = useState("");
+  const mitraTersaring = useMemo(() => cariMitraSurat(mitraTerurut, cariBast), [mitraTerurut, cariBast]);
+  const paginasiBast = usePaginasiTabel(mitraTersaring, 10, cariBast);
 
   /**
    * Menetapkan nomor BAST lebih dulu, karena nomor wajib tercetak di surat.
@@ -143,7 +159,8 @@ export default function TabBast({
       judul: "Rekap Berita Acara Serah Terima",
       subJudul: `Periode ${labelRentang(rentang.mulai, rentang.selesai)} · Tanggal serah terima ${tanggalBast}`,
       kolom,
-      baris: dataMitra,
+      // Mengikuti pencarian dan urutan tabel yang sedang tampil (semua halaman).
+      baris: mitraTersaring,
       namaFile: `rekap-bast-${rentang.mulai}-sd-${rentang.selesai}`,
     });
   };
@@ -220,20 +237,35 @@ export default function TabBast({
             Tidak ada mitra dengan honor pada periode ini.
           </p>
         ) : (
+          <>
+          <KotakCari
+            id="cariBast"
+            nilai={cariBast}
+            onUbah={setCariBast}
+            placeholder="Cari nama mitra, nomor SPK, atau nomor BAST..."
+            className="sm:w-80"
+          />
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>No. BAST</TableHead>
-                  <TableHead>No. SPK</TableHead>
-                  <TableHead>Nama Mitra</TableHead>
-                  <TableHead className="text-center">Baris</TableHead>
-                  <TableHead>Jangka Waktu</TableHead>
+                  <TableHead><KepalaUrut label="No. BAST" kolom="nomorBast" urutan={urutanBast} onUrut={urutBast} /></TableHead>
+                  <TableHead><KepalaUrut label="No. SPK" kolom="nomor" urutan={urutanBast} onUrut={urutBast} /></TableHead>
+                  <TableHead><KepalaUrut label="Nama Mitra" kolom="nama" urutan={urutanBast} onUrut={urutBast} /></TableHead>
+                  <TableHead className="text-center"><KepalaUrut label="Baris" kolom="baris" urutan={urutanBast} onUrut={urutBast} className="mx-auto" /></TableHead>
+                  <TableHead><KepalaUrut label="Jangka Waktu" kolom="jangkaWaktu" urutan={urutanBast} onUrut={urutBast} /></TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dataMitra.map(m => {
+                {mitraTersaring.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      Tidak ada mitra yang cocok dengan &quot;{cariBast}&quot;.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {paginasiBast.dataHalaman.map(m => {
                   const siap = !!m.nomorSurat;
                   return (
                     <TableRow key={m.pplMasterId} className={siap ? undefined : "opacity-60"}>
@@ -264,6 +296,8 @@ export default function TabBast({
               </TableBody>
             </Table>
           </div>
+          <PaginasiTabel paginasi={paginasiBast} />
+          </>
         )}
       </CardContent>
     </Card>

@@ -3,7 +3,7 @@
 import { RowDataPacket } from 'mysql2';
 import db from '../db';
 import { PMLAdminData } from '@shared/api';
-import { KONDISI_PERIODE, paramPeriode } from './rentangHonorSql';
+import { KONDISI_PERIODE, JENIS_DARI_TAHAP, paramPeriode } from './rentangHonorSql';
 import type { PeriodeFilter } from './pplService';
 
 export const getPmlAdminData = async (periode?: PeriodeFilter): Promise<PMLAdminData[]> => {
@@ -37,8 +37,7 @@ export const getPmlAdminData = async (periode?: PeriodeFilter): Promise<PMLAdmin
               -- ppl_honorarium.jenis_pekerjaan memakai 'pengolahan'.
               LEFT JOIN ppl_honorarium ph
                      ON ph.ppl_id = p.id
-                    AND ph.jenis_pekerjaan = CASE p.tahap
-                          WHEN 'pengolahan-analisis' THEN 'pengolahan' ELSE p.tahap END
+                    AND ph.jenis_pekerjaan = ${JENIS_DARI_TAHAP}
              WHERE ${saringPeriode}
         ) x ON x.pml_id = u.id
         WHERE

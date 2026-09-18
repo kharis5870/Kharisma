@@ -1,0 +1,62 @@
+@startuml activity-impor-mitra
+' Rincian use case "Mengimpor Data Mitra dari SOBAT" dan
+' "Menonaktifkan / Mengaktifkan Mitra".
+'
+' Sesuai kode (routes/admin.ts POST /ppl/impor, imporMitraService.ts):
+'  - berkas Excel dibaca di peramban; server hanya menerima baris terbaca
+'    beserta keputusan pengguna per baris;
+'  - pratinjau tidak menulis apa pun;
+'  - penerapan dalam SATU transaksi dan TIDAK PERNAH menghapus mitra:
+'    mitra yang tidak ada lagi di berkas hanya dinonaktifkan.
+!include _gaya.iuml
+
+|Admin|
+start
+:Membuka fitur Impor Mitra
+dan memilih berkas Excel dari SOBAT;
+
+|Sistem|
+:Membaca berkas di peramban
+dan memetakan kolomnya;
+:Mencocokkan setiap baris dengan mitra yang ada
+berdasarkan ID SOBAT, lalu nama;
+
+repeat
+  |Admin|
+  :Menentukan tindakan setiap baris:
+  tambah / perbarui / lewati;
+  :Memilih mitra yang tidak ada di berkas
+  untuk dinonaktifkan;
+  |Sistem|
+  :Menghitung ringkasan pratinjau
+  tanpa mengubah database;
+  |Admin|
+repeat while (Ringkasan belum sesuai?) is (ya, ubah keputusan) not (tidak)
+
+:Menyetujui impor;
+
+|Sistem|
+:Memulai satu transaksi;
+:Menambah mitra baru dengan ID otomatis
+dan mencocokkan kecamatan/desanya;
+:Memperbarui data mitra yang dipilih
+dan menyimpan ID SOBAT-nya;
+:Menonaktifkan mitra yang dipilih
+tanpa menghapus riwayatnya;
+if (Terjadi galat?) then (ya)
+  :Membatalkan seluruh perubahan;
+  :Menampilkan pesan galat;
+else (tidak)
+  :Menyimpan transaksi;
+  :Menampilkan hasil impor;
+endif
+stop
+
+note right
+  Mitra nonaktif tidak muncul di pilihan
+  alokasi baru, tetapi honor, surat, dan
+  penilaiannya tetap tampil dan dapat
+  diaktifkan kembali.
+end note
+
+@enduml

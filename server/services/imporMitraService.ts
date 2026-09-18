@@ -215,7 +215,10 @@ export const terapkanImpor = async (
                     `INSERT INTO ppl_master
                         (id, sobat_id, namaPPL, posisi, alamat, noTelepon, kecamatan_id, desa_id, aktif)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-                    [r.mitraId, r.sobatId, r.nama, r.posisi, r.alamat, r.telepon, r.kecamatanId, r.desaId]
+                    // `mitraId!`: selalu sudah terisi di titik ini (id lama untuk
+                    // 'perbarui', id hasil alokasi untuk 'tambah'). Tanda seru
+                    // hanya untuk tipe mysql2 3.24 yang menolak `undefined`.
+                    [r.mitraId!, r.sobatId, r.nama, r.posisi, r.alamat, r.telepon, r.kecamatanId, r.desaId]
                 );
             } else {
                 // Wilayah hanya ditimpa bila berkasnya memang menyebutkannya:
@@ -233,7 +236,7 @@ export const terapkanImpor = async (
                             aktif = 1,
                             nonaktifSejak = NULL
                       WHERE id = ?`,
-                    [r.sobatId, r.nama, r.posisi, r.alamat, r.telepon, r.kecamatanId, r.desaId, r.mitraId]
+                    [r.sobatId, r.nama, r.posisi, r.alamat, r.telepon, r.kecamatanId, r.desaId, r.mitraId!]
                 );
             }
         }

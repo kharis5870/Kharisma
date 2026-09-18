@@ -39,6 +39,10 @@ import { labelRentang, labelRentangSingkat } from "@/lib/honorPeriode";
 import { formatRupiah } from "@/lib/terbilang";
 import { exportToExcel, type KolomEkspor } from "@/lib/exportUtils";
 import AlertModal from "@/components/AlertModal";
+import KotakCari from "@/components/KotakCari";
+import PaginasiTabel from "@/components/PaginasiTabel";
+import { usePaginasiTabel } from "@/hooks/usePaginasiTabel";
+import { cariRiwayatSurat } from "@/lib/cariSurat";
 
 type HasilRapikan = RencanaRapikan & { diterapkan: number };
 
@@ -72,6 +76,12 @@ export default function RiwayatSurat() {
   const surat = useMemo(() => data?.surat ?? [], [data]);
   const jumlahAktif = surat.filter(s => s.status === "aktif").length;
   const jumlahBatal = surat.length - jumlahAktif;
+
+  // Pencarian dan halaman tabel. Lencana jumlah surat di atas tabel tetap
+  // menghitung SELURUH tahun, bukan hasil pencarian.
+  const [cariSurat, setCariSurat] = useState("");
+  const suratTersaring = useMemo(() => cariRiwayatSurat(surat, cariSurat), [surat, cariSurat]);
+  const paginasiRiwayat = usePaginasiTabel(suratTersaring, 10, cariSurat);
 
   const segarkan = () => queryClient.invalidateQueries({ queryKey: ["riwayatSurat"] });
   const gagal = (title: string) => (error: any) =>
@@ -182,9 +192,12 @@ export default function RiwayatSurat() {
     ];
     void exportToExcel({
       judul: "Riwayat Penyuratan Mitra",
-      subJudul: `Tahun ${tahun} · ${jumlahAktif} surat berlaku, ${jumlahBatal} batal`,
+      subJudul: `Tahun ${tahun} · ${jumlahAktif} surat berlaku, ${jumlahBatal} batal`
+        + (cariSurat.trim() ? ` · hasil pencarian "${cariSurat.trim()}"` : ""),
       kolom,
-      baris: surat,
+      // Mengikuti pencarian yang sedang aktif (semua halaman), seperti ekspor
+      // di halaman lain. Tanpa pencarian, isinya seluruh surat tahun ini.
+      baris: suratTersaring,
       namaFile: `riwayat-penyuratan-${tahun}`,
     });
   };
@@ -211,16 +224,27 @@ export default function RiwayatSurat() {
         <Card>
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-              <div className="space-y-2 sm:w-40">
-                <Label htmlFor="tahunRiwayat">Tahun Surat</Label>
-                <Input
-                  id="tahunRiwayat"
-                  type="number"
-                  value={tahun}
-                  min={2000}
-                  max={2999}
-                  onChange={e => setTahun(Number(e.target.value) || new Date().getFullYear())}
-                />
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                <div className="space-y-2 sm:w-40">
+                  <Label htmlFor="tahunRiwayat">Tahun Surat</Label>
+                  <Input
+                    id="tahunRiwayat"
+                    type="number"
+                    value={tahun}
+                    min={2000}
+                    max={2999}
+                    onChange={e => setTahun(Number(e.target.value) || new Date().getFullYear())}
+                  />
+                </div>
+                <div className="space-y-2 sm:w-80">
+                  <Label htmlFor="cariRiwayat">Cari Surat</Label>
+                  <KotakCari
+                    id="cariRiwayat"
+                    nilai={cariSurat}
+                    onUbah={setCariSurat}
+                    placeholder="Nama mitra, nomor surat, status, catatan..."
+                  />
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={ekspor} disabled={surat.length === 0}>
@@ -296,7 +320,14 @@ export default function RiwayatSurat() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {surat.map(item => {
+                  {!isLoading && surat.length > 0 && suratTersaring.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        Tidak ada surat yang cocok dengan &quot;{cariSurat}&quot;.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {paginasiRiwayat.dataHalaman.map(item => {
                     const batal = item.status === "batal";
                     // Namanya sengaja spesifik: di baris yang sama sudah ada
                     // `berubah` untuk NOMOR surat yang sedang disunting, dan
@@ -476,6 +507,7 @@ export default function RiwayatSurat() {
                 </TableBody>
               </Table>
             </div>
+            {surat.length > 0 && <PaginasiTabel paginasi={paginasiRiwayat} />}
           </CardContent>
         </Card>
       </div>

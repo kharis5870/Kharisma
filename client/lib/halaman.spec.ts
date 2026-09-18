@@ -8,15 +8,15 @@ describe("judulDariPath", () => {
     expect(judulDariPath("/profil")).toBe("Pengaturan Profil");
   });
 
-  // Dulu kedua rute ini tidak ada di peta judul dan jatuh ke "Kharisma".
+  // Dulu kedua rute ini tidak ada di peta judul dan jatuh ke nama aplikasi.
   it("menangani rute berparameter", () => {
     expect(judulDariPath("/edit-activity/66")).toBe("Edit Kegiatan");
     expect(judulDariPath("/view-documents/74")).toBe("Dokumen Kegiatan");
   });
 
   it("jatuh ke nama aplikasi untuk path tak dikenal", () => {
-    expect(judulDariPath("/entah-apa")).toBe("Kharisma");
-    expect(judulDariPath("/")).toBe("Kharisma");
+    expect(judulDariPath("/entah-apa")).toBe("SIKAMI");
+    expect(judulDariPath("/")).toBe("SIKAMI");
   });
 });
 

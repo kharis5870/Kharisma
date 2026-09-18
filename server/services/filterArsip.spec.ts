@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { bacaSumberLayanan } from "./__uji__/bacaSumberLayanan";
 
 /**
  * Mengunci perilaku kegiatan yang diarsipkan.
@@ -29,7 +28,7 @@ import { fileURLToPath } from "node:url";
  */
 
 const baca = (namaBerkas: string): string => {
-  const isi = readFileSync(fileURLToPath(new URL(namaBerkas, import.meta.url)), "utf8");
+  const isi = bacaSumberLayanan(namaBerkas);
   return isi
     .replace(/\/\*[\s\S]*?\*\//g, "")   // komentar blok
     .replace(/^\s*\/\/.*$/gm, "")       // komentar baris

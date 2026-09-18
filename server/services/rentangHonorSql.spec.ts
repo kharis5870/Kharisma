@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
+import { bacaSumberLayanan } from "./__uji__/bacaSumberLayanan";
 import {
   KONDISI_PERIODE, kondisiOverlap, listingRange, paramPeriode,
   rentangHonorSql, MULAI_SESUAI_TAHAP,
@@ -76,7 +77,7 @@ describe("tidak ada salinan aturan ini di layanan lain", () => {
 
   it("honorService dan kontrakService mengambilnya dari modul bersama", () => {
     for (const berkas of ["honorService.ts", "kontrakService.ts"]) {
-      expect(readFileSync(new URL(berkas, dir), "utf-8")).toContain("from './rentangHonorSql'");
+      expect(bacaSumberLayanan(berkas)).toContain("from './rentangHonorSql'");
     }
   });
 });

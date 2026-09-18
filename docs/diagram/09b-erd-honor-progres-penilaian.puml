@@ -40,6 +40,7 @@ entity "ppl_honor_bulan" as ppl_honor_bulan {
   --
   ppl_id : int <<FK>>
   bulan : varchar(7)
+  volume : int
   jumlah : int
   ..
   UQ (ppl_id, bulan)

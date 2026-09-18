@@ -2,14 +2,14 @@
 
 import { RowDataPacket } from 'mysql2';
 import db from '../db';
-import { PPLHonorData } from '@shared/api';
+import { PPLHonorData, RincianHonorKegiatan } from '@shared/api';
 // Jalur relatif, BUKAN '@shared/...': alias itu tidak tersedia saat
 // vite.config.ts memuat kode server lewat Node, dan ini nilai runtime.
 import { bulanDilalui } from '../../shared/pembebananHonor';
 // Fragmen SQL rentang honor dipakai bersama beberapa layanan. Dulu disalin di
 // berkas ini DAN di kontrakService; lihat rentangHonorSql.ts untuk alasannya.
 import {
-    kondisiOverlap, listingRange, pencacahanRange, pengolahanRange,
+    kondisiOverlap, listingRange, pencacahanRange, pengolahanRange, JENIS_DARI_TAHAP,
 } from './rentangHonorSql';
 
 interface HonorRowResult extends RowDataPacket {
@@ -20,6 +20,9 @@ interface HonorRowResult extends RowDataPacket {
     tahap: 'listing' | 'pencacahan' | 'pengolahan-analisis';
     besaranHonor: number;
     bulanPembebanan: string | null;
+    volume: number;
+    satuan: string | null;
+    hargaSatuan: number | null;
 }
 
 /**
@@ -60,7 +63,15 @@ export const getHonorRekap = async (tanggalMulai: string, tanggalSelesai: string
             k.namaKegiatan,
             p.tahap,
             b.jumlah AS besaranHonor,
-            b.bulan AS bulanPembebanan
+            b.bulan AS bulanPembebanan,
+            -- Muatan porsi bulan ini, untuk rincian beban per kegiatan. Satuan
+            -- dan harga satuan diambil lewat subkueri supaya satu baris
+            -- pembebanan tidak pernah terduplikasi oleh JOIN.
+            b.volume AS volume,
+            (SELECT ph.satuanBebanKerja FROM ppl_honorarium ph
+              WHERE ph.ppl_id = p.id AND ph.jenis_pekerjaan = ${JENIS_DARI_TAHAP} LIMIT 1) AS satuan,
+            (SELECT ph.hargaSatuan FROM ppl_honorarium ph
+              WHERE ph.ppl_id = p.id AND ph.jenis_pekerjaan = ${JENIS_DARI_TAHAP} LIMIT 1) AS hargaSatuan
         FROM ppl_honor_bulan b
         JOIN ppl p ON p.id = b.ppl_id
         JOIN kegiatan k ON k.id = p.kegiatanId
@@ -72,7 +83,7 @@ export const getHonorRekap = async (tanggalMulai: string, tanggalSelesai: string
             (p.tahap = 'pencacahan' AND ${kondisiOverlap(pencacahanRange)}) OR
             (p.tahap = 'pengolahan-analisis' AND ${kondisiOverlap(pengolahanRange)})
           )
-        ORDER BY pm.namaPPL;
+        ORDER BY pm.namaPPL, k.namaKegiatan, p.tahap, b.bulan;
     `;
 
     // Tiap kondisi overlap butuh pasangan (tanggalSelesai, tanggalMulai).
@@ -96,6 +107,8 @@ export const getHonorRekap = async (tanggalMulai: string, tanggalSelesai: string
         // Satu alokasi kini bisa menyumbang beberapa baris (satu per bulan
         // pembebanan), jadi kegiatannya harus tetap dihitung sekali saja.
         kegiatanTerhitung: Set<string>;
+        // Rincian per kegiatan x tahap, dikumpulkan dari baris per bulan.
+        rincianPerKunci: Map<string, RincianHonorKegiatan>;
     };
 
     const perMitra = new Map<string, Akumulasi>();
@@ -111,7 +124,9 @@ export const getHonorRekap = async (tanggalMulai: string, tanggalSelesai: string
                 kegiatanNames: [],
                 honorPerBulan: [],
                 honorPerBulanPembebanan: {},
+                rincianKegiatan: [],
                 kegiatanTerhitung: new Set(),
+                rincianPerKunci: new Map(),
             };
             perMitra.set(row.id, mitra);
         }
@@ -126,44 +141,39 @@ export const getHonorRekap = async (tanggalMulai: string, tanggalSelesai: string
             mitra.kegiatanNames.push(`${row.namaKegiatan} (${labelTahap[row.tahap]})`);
         }
 
+        // Rincian beban: muatan dan honor dijumlahkan dari porsi tiap bulan
+        // pembebanan yang masuk rentang, jadi totalnya sama persis dengan honor
+        // mitra di atas — termasuk honor lintas bulan yang hanya sebagian
+        // jatuh di rentang ini.
+        let rincian = mitra.rincianPerKunci.get(kunci);
+        if (!rincian) {
+            rincian = {
+                kunci,
+                kegiatanId: row.kegiatanId,
+                namaKegiatan: row.namaKegiatan,
+                tahap: labelTahap[row.tahap],
+                muatan: 0,
+                satuan: row.satuan ?? '',
+                hargaSatuan: Number(row.hargaSatuan) || 0,
+                honor: 0,
+                honorPerBulan: {},
+            };
+            mitra.rincianPerKunci.set(kunci, rincian);
+            mitra.rincianKegiatan!.push(rincian);
+        }
+        rincian.muatan += Number(row.volume) || 0;
+        rincian.honor += honor;
+        if (row.bulanPembebanan) {
+            rincian.honorPerBulan[row.bulanPembebanan] = (rincian.honorPerBulan[row.bulanPembebanan] || 0) + honor;
+        }
+
         if (row.bulanPembebanan) {
             mitra.honorPerBulanPembebanan[row.bulanPembebanan] =
                 (mitra.honorPerBulanPembebanan[row.bulanPembebanan] || 0) + honor;
         }
     }
 
-    return Array.from(perMitra.values()).map(({ kegiatanTerhitung, ...mitra }) => mitra);
-};
-
-/**
- * Honor bulanan seorang mitra sepanjang satu tahun, indeks 0 = Januari.
- *
- * Dibaca dari `ppl_honor_bulan`, bukan lagi dari UNION tiga cabang atas kolom
- * `bulanHonor*`. Selain jauh lebih pendek, ini satu-satunya cara agar honor
- * yang dipecah ke beberapa bulan muncul di bulan yang benar — kolom
- * `bulanHonor*` hanya bisa menyebut SATU bulan per tahap.
- */
-export const getHonorDetail = async (pplMasterId: string, tahun: number): Promise<number[]> => {
-    const honorPerBulan = Array(12).fill(0);
-
-    const [rows] = await db.query<RowDataPacket[]>(`
-        SELECT CAST(SUBSTRING_INDEX(b.bulan, '-', 1) AS UNSIGNED) AS bulan,
-               SUM(b.jumlah) AS total
-          FROM ppl_honor_bulan b
-          JOIN ppl p ON p.id = b.ppl_id
-         WHERE p.ppl_master_id = ?
-           AND b.bulan LIKE CONCAT('%-', ?)
-         GROUP BY bulan
-    `, [pplMasterId, tahun]);
-
-    rows.forEach(row => {
-        const indeks = Number(row.bulan) - 1;
-        if (indeks >= 0 && indeks < 12) {
-            honorPerBulan[indeks] = Number(row.total) || 0;
-        }
-    });
-
-    return honorPerBulan;
+    return Array.from(perMitra.values()).map(({ kegiatanTerhitung, rincianPerKunci, ...mitra }) => mitra);
 };
 
 /**

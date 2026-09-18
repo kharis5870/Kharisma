@@ -380,7 +380,9 @@ export default function DaftarPPL() {
     if (posisi < 0) return;
     setCurrentPage(Math.floor(posisi / rowsPerPage) + 1);
     window.setTimeout(() => {
-      document.querySelector(`[data-ppl-id="${pplDisorot}"]`)
+      // CSS.escape: nilainya datang dari URL (?sorot=), jadi tanda kutip di
+      // dalamnya akan merusak selektor dan melempar galat.
+      document.querySelector(`[data-ppl-id="${CSS.escape(pplDisorot)}"]`)
         ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 120);
   }, [pplDisorot, filteredAndSortedData, rowsPerPage]);

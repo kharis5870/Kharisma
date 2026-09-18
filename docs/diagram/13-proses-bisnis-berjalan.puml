@@ -1,0 +1,105 @@
+@startuml proses-berjalan
+' Pengganti Gambar 5 (Proses Bisnis Sistem Berjalan) di Bab IV.
+' Menggambarkan cara kerja sebelum ada sistem, sesuai keterangan pengguna:
+'  - nama mitra diisikan ke satu spreadsheet yang disediakan Tim Keuangan;
+'  - batas SBML dicek di AWAL bulan, sebelum SPK dibuat;
+'  - progres FASIH masuk otomatis ke PML di aplikasi FASIH; progres Non-FASIH
+'    dicatat PML di spreadsheet dan dipantau Ketua Tim (tidak ada rekap ulang);
+'  - di akhir, Tim Keuangan hanya memastikan tugas SPK selesai untuk BAST
+'    dan pencairan honor.
+' Pengecekan yang dapat berulang digambar dengan `repeat`, sehingga panah
+' kembali ke atas bila hasil pemeriksaan belum sesuai.
+!include _gaya.iuml
+
+|#F5F5F5|Kepala BPS|
+|#F7FAFF|Ketua Tim|
+|#FFFDF2|Tim Keuangan|
+|#F6FFF7|PML|
+|#FFF7F7|Pegawai Perekap Penilaian|
+|#FAFAFA|Mitra Statistik|
+
+|Kepala BPS|
+start
+:Menugaskan kegiatan statistik
+kepada Ketua Tim;
+
+|Ketua Tim|
+:Menyusun rencana kegiatan
+dan jadwal tiap tahap;
+
+repeat
+  :Mengisi atau memperbaiki nama mitra, PML,
+  dan beban kerja pada spreadsheet yang
+  disediakan Tim Keuangan;
+  note left
+    Alokasi tim lain pada bulan
+    yang sama tidak terlihat.
+  end note
+
+  |Tim Keuangan|
+  :Memindahkan data setiap mitra dan
+  mengecek batas honor SBML satu per satu
+  pada spreadsheet pengecekan;
+  note left
+    Pengecekan tidak otomatis: kelebihan
+    batas baru ketahuan bila data
+    dicocokkan satu per satu.
+  end note
+repeat while (Ada honor mitra yang\nmelebihi batas SBML?) is (ya) not (tidak)
+
+:Mengetik dan menomori SPK satu per satu
+di awal bulan, lalu mencetaknya;
+
+|Mitra Statistik|
+:Menandatangani SPK dan
+melaksanakan tugas lapangan;
+
+|PML|
+if (Kegiatan menggunakan\naplikasi FASIH?) then (ya)
+  :Memeriksa assignment mitra yang
+  masuk otomatis di aplikasi FASIH;
+else (tidak)
+  :Mencatat progres mitra pada
+  spreadsheet progres kegiatan;
+endif
+
+|Ketua Tim|
+:Memantau progres tim melalui aplikasi
+FASIH atau spreadsheet progres;
+note left
+  Progres setiap tim tersimpan di
+  tempat berbeda, sehingga Kepala BPS
+  tidak dapat memantau progres seluruh
+  tim dalam satu tampilan.
+end note
+
+repeat
+  :Mengumpulkan dokumen kegiatan (SK, Surat
+  Tugas, KAK, Visum) ke folder penyimpanan
+  daring, atau melengkapinya bila ditagih;
+
+  |Tim Keuangan|
+  :Memeriksa kelengkapan dokumen;
+repeat while (Dokumen sudah lengkap?) is (belum) not (lengkap)
+
+:Memastikan tugas dalam SPK
+sudah diselesaikan mitra;
+:Mengetik dan menomori BAST
+satu per satu sesuai SPK;
+:Memproses pencairan honor mitra;
+
+|PML|
+:Mengisi nilai mitra pada
+spreadsheet penilaian;
+note right
+  Spreadsheet dapat dibuka
+  dan diubah siapa pun yang
+  memiliki tautannya.
+end note
+
+|Pegawai Perekap Penilaian|
+:Menghitung peringkat mitra per triwulan
+secara manual untuk bahan evaluasi
+dan apresiasi mitra;
+stop
+@enduml

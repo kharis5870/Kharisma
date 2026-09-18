@@ -15,7 +15,7 @@ import {
   PaginationContent, 
   PaginationItem 
 } from "@/components/ui/pagination";
-import { AlertTriangle, Edit, Save, X, DollarSign, TrendingUp, Users, Search, ChevronUp, ChevronDown, List, ChevronLeft, ChevronRight, Loader2, FileDown, Sheet } from "lucide-react";
+import { AlertTriangle, Edit, Save, X, DollarSign, TrendingUp, Users, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, FileDown, Sheet } from "lucide-react";
 import { exportToPdf, exportToExcel, type KolomEkspor } from "@/lib/exportUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PPLHonorData } from "@shared/api";
@@ -26,14 +26,14 @@ import AlertModal from "@/components/AlertModal";
 import SuccessModal from "@/components/SuccessModal";
 import { apiClient } from "@/lib/apiClient";
 import { DateRangePicker, type RentangTanggal } from "@/components/ui/date-range-picker";
-import { labelRentang } from "@/lib/honorPeriode";
+import { labelRentang, FORMAT_TANGGAL } from "@/lib/honorPeriode";
+import { formatRupiah } from "@/lib/terbilang";
 import {
   format, startOfMonth, endOfMonth, addMonths,
   startOfQuarter, endOfQuarter, startOfYear, endOfYear,
 } from "date-fns";
 import { useHalamanAman } from "@/hooks/useHalamanAman";
 
-const FORMAT_TANGGAL = "yyyy-MM-dd";
 
 /** Rentang default saat halaman dibuka: bulan berjalan. */
 const rentangBulanIni = (): RentangTanggal => ({
@@ -99,34 +99,94 @@ const updateHonorLimit = async (newLimit: number): Promise<any> => {
     return apiClient.put('/settings/HONOR_LIMIT', { value: newLimit });
 }
 
+const NAMA_BULAN_SINGKAT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+/** Kunci bulan pembebanan "09-2026" -> "Sep 2026". */
+const labelKunciBulan = (kunci: string): string => {
+    const [bulan, tahun] = kunci.split('-');
+    const nama = NAMA_BULAN_SINGKAT[Number(bulan) - 1];
+    return nama ? `${nama} ${tahun}` : kunci;
+};
+
+/** Mengurutkan kunci "MM-YYYY" menurut tahun lalu bulan (urutan teks salah lintas tahun). */
+const urutKunciBulan = (a: string, b: string): number => {
+    const [bulanA, tahunA] = a.split('-').map(Number);
+    const [bulanB, tahunB] = b.split('-').map(Number);
+    return tahunA - tahunB || bulanA - bulanB;
+};
+
+/**
+ * Rincian kegiatan seorang mitra: muatan, harga satuan, dan honor per kegiatan.
+ *
+ * Bentuknya mengikuti dialog isi surat di Riwayat Penyuratan. Angkanya dihitung
+ * server dari porsi yang dibebankan pada bulan-bulan dalam rentang, jadi
+ * totalnya selalu sama dengan kolom honor di tabel — termasuk untuk honor lintas
+ * bulan yang hanya sebagian jatuh di rentang ini.
+ */
 const ActivityDetailModal = ({ isOpen, onClose, pplData, rentang }: { isOpen: boolean, onClose: () => void, pplData: PPLHonorData | null, rentang: RentangTanggal }) => {
     if (!pplData) return null;
 
+    const rincian = pplData.rincianKegiatan ?? [];
+    const total = rincian.reduce((jumlah, r) => jumlah + r.honor, 0);
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Detail Kegiatan: {pplData.nama}</DialogTitle>
+                    <DialogTitle>Rincian Kegiatan: {pplData.nama}</DialogTitle>
                     <DialogDescription>
-                        Berikut adalah daftar kegiatan yang honornya jatuh pada rentang {labelRentang(rentang.mulai, rentang.selesai)}.
+                        Beban dan honor yang jatuh pada rentang {labelRentang(rentang.mulai, rentang.selesai)}.
+                        Untuk honor lintas bulan, yang dihitung hanya porsi yang dibebankan di rentang ini.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="mt-4 max-h-80 overflow-y-auto">
-                    {pplData.kegiatanNames && pplData.kegiatanNames.length > 0 ? (
-                        <ul className="space-y-2">
-                            {pplData.kegiatanNames.map((kegiatan, index) => (
-                                <li key={index} className="flex items-start gap-3 p-3 bg-muted rounded-md">
-                                    <List className="w-4 h-4 text-bps-blue-500 mt-1 flex-shrink-0" />
-                                    {/* Nama kegiatan sekarang akan menampilkan (Listing), (Pencacahan), dll. */}
-                                    <span>{kegiatan}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-muted-foreground text-center py-4">Tidak ada kegiatan tercatat untuk bulan ini.</p>
-                    )}
-                </div>
-                <div className="mt-6 flex justify-end">
+
+                {rincian.length > 0 ? (
+                    <div className="max-h-[60vh] overflow-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Kegiatan</TableHead>
+                                    <TableHead className="w-28 text-right">Muatan</TableHead>
+                                    <TableHead className="w-32 text-right">Harga Satuan</TableHead>
+                                    <TableHead className="w-36 text-right">Honor</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rincian.map(r => {
+                                    const bulan = Object.keys(r.honorPerBulan).sort(urutKunciBulan);
+                                    return (
+                                        <TableRow key={r.kunci}>
+                                            <TableCell className="font-medium">
+                                                {r.namaKegiatan}
+                                                <span className="ml-2 text-xs font-normal text-muted-foreground">{r.tahap}</span>
+                                                {/* Porsi per bulan hanya ditampilkan bila rentangnya
+                                                    memang mencakup lebih dari satu bulan pembebanan. */}
+                                                {bulan.length > 1 && (
+                                                    <span className="block text-xs font-normal text-muted-foreground">
+                                                        {bulan.map(k => `${labelKunciBulan(k)}: ${formatRupiah(r.honorPerBulan[k])}`).join(' · ')}
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right whitespace-nowrap">
+                                                {r.muatan.toLocaleString('id-ID')} {r.satuan}
+                                            </TableCell>
+                                            <TableCell className="text-right whitespace-nowrap">{formatRupiah(r.hargaSatuan)}</TableCell>
+                                            <TableCell className="text-right whitespace-nowrap">{formatRupiah(r.honor)}</TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                                <TableRow>
+                                    <TableCell colSpan={3} className="text-right font-semibold">Total</TableCell>
+                                    <TableCell className="text-right font-semibold whitespace-nowrap">{formatRupiah(total)}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                ) : (
+                    <p className="text-muted-foreground text-center py-4">Tidak ada kegiatan tercatat pada rentang ini.</p>
+                )}
+
+                <div className="mt-2 flex justify-end">
                     <Button variant="outline" onClick={onClose}>Tutup</Button>
                 </div>
             </DialogContent>
