@@ -354,6 +354,72 @@ const qPengingatDokumen = async (userId: string): Promise<AppNotification[]> => 
 };
 
 /**
+ * Mitra seorang PML yang belum berprogres padahal pendataan hampir habis.
+ *
+ * Ini satu-satunya notifikasi yang memang ditujukan ke PML. Sebelum ini akun
+ * biasa praktis tidak menerima apa pun: semua jenis lain mensyaratkan pemegang
+ * ketua tim atau supervisor/admin, padahal PML-lah yang mengisi progres.
+ *
+ * "PML" BUKAN PERAN, melainkan siapa pun yang tercatat di `ppl.pml_id` — di
+ * kantor ini seorang supervisor pun bisa mengawasi mitra. Karena itu
+ * penyaringnya ada di dalam query, bukan di percabangan peran.
+ *
+ * KENAPA TAHAP PERTAMA TIDAK DIHITUNG SEBAGAI PROGRES
+ * Tahap pertama ('open' untuk pendataan, 'belum_entry' untuk pengolahan) terisi
+ * otomatis sebesar beban kerja begitu mitra dialokasikan. Menghitungnya sebagai
+ * progres membuat setiap mitra tampak sudah bekerja penuh sejak hari pertama,
+ * dan peringatan ini tidak akan pernah muncul.
+ *
+ * SATU notifikasi per kegiatan dan tahap mitra, bukan per mitra: seorang PML
+ * bisa memegang sepuluh alokasi sekaligus, dan sepuluh baris yang nyaris sama
+ * akan menenggelamkan isi lonceng.
+ *
+ * Ekornya tujuh hari sesudah tenggat supaya yang sudah telanjur lewat tetap
+ * ketahuan, tanpa menjadi peringatan abadi pada kegiatan lama.
+ */
+const qMitraTanpaProgres = async (userId: string): Promise<AppNotification[]> => {
+    const [rows] = await pool.query<RowDataPacket[]>(`
+        SELECT
+          CONCAT('mitra-nol-', k.id, '-', p.tahap)             AS id,
+          k.id                                                 AS kegiatanId,
+          k.namaKegiatan                                       AS namaKegiatan,
+          NULL                                                 AS tahap,
+          p.tahap                                              AS tahapMitra,
+          COUNT(*)                                             AS pendingCount,
+          DATEDIFF(k.tanggalSelesaiPengumpulanData, CURDATE()) AS daysLeft,
+          k.tanggalSelesaiPengumpulanData                      AS deadline,
+          k.lastUpdated                                        AS occurredAt
+        FROM ppl      p
+        JOIN kegiatan k ON k.id = p.kegiatanId
+        WHERE p.pml_id  = ?
+          AND k.isArsip = 0
+          AND p.bebanKerja > 0
+          AND k.tanggalMulaiPengumpulanData  IS NOT NULL
+          AND k.tanggalSelesaiPengumpulanData IS NOT NULL
+          AND CURDATE() >= k.tanggalMulaiPengumpulanData
+          AND DATEDIFF(k.tanggalSelesaiPengumpulanData, CURDATE()) <= 7
+          AND CURDATE() <= DATE_ADD(k.tanggalSelesaiPengumpulanData, INTERVAL 7 DAY)
+          AND COALESCE((SELECT SUM(g.value) FROM ppl_progress g
+                         WHERE g.ppl_id = p.id
+                           AND g.progress_type NOT IN ('open', 'belum_entry')), 0) = 0
+        GROUP BY k.id, k.namaKegiatan, p.tahap,
+                 k.tanggalSelesaiPengumpulanData, k.lastUpdated
+        ORDER BY daysLeft ASC
+        LIMIT 10
+    `, [userId]);
+
+    return rows.map(r => ({
+        ...r,
+        pendingCount: angka(r.pendingCount),
+        daysLeft: angka(r.daysLeft),
+        kind: 'mitra_tanpa_progres',
+        // Tiga hari terakhir dan sesudah tenggat: sudah tidak cukup waktu untuk
+        // menunggu mitra bergerak sendiri.
+        severity: angka(r.daysLeft) <= 3 ? 'critical' : 'warning',
+    })) as AppNotification[];
+};
+
+/**
  * Surat yang sudah terbit tetapi isinya tidak lagi sesuai (supervisor + admin).
  *
  * Inilah yang membuat perubahan setelah penandatanganan tidak lolos diam-diam:
@@ -419,6 +485,9 @@ export const getNotificationsFor = async (
     // kegiatan, dan pembuat kegiatan bisa siapa saja — semua pengguna boleh
     // membuat kegiatan. Penyaringnya ada di dalam query, bukan di sini.
     tugas.push(qPengingatDokumen(userId));
+    // Juga tanpa syarat peran: yang menentukan adalah ppl.pml_id, bukan
+    // users.role. Lihat komentar di qMitraTanpaProgres.
+    tugas.push(qMitraTanpaProgres(userId));
 
     const semua = (await Promise.all(tugas)).flat();
 

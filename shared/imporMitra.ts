@@ -36,11 +36,15 @@ export type KolomMitra =
 export const ALIAS_KOLOM: Record<KolomMitra, string[]> = {
   sobatId: ['sobatid', 'idsobat', 'idmitrasobat', 'kodesobat', 'nomorsobat'],
   nama: ['nama', 'namamitra', 'namappl', 'namalengkap', 'namapetugas'],
-  posisi: ['posisi', 'jenispetugas', 'peran', 'jabatan'],
-  alamat: ['alamat', 'alamatlengkap', 'alamatdomisili'],
-  telepon: ['telepon', 'notelepon', 'nohp', 'hp', 'nomorhp', 'nomortelepon', 'kontak'],
-  kecamatan: ['kecamatan', 'namakecamatan', 'kec'],
-  desa: ['desa', 'namadesa', 'kelurahan', 'desakelurahan'],
+  // 'posisiditerima': judul kolom di ekspor PALAPA, isinya "Mitra Pendataan",
+  // "Mitra Pengolahan", atau "Mitra (Pendataan dan Pengolahan)".
+  posisi: ['posisi', 'posisiditerima', 'jenispetugas', 'peran', 'jabatan'],
+  alamat: ['alamat', 'alamatdetail', 'alamatlengkap', 'alamatdomisili'],
+  telepon: ['telepon', 'notelepon', 'notelp', 'telp', 'nohp', 'hp', 'nomorhp',
+    'nomortelepon', 'kontak'],
+  kecamatan: ['kecamatan', 'alamatkec', 'alamatkecamatan', 'namakecamatan', 'kodekecamatan', 'kec'],
+  desa: ['desa', 'alamatdesa', 'alamatdesakel', 'alamatkelurahan', 'namadesa',
+    'kodedesa', 'kelurahan', 'desakelurahan'],
 };
 
 /** Tanpa kolom ini berkas tidak bisa dibaca sama sekali. */
@@ -136,6 +140,26 @@ export interface BarisImpor {
 
 const teks = (nilai: unknown): string => String(nilai ?? '').trim();
 
+/**
+ * Menyeragamkan nomor telepon menjadi bentuk lokal 08xx.
+ *
+ * SOBAT menyimpan nomornya dengan awalan +62 DAN nol daerahnya sekaligus —
+ * "+62 085-7583-94017". Membuang yang bukan angka saja menyisakan
+ * "62085758394017", nomor yang tidak bisa dihubungi siapa pun dan tidak sama
+ * dengan nomor yang sudah tersimpan untuk orang yang sama.
+ *
+ * Nol di depan juga sering hilang karena Excel membaca selnya sebagai bilangan;
+ * itu sebabnya nomor dibaca sebagai teks, bukan angka.
+ */
+export const normalkanTelepon = (nilai: unknown): string => {
+  const angka = teks(nilai).replace(/[^0-9]/g, '');
+  if (angka === '') return '';
+  // '620...' berarti kode negara dan nol daerah ditulis dua-duanya.
+  if (angka.startsWith('620')) return angka.slice(2);
+  if (angka.startsWith('62')) return `0${angka.slice(2)}`;
+  return angka;
+};
+
 /** Menyusun satu baris berkas menjadi data mitra, menurut peta kolom. */
 export const bacaBaris = (
   sel: unknown[],
@@ -151,9 +175,7 @@ export const bacaBaris = (
     nama: ambil('nama'),
     posisi: normalkanPosisi(ambil('posisi')),
     alamat: ambil('alamat') || undefined,
-    // Angka telepon sering terbaca sebagai bilangan sehingga nol di depannya
-    // hilang; yang bukan angka dibuang supaya "0812-3456" dan "0812 3456" sama.
-    telepon: ambil('telepon').replace(/[^0-9]/g, '') || undefined,
+    telepon: normalkanTelepon(ambil('telepon')) || undefined,
     kecamatan: ambil('kecamatan') || undefined,
     desa: ambil('desa') || undefined,
   };

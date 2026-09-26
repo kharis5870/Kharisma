@@ -1,0 +1,47 @@
+@startuml activity-arsip-hapus
+' Rincian use case "Mengarsipkan / Menghapus Kegiatan" (KF-16).
+' Sesuai server/routes/kegiatan.ts:
+'   - PUT /:id/arsip  -> wajibAdmin, setArsipKegiatan (data tetap utuh)
+'   - DELETE /:id     -> wajibAdmin, DITOLAK bila keterikatanKegiatan > 0
+'     (alokasi mitra atau penilaian), lalu diarahkan ke Arsip.
+!include _gaya.iuml
+
+|Admin|
+start
+:Membuka Riwayat Kegiatan
+dan memilih satu kegiatan;
+
+if (Tindakan yang dipilih?) then (Arsipkan)
+  |Sistem|
+  :Menandai kegiatan sebagai
+  arsip beserta pelakunya;
+  :Menyembunyikan dari
+  daftar utama dasbor;
+  |Admin|
+  :Dapat dikembalikan lewat
+  Batalkan Arsip;
+
+else (Hapus)
+  |Sistem|
+  :Menghitung alokasi mitra
+  dan penilaian terkait;
+
+  if (Sudah punya alokasi mitra\natau penilaian?) then (ya)
+    :Menolak penghapusan dan
+    menjelaskan alasannya;
+    :Menyarankan agar kegiatan
+    diarsipkan;
+    |Admin|
+    :Mengarsipkan kegiatan;
+  else (belum)
+    |Sistem|
+    :Menghapus kegiatan
+    secara permanen;
+  endif
+endif
+
+|Sistem|
+:Mencatat tindakan pada
+riwayat kegiatan;
+stop
+@enduml

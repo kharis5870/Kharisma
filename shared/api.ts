@@ -538,7 +538,8 @@ export type NotificationKind =
   | 'progress_stale'        // ketua tim: tidak ada pembaruan > 2 hari
   | 'document_keuangan_kosong'  // supervisor/admin: dokumen keuangan belum diisi
   | 'document_reminder'         // ketua tim & pembuat kegiatan: diingatkan tim keuangan
-  | 'surat_berubah';            // supervisor/admin: isi surat yang sudah terbit tidak lagi sesuai
+  | 'surat_berubah'             // supervisor/admin: isi surat yang sudah terbit tidak lagi sesuai
+  | 'mitra_tanpa_progres';      // PML: mitranya belum berprogres, pendataan hampir habis
 
 export type NotificationSeverity = 'critical' | 'warning' | 'info';
 
@@ -558,8 +559,16 @@ export interface AppNotification {
 
   kegiatanId: number;
   namaKegiatan: string;
-  /** Tahap terkait; null untuk progress_stale. */
+  /** Tahap terkait; null untuk progress_stale dan mitra_tanpa_progres. */
   tahap: Dokumen['tipe'] | null;
+
+  /**
+   * mitra_tanpa_progres: tahap ALOKASI MITRA ('listing' | 'pencacahan' |
+   * 'pengolahan-analisis'), sengaja dipisah dari `tahap` di atas yang berisi
+   * tahap DOKUMEN. Keduanya tidak boleh dicampur: mitra "pengolahan-analisis"
+   * bekerja pada masa pengumpulan data, bukan pada tahap Pengolahan & Analisis.
+   */
+  tahapMitra?: PPL['tahap'] | null;
 
   dokumenId?: number | null;
   namaDokumen?: string | null;

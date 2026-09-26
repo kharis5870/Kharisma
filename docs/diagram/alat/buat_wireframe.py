@@ -109,7 +109,7 @@ class Halaman:
 
     def kerangka(self, menu_aktif, judul, subjudul="", tanpa_menu=False):
         """Header + bilah sisi + judul halaman. Mengembalikan (x, y) awal isi."""
-        self.tambah("bar", 0, 0, LEBAR, 44, "OPTIMA")
+        self.tambah("bar", 0, 0, LEBAR, 44, "SIKAMI")
         self.tambah("field", 300, 9, 360, 26, "Cari kegiatan, mitra, atau halaman")
         self.tambah("box", 1080, 9, 56, 26, "tema")
         self.tambah("box", 1144, 9, 56, 26, "notif")

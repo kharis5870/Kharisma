@@ -15,91 +15,67 @@
 |#F7FAFF|Ketua Tim|
 |#FFFDF2|Tim Keuangan|
 |#F6FFF7|PML|
-|#FFF7F7|Pegawai Perekap Penilaian|
+|#FFF7F7|Perekap Penilaian|
 |#FAFAFA|Mitra Statistik|
 
 |Kepala BPS|
 start
-:Menugaskan kegiatan statistik
+:Menugaskan kegiatan
 kepada Ketua Tim;
 
 |Ketua Tim|
-:Menyusun rencana kegiatan
-dan jadwal tiap tahap;
+:Menyusun rencana dan
+jadwal kegiatan;
 
 repeat
-  :Mengisi atau memperbaiki nama mitra, PML,
-  dan beban kerja pada spreadsheet yang
-  disediakan Tim Keuangan;
-  note left
-    Alokasi tim lain pada bulan
-    yang sama tidak terlihat.
-  end note
+  :Mengisi mitra, PML, dan
+  beban kerja di spreadsheet;
 
   |Tim Keuangan|
-  :Memindahkan data setiap mitra dan
-  mengecek batas honor SBML satu per satu
-  pada spreadsheet pengecekan;
-  note left
-    Pengecekan tidak otomatis: kelebihan
-    batas baru ketahuan bila data
-    dicocokkan satu per satu.
-  end note
-repeat while (Ada honor mitra yang\nmelebihi batas SBML?) is (ya) not (tidak)
+  :Memindahkan data mitra dan
+  mengecek batas SBML manual;
+repeat while (Ada yang melebihi\nbatas SBML?) is (ya) not (tidak)
 
-:Mengetik dan menomori SPK satu per satu
-di awal bulan, lalu mencetaknya;
+:Mengetik, menomori, dan
+mencetak SPK satu per satu;
 
 |Mitra Statistik|
 :Menandatangani SPK dan
-melaksanakan tugas lapangan;
+bekerja di lapangan;
 
 |PML|
 if (Kegiatan menggunakan\naplikasi FASIH?) then (ya)
-  :Memeriksa assignment mitra yang
-  masuk otomatis di aplikasi FASIH;
+  :Memeriksa progres mitra
+  di aplikasi FASIH;
 else (tidak)
-  :Mencatat progres mitra pada
-  spreadsheet progres kegiatan;
+  :Mencatat progres mitra
+  di spreadsheet;
 endif
 
 |Ketua Tim|
-:Memantau progres tim melalui aplikasi
-FASIH atau spreadsheet progres;
-note left
-  Progres setiap tim tersimpan di
-  tempat berbeda, sehingga Kepala BPS
-  tidak dapat memantau progres seluruh
-  tim dalam satu tampilan.
-end note
+:Memantau progres lewat
+FASIH atau spreadsheet;
 
 repeat
-  :Mengumpulkan dokumen kegiatan (SK, Surat
-  Tugas, KAK, Visum) ke folder penyimpanan
-  daring, atau melengkapinya bila ditagih;
+  :Mengumpulkan dokumen
+  kegiatan ke folder daring;
 
   |Tim Keuangan|
   :Memeriksa kelengkapan dokumen;
 repeat while (Dokumen sudah lengkap?) is (belum) not (lengkap)
 
-:Memastikan tugas dalam SPK
-sudah diselesaikan mitra;
-:Mengetik dan menomori BAST
-satu per satu sesuai SPK;
-:Memproses pencairan honor mitra;
+:Memastikan tugas SPK
+sudah diselesaikan;
+:Mengetik dan menomori
+BAST satu per satu;
+:Memproses pencairan honor;
 
 |PML|
-:Mengisi nilai mitra pada
-spreadsheet penilaian;
-note right
-  Spreadsheet dapat dibuka
-  dan diubah siapa pun yang
-  memiliki tautannya.
-end note
+:Mengisi nilai mitra
+di spreadsheet;
 
-|Pegawai Perekap Penilaian|
-:Menghitung peringkat mitra per triwulan
-secara manual untuk bahan evaluasi
-dan apresiasi mitra;
+|Perekap Penilaian|
+:Menghitung peringkat mitra
+per triwulan secara manual;
 stop
 @enduml

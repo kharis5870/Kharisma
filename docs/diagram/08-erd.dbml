@@ -118,12 +118,14 @@ Table ketua_tim {
 
 Table kecamatan {
   id int [pk, increment]
+  kode char(3) [unique, note: 'Tiga digit kode kecamatan BPS']
   nama varchar(255) [not null]
 }
 
 Table desa {
   id int [pk, increment]
   kecamatan_id int [not null, ref: > kecamatan.id]
+  kode char(3) [note: 'Tiga digit kode desa BPS, unik dalam satu kecamatan']
   nama varchar(255) [not null]
 }
 

@@ -14,35 +14,31 @@ start
 
 |Sistem|
 if (Percobaan masuk\nmasih dalam batas?) then (tidak)
-  :Menolak sementara dan meminta
-  pengguna menunggu beberapa saat;
+  :Menolak sementara dan
+  meminta menunggu;
   stop
 else (ya)
 endif
 
-:Mencari akun dan membandingkan kata sandi
-dengan sandi tersandi (hash) di basis data;
+:Mencocokkan kata sandi dengan
+sandi tersandi di basis data;
 
 if (Akun dan kata sandi cocok?) then (tidak)
-  :Menampilkan satu pesan yang sama untuk
-  nama pengguna salah maupun kata sandi salah;
+  :Menampilkan satu pesan yang
+  sama untuk kedua kesalahan;
   stop
 else (ya)
 endif
 
-:Membuat token bertanda tangan berisi id, peran,
-dan nomor versi token, berlaku 12 jam;
+:Membuat token bertanda tangan
+yang berlaku 12 jam;
 
 |Pengguna|
-:Menyimpan token di peramban
-dan membuka dasbor;
+:Menyimpan token dan
+membuka dasbor;
 
 |Sistem|
 :Menampilkan menu sesuai peran;
-note right
-  Menu Manajemen Admin hanya
-  tampil bagi Admin.
-end note
 
 |Pengguna|
 if (Mengganti kata sandi?) then (tidak)
@@ -52,21 +48,21 @@ if (Mengganti kata sandi?) then (tidak)
 else (ya)
 endif
 
-:Membuka halaman Profil dan mengisi kata sandi
-lama, kata sandi baru, dan ulangannya;
+:Mengisi kata sandi lama,
+baru, dan ulangannya;
 
 |Sistem|
-if (Kata sandi baru memenuhi aturan\n8-72 karakter dan bukan nama pengguna?) then (tidak)
+if (Kata sandi baru\nmemenuhi aturan?) then (tidak)
   :Menolak dan menjelaskan
   aturan yang dilanggar;
   stop
 else (ya)
 endif
 
-:Menyimpan sandi baru dalam bentuk hash
-dan menaikkan nomor versi token akun;
-:Menolak seluruh token lama akun tersebut
-sehingga perangkat lain harus masuk kembali;
+:Menyimpan sandi baru dan
+menaikkan versi token;
+:Menolak seluruh token lama
+akun tersebut;
 
 |Pengguna|
 :Masuk kembali dengan

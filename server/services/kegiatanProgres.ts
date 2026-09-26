@@ -4,6 +4,9 @@ import { RowDataPacket } from 'mysql2';
 import db from '../db';
 import { catatRiwayat } from './riwayatService';
 import { PPL, ProgressType } from '@shared/api';
+// Jalur relatif, BUKAN '@shared/...': alias itu tidak tersedia saat
+// vite.config.ts memuat kode server lewat Node, dan ini nilai runtime.
+import { progresBolehDiperbarui, PESAN_PROGRES_BELUM_DIBUKA } from '../../shared/hakKegiatan';
 import { PPLPacket, ProgressPacket, calculateProgress } from './kegiatanBantu';
 
 // =================================================================
@@ -21,7 +24,25 @@ export const updatePplProgress = async (pplId: number, progressData: Partial<Rec
         // berubah di tengah jalan.
         const [pemilik] = await connection.query<RowDataPacket[]>('SELECT kegiatanId FROM ppl WHERE id = ?', [pplId]);
         if (pemilik[0]) {
-            await connection.query('SELECT id FROM kegiatan WHERE id = ? FOR UPDATE', [pemilik[0].kegiatanId]);
+            // Tanggalnya ikut dibaca di sini, bukan lewat kueri tersendiri:
+            // baris kegiatan memang sedang dikunci, dan menambah kueri kedua
+            // berarti meminjam koneksi lain di tengah transaksi.
+            //
+            // CURDATE() dipakai sebagai "hari ini" supaya acuannya sama dengan
+            // notifikasi dan peringatan dasbor: sesi database sudah +07:00,
+            // sedangkan jam mesin server cPanel umumnya UTC.
+            const [kegRows] = await connection.query<RowDataPacket[]>(`
+                SELECT DATE_FORMAT(tanggalMulaiPengumpulanData, '%Y-%m-%d') AS mulaiPendataan,
+                       DATE_FORMAT(CURDATE(), '%Y-%m-%d')                   AS hariIni
+                  FROM kegiatan WHERE id = ? FOR UPDATE`, [pemilik[0].kegiatanId]);
+
+            const keg = kegRows[0];
+            if (keg && !progresBolehDiperbarui(keg.mulaiPendataan, keg.hariIni)) {
+                throw Object.assign(new Error(PESAN_PROGRES_BELUM_DIBUKA), {
+                    statusCode: 409,
+                    details: { code: 'PROGRES_BELUM_DIBUKA', mulaiPendataan: keg.mulaiPendataan },
+                });
+            }
         }
         const [pplRows] = await connection.query<RowDataPacket[]>('SELECT kegiatanId, bebanKerja, tahap FROM ppl WHERE id = ? FOR UPDATE', [pplId]);
         if (pplRows.length === 0) {

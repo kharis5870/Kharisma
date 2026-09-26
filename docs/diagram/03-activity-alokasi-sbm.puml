@@ -1,6 +1,6 @@
 @startuml activity-alokasi-sbm
 ' Rincian use case "Membuat/Menyunting Kegiatan & Alokasi Mitra"
-' beserta "Validasi Batas Honor (SBM)".
+' beserta "Validasi Batas Honor (SBML)".
 '
 ' Sesuai kode:
 '  - pelanggaran batas TIDAK ditolak mutlak: server menjawab 409
@@ -15,69 +15,58 @@
 start
 :Membuka halaman Kegiatan Baru
 atau Edit Kegiatan;
-:Mengisi informasi kegiatan, jadwal tahap,
-serta menandai tahap Pengolahan dan
-Diseminasi yang dipakai;
-:Mengisi satuan beban kerja dan
-harga satuan per jenis pekerjaan;
+:Mengisi informasi kegiatan,
+jadwal, dan tahap yang dipakai;
+:Mengisi satuan beban kerja
+dan harga satuan;
 
 repeat
   |Ketua Tim|
-  :Menekan tombol Pilih dari Daftar PPL
-  pada tahap yang diisi;
+  :Menekan Pilih dari
+  Daftar PPL;
   |Sistem|
-  :Menampilkan mitra aktif yang posisinya
-  sesuai tahap beserta jumlah kegiatannya;
+  :Menampilkan mitra aktif
+  yang sesuai tahap;
   |Ketua Tim|
-  :Menyaring mitra menurut kecamatan
-  dan desa, lalu mencentang mitra;
-  :Mengisi PML dan beban kerja
-  untuk setiap mitra terpilih;
-  :Memilih metode pembebanan
-  (satu bulan / menurut jumlah hari / luber);
+  :Menyaring mitra per kecamatan
+  dan desa, lalu memilihnya;
+  :Mengisi PML dan beban
+  kerja tiap mitra;
+  :Memilih metode pembebanan;
   :Menekan tombol Simpan;
   |Sistem|
-  :Menghitung honor = beban kerja × harga satuan;
-  :Membagi muatan ke bulan pembebanan sesuai metode,
-  dengan honor per bulan sebesar volume × harga satuan;
-  :Menjumlahkan honor mitra pada bulan yang sama
-  dari seluruh kegiatan lain;
-  if (Total honor bulanan > batas SBM?) then (ya)
-    :Menampilkan peringatan: nama mitra,
-    bulan, total honor, dan batas;
+  :Menghitung honor dan membagi
+  muatan ke bulan pembebanan;
+  :Menjumlahkan honor mitra
+  dari seluruh kegiatan;
+  if (Melebihi batas SBML?) then (ya)
+    :Menampilkan peringatan
+    beserta rinciannya;
     |Ketua Tim|
     if (Tetap lanjutkan?) then (ya)
-      :Mengonfirmasi penyimpanan
-      melebihi batas;
+      :Mengonfirmasi tetap
+      menyimpan;
     else (tidak)
-      :Merevisi alokasi atau
-      metode pembebanan;
+      :Merevisi alokasi;
     endif
   else (tidak)
   endif
   |Sistem|
 repeat while (Ketua Tim merevisi alokasi?) is (ya) not (tidak)
 
-if (Kegiatan sudah disimpan orang lain\nsejak halaman dibuka?) then (ya)
-  :Menolak penyimpanan dan meminta
-  pengguna memuat ulang halaman;
+if (Sudah diubah\norang lain?) then (ya)
+  :Menolak dan meminta
+  muat ulang halaman;
   stop
 else (tidak)
 endif
 
-:Menyimpan kegiatan, alokasi mitra, rincian honor,
-dan pembebanan honor per bulan dalam satu transaksi;
-:Menaikkan versi kegiatan;
-:Membuat daftar dokumen wajib setiap tahap;
+:Menyimpan seluruh data
+dalam satu transaksi;
+:Menaikkan versi dan membuat
+daftar dokumen wajib;
 :Mencatat riwayat kegiatan;
-:Menampilkan pesan berhasil;
 stop
 
-note right
-  Tombol batal hanya tersedia di
-  jendela konfirmasi selama sekitar
-  6 detik, lalu jendela otomatis
-  tertutup dan berpindah ke dasbor.
-end note
 
 @enduml

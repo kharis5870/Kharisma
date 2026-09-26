@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   bacaBaris, cariBarisHeader, kolomWajibHilang, normalkanHeader, normalkanPosisi,
-  periksaImpor, petakanKolom, ringkasTemuan, tidakAdaDiBerkas,
+  normalkanTelepon, periksaImpor, petakanKolom, ringkasTemuan, tidakAdaDiBerkas,
   type BarisImpor, type MitraTersimpan,
 } from "@shared/imporMitra";
 
@@ -186,5 +186,71 @@ describe("mitra yang tidak ada di berkas", () => {
        { nomorBaris: 2, nama: "Siti Aminah", sobatId: "SB-2" }],
       tersimpan);
     expect(sisa).toEqual([]);
+  });
+});
+
+/**
+ * Berkas ekspor PALAPA, yang dipakai sehari-hari untuk daftar mitra.
+ *
+ * Header dan isinya berbeda dari ekspor mitra sensus, dan sebelum ini LIMA dari
+ * tujuh kolomnya tidak dikenali sama sekali — berkasnya terbaca, tapi alamat,
+ * telepon, wilayah, dan posisi semua kosong tanpa satu pun peringatan.
+ */
+describe("berkas PALAPA", () => {
+  const HEADER_PALAPA = ["Email", "SOBAT ID", "Nama Lengkap", "Alamat Detail", "Alamat Kec",
+    "Alamat Desa", "Jenis Kelamin", "No Telp", "NPWP", "POSISI DITERIMA", "STATUS", "Catatan"];
+
+  it("seluruh kolom yang dipakai dikenali", () => {
+    const peta = petakanKolom(HEADER_PALAPA);
+    expect(peta.sobatId).toBe(1);
+    expect(peta.nama).toBe(2);
+    expect(peta.alamat).toBe(3);
+    expect(peta.kecamatan).toBe(4);
+    expect(peta.desa).toBe(5);
+    expect(peta.telepon).toBe(7);
+    expect(peta.posisi).toBe(9);
+  });
+
+  it("satu baris terbaca utuh, termasuk kode wilayah dan posisi", () => {
+    const sel = ["amafnhy.natsir@gmail.com", "170123110117", "AFZUMARNI",
+      "Prumnas Kayu Kunyit No.128", "040", "033", "2", "+62 823-7404-1702", null,
+      "Mitra (Pendataan dan Pengolahan)", "Diterima", null];
+    expect(bacaBaris(sel, petakanKolom(HEADER_PALAPA), 2)).toEqual({
+      nomorBaris: 2,
+      sobatId: "170123110117",
+      nama: "AFZUMARNI",
+      posisi: "Pendataan/Pengolahan",
+      alamat: "Prumnas Kayu Kunyit No.128",
+      telepon: "082374041702",
+      kecamatan: "040",
+      desa: "033",
+    });
+  });
+
+  it("ketiga isi kolom POSISI DITERIMA dikenali", () => {
+    expect(normalkanPosisi("Mitra Pendataan")).toBe("Pendataan");
+    expect(normalkanPosisi("Mitra Pengolahan")).toBe("Pengolahan");
+    expect(normalkanPosisi("Mitra (Pendataan dan Pengolahan)")).toBe("Pendataan/Pengolahan");
+  });
+});
+
+describe("normalkanTelepon", () => {
+  it("kode negara dan nol daerah yang ditulis dua-duanya dirapikan", () => {
+    // Bentuk asli di SOBAT; tanpa ini tersimpan sebagai 62085758394017.
+    expect(normalkanTelepon("+62 085-7583-94017")).toBe("085758394017");
+  });
+
+  it("kode negara tanpa nol daerah diganti nol", () => {
+    expect(normalkanTelepon("+62 823-7404-1702")).toBe("082374041702");
+  });
+
+  it("nomor lokal dibiarkan apa adanya", () => {
+    expect(normalkanTelepon("0812-3456-7890")).toBe("081234567890");
+    expect(normalkanTelepon("0812 3456 7890")).toBe("081234567890");
+  });
+
+  it("sel kosong menghasilkan teks kosong", () => {
+    expect(normalkanTelepon(null)).toBe("");
+    expect(normalkanTelepon("-")).toBe("");
   });
 });

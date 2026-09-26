@@ -13,11 +13,11 @@
 |Tim Keuangan|
 |Sistem|
 start
-:Membandingkan salinan isi setiap surat aktif
-dengan data honor dan muatan terkini;
+:Membandingkan isi surat aktif
+dengan data terkini;
 if (Isi surat berubah sejak terbit?) then (ya)
-  :Menampilkan notifikasi surat berubah
-  kepada Tim Keuangan;
+  :Memberi notifikasi surat
+  berubah ke Tim Keuangan;
 else (tidak)
 endif
 
@@ -25,29 +25,29 @@ endif
 :Membuka Riwayat Penyuratan
 dan memilih tahun;
 |Sistem|
-:Menampilkan surat aktif, surat batal,
-dan nomor yang kosong;
+:Menampilkan surat aktif,
+batal, dan nomor kosong;
 
 |Tim Keuangan|
 if (Surat perlu ditindaklanjuti?) then (ya)
   if (Mitra masih memiliki honor\npada bulan surat?) then (ya)
     :Memperbarui isi surat;
     |Sistem|
-    :Menyegarkan isi surat mengikuti data terkini
-    dengan nomor yang sama;
+    :Menyegarkan isi surat,
+    nomor tetap sama;
   else (tidak)
     |Tim Keuangan|
     :Membatalkan surat dan
     menulis catatan alasan;
     |Sistem|
-    :Mengubah status surat menjadi batal,
-    nomornya tetap tercatat di riwayat;
+    :Status menjadi batal,
+    nomor tetap tercatat;
     |Tim Keuangan|
     if (Surat batal perlu dihapus?) then (ya)
       :Menghapus surat batal;
       |Sistem|
-      :Menghapus surat dan mencatatnya
-      di riwayat surat;
+      :Menghapus surat dan
+      mencatat riwayatnya;
     else (tidak)
     endif
   endif
@@ -56,16 +56,16 @@ endif
 
 |Tim Keuangan|
 if (Penomoran perlu dirapikan?) then (ya)
-  :Meminta pratinjau rapikan nomor
-  untuk satu tahun;
+  :Meminta pratinjau
+  rapikan nomor;
   |Sistem|
-  :Menampilkan rencana pergeseran nomor
-  tanpa mengubah data;
+  :Menampilkan rencana
+  pergeseran nomor;
   |Tim Keuangan|
   :Mengetik frasa konfirmasi;
   |Sistem|
-  :Menerapkan nomor baru dan
-  mencatatnya di riwayat surat;
+  :Menerapkan nomor baru
+  dan mencatat riwayatnya;
 else (tidak)
 endif
 stop

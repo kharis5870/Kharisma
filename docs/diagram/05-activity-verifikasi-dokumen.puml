@@ -14,8 +14,8 @@ if (Tautan dokumen masih kosong?) then (ya)
   else (tidak)
     :Menekan Kirim Pengingat;
     |Sistem|
-    :Menampilkan notifikasi pengingat
-    kepada Ketua Tim dan pembuat kegiatan;
+    :Mengirim pengingat ke Ketua
+    Tim dan pembuat kegiatan;
     |Ketua Tim|
     :Mengisi tautan dokumen;
   endif
@@ -24,8 +24,8 @@ endif
 
 |Sistem|
 :Memeriksa format dan panjang tautan;
-:Menandai dokumen berstatus Pending
-dan memberi notifikasi menunggu persetujuan;
+:Menandai dokumen Pending
+dan mengirim notifikasi;
 
 repeat
   |Tim Keuangan|
@@ -35,24 +35,26 @@ repeat
     :Menyetujui per dokumen atau
     sekaligus satu tahap;
     |Sistem|
-    :Mengubah status menjadi Approved
-    dan mencatat penyetuju;
+    :Status menjadi Approved,
+    penyetuju dicatat;
   else (tidak)
     |Tim Keuangan|
-    :Menolak dan menulis catatan revisi;
+    :Menolak disertai
+    catatan revisi;
     |Sistem|
-    :Mengubah status menjadi Rejected
-    dan memberi notifikasi ke Ketua Tim;
+    :Status menjadi Rejected,
+    Ketua Tim diberi notifikasi;
     |Ketua Tim|
     :Memperbaiki tautan dokumen;
     |Sistem|
-    :Mengembalikan status ke Pending dan memberi
-    notifikasi dokumen diunggah ulang;
+    :Status kembali Pending,
+    notifikasi diunggah ulang;
   endif
   |Sistem|
-repeat while (Dokumen ditolak?) is (ya, periksa ulang) not (tidak)
+repeat while (Dokumen ditolak?) is (ya) not (tidak)
 
-:Mencatat seluruh aksi ke riwayat kegiatan;
+:Mencatat aksi ke
+riwayat kegiatan;
 stop
 
 @enduml

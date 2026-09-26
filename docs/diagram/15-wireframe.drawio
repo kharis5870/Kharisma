@@ -10,7 +10,7 @@
         <mxCell id="w01-2" value="Gambar W-01. Rancangan Kerangka Umum Tampilan" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w01-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w01-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w01-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -176,7 +176,7 @@
         <mxCell id="w03-2" value="Gambar W-03. Rancangan Halaman Dasbor Monitoring" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w03-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w03-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w03-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -424,7 +424,7 @@
         <mxCell id="w04-2" value="Gambar W-04. Rancangan Halaman Input Kegiatan — Tab Info Dasar dan Jadwal" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w04-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w04-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w04-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -567,7 +567,7 @@
         <mxCell id="w05-2" value="Gambar W-05. Rancangan Tab Alokasi Mitra dan Pembebanan Honor" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w05-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w05-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w05-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -755,7 +755,7 @@
         <mxCell id="w06-2" value="Gambar W-06. Rancangan Jendela Peringatan Batas Honor Bulanan" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w06-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w06-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w06-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -886,7 +886,7 @@
         <mxCell id="w07-2" value="Gambar W-07. Rancangan Halaman Sunting Kegiatan" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w07-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w07-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w07-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -1074,7 +1074,7 @@
         <mxCell id="w08-2" value="Gambar W-08. Rancangan Halaman Dokumen Kegiatan" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w08-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w08-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w08-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -1277,7 +1277,7 @@
         <mxCell id="w09-2" value="Gambar W-09. Rancangan Halaman Manajemen Honor" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w09-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w09-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w09-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -1486,7 +1486,7 @@
         <mxCell id="w10-2" value="Gambar W-10. Rancangan Halaman Daftar PPL (susunan Daftar PML serupa)" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w10-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w10-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w10-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -1710,7 +1710,7 @@
         <mxCell id="w11-2" value="Gambar W-11. Rancangan Halaman Penilaian Mitra dan Jendela Pengisian Nilai" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w11-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w11-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w11-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -1904,7 +1904,7 @@
         <mxCell id="w12-2" value="Gambar W-12. Rancangan Halaman Rekap Penilaian Triwulanan" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w12-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w12-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w12-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -2074,7 +2074,7 @@
         <mxCell id="w13-2" value="Gambar W-13. Rancangan Halaman Generate Surat" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w13-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w13-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w13-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -2292,7 +2292,7 @@
         <mxCell id="w14-2" value="Gambar W-14. Rancangan Halaman Template Surat" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w14-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w14-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w14-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -2426,7 +2426,7 @@
         <mxCell id="w15-2" value="Gambar W-15. Rancangan Halaman Riwayat Penyuratan" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w15-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w15-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w15-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -2659,7 +2659,7 @@
         <mxCell id="w16-2" value="Gambar W-16a. Rancangan Halaman Manajemen Admin" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w16-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w16-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w16-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -2847,7 +2847,7 @@
         <mxCell id="w16b-2" value="Gambar W-16b. Rancangan Jendela Impor Mitra dari Excel SOBAT" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w16b-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w16b-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w16b-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">
@@ -3029,7 +3029,7 @@
         <mxCell id="w17-2" value="Gambar W-17. Rancangan Halaman Profil, Panel Notifikasi, dan Pencarian Global" style="text;html=1;fontFamily=Arial;align=left;verticalAlign=middle;fontSize=10;fontColor=#777777;" vertex="1" parent="1">
           <mxGeometry x="40" y="768" width="1280" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="w17-3" value="OPTIMA" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="w17-3" value="SIKAMI" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#F5F5F5;strokeColor=#999999;align=left;spacingLeft=10;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="40" width="1280" height="44" as="geometry" />
         </mxCell>
         <mxCell id="w17-4" value="Cari kegiatan, mitra, atau halaman" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#FFFFFF;strokeColor=#B3B3B3;align=left;spacingLeft=8;fontSize=11;fontColor=#8C8C8C;" vertex="1" parent="1">

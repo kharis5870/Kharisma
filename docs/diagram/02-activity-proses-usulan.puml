@@ -5,22 +5,21 @@
 
 |Ketua Tim|
 start
-:Membuat kegiatan: jadwal empat tahap,
-tahap pengolahan dan diseminasi yang
-dipakai, serta dokumen wajibnya;
+:Membuat kegiatan beserta
+jadwal dan dokumen wajib;
 
 repeat
   |Ketua Tim|
-  :Mengalokasikan mitra aktif, PML,
-  beban kerja, dan harga satuan;
+  :Mengalokasikan mitra, PML,
+  beban kerja, dan harga;
   |Sistem|
-  :Membagi muatan ke bulan pembebanan
-  dan membandingkan honor dengan batas SBM;
-repeat while (Melebihi batas SBM dan\nKetua Tim memilih merevisi?) is (ya) not (tidak)
+  :Membagi muatan per bulan
+  dan memeriksa batas SBML;
+repeat while (Melebihi batas SBML\ndan direvisi?) is (ya) not (tidak)
 
 |Sistem|
 :Menyimpan kegiatan, alokasi,
-dan pembebanan honor per bulan;
+dan honor per bulan;
 
 fork
   |Tim Keuangan|
@@ -37,7 +36,7 @@ fork again
 end fork
 
 |Sistem|
-:Memperbarui dashboard monitoring
+:Memperbarui dasbor
 dan notifikasi;
 
 |Tim Keuangan|
@@ -62,11 +61,11 @@ repeat while (Masih ada dokumen\nbelum disetujui?) is (ya) not (tidak)
 
 |PML|
 :Menilai kinerja mitra
-(tiga aspek, skala 1–10);
+(3 aspek, skala 1–10);
 
 |Sistem|
-:Menghitung rata-rata dan
-peringkat mitra per triwulan;
+:Menghitung peringkat
+mitra per triwulan;
 stop
 
 @enduml

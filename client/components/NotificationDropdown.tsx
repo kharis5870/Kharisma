@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   Bell, FileText, Clock, ExternalLink, CheckCircle, AlertCircle, Loader2,
-  MapPin, AlertOctagon, AlertTriangle, CalendarClock, RefreshCw, FileSignature, BellRing} from "lucide-react";
+  MapPin, AlertOctagon, AlertTriangle, CalendarClock, RefreshCw, FileSignature, BellRing,
+  UserX} from "lucide-react";
 import type { AppNotification, NotificationKind } from "@shared/api";
 import { apiClient } from "@/lib/apiClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,6 +29,29 @@ const getRelativeTime = (dateString: string) => {
 
 const formatTahap = (tahap?: string | null) =>
   tahap ? tahap.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+
+/**
+ * Sebutan tahap ALOKASI MITRA, bukan tahap dokumen.
+ *
+ * "Pengolahan" sengaja tidak ditulis "Pengolahan & Analisis": mitra pengolahan
+ * bekerja pada masa pendataan, dan menyamakan keduanya akan menyesatkan.
+ */
+const labelTahapMitra = (tahap: AppNotification['tahapMitra']): string => {
+  switch (tahap) {
+    case 'listing': return 'listing';
+    case 'pencacahan': return 'pencacahan';
+    case 'pengolahan-analisis': return 'pengolahan';
+    default: return '';
+  }
+};
+
+/** Sisa waktu pendataan dalam kalimat, termasuk ketika tenggatnya sudah lewat. */
+const sisaPendataan = (daysLeft: number | null | undefined): string => {
+  const sisa = daysLeft ?? 0;
+  if (sisa < 0) return `pendataan sudah berakhir ${Math.abs(sisa)} hari lalu`;
+  if (sisa === 0) return 'pendataan berakhir hari ini';
+  return `pendataan tinggal ${sisa} hari`;
+};
 
 /** Ikon, warna, dan pengelompokan per jenis notifikasi. */
 const META: Record<NotificationKind, { icon: React.ElementType; chip: string; grup: string }> = {
@@ -72,6 +96,12 @@ const META: Record<NotificationKind, { icon: React.ElementType; chip: string; gr
     icon: Clock, grup: 'Informasi',
     chip: 'bg-muted text-muted-foreground',
   },
+  // Dikelompokkan "Tenggat mendekat" karena yang mendesak memang tenggatnya:
+  // pendataan tinggal hitungan hari sementara mitranya belum bergerak.
+  mitra_tanpa_progres: {
+    icon: UserX, grup: 'Tenggat mendekat',
+    chip: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  },
 };
 
 const URUTAN_GRUP = ['Perlu diperbaiki', 'Tenggat mendekat', 'Perlu diisi', 'Menunggu persetujuan', 'Informasi'] as const;
@@ -80,6 +110,10 @@ const URUTAN_GRUP = ['Perlu diperbaiki', 'Tenggat mendekat', 'Perlu diisi', 'Men
 const tujuanNotifikasi = (n: AppNotification): string => {
   switch (n.kind) {
     case 'progress_stale':
+      return `/dashboard`;
+    // Progres mitra diperbarui dari kartu kegiatan di Dashboard; tidak ada
+    // halaman tersendiri untuk itu.
+    case 'mitra_tanpa_progres':
       return `/dashboard`;
     // Surat tidak dibereskan dari halaman dokumen, melainkan dari layar tempat
     // suratnya dibuat. Langsung ke tab "Generate SPK", bukan tab pengaturan
@@ -115,6 +149,14 @@ const judulNotifikasi = (n: AppNotification) => {
       return <>Isi surat <span className="font-bold">{n.namaDokumen}</span> untuk {n.actorName} tidak lagi sesuai data sekarang.</>;
     case 'progress_stale':
       return <>Tidak ada pembaruan progress selama {n.daysLeft} hari.</>;
+    case 'mitra_tanpa_progres':
+      return (
+        <>
+          <span className="font-bold">{n.pendingCount} mitra</span>{' '}
+          {labelTahapMitra(n.tahapMitra)} belum ada progres —{' '}
+          {sisaPendataan(n.daysLeft)}.
+        </>
+      );
   }
 };
 

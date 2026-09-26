@@ -81,6 +81,7 @@ entity "ppl_master" as ppl_master {
 entity "kecamatan" as kecamatan {
   * id : int <<PK>>
   --
+  kode : char(3) <<UQ>>
   nama : varchar(255)
 }
 
@@ -88,6 +89,7 @@ entity "desa" as desa {
   * id : int <<PK>>
   --
   kecamatan_id : int <<FK>>
+  kode : char(3)
   nama : varchar(255)
 }
 

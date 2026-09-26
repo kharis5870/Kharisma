@@ -55,7 +55,7 @@ Bila penomoran subbab Anda sekarang sudah terlanjur 4.2.3 Rancangan Basis Data d
 sebelum rancangan basis data dan geser nomornya. Sebagai jalan tengah, pada pembuka
 setiap rancangan halaman ditambahkan satu kalimat rujukan silang, misalnya
 "Rancangan alur kerja halaman ini telah dijelaskan pada Gambar 12 (Activity Diagram
-Alokasi Mitra dan Validasi Batas SBM)". Dengan begitu pembaca tetap terbantu tanpa
+Alokasi Mitra dan Validasi Batas SBML)". Dengan begitu pembaca tetap terbantu tanpa
 mengulang gambar. Kalimat rujukan itu sudah disiapkan di tiap halaman di bawah ini.
 
 ---
@@ -88,7 +88,7 @@ pengguna tidak perlu menyesuaikan diri setiap berpindah halaman.
 
 ```
 +---------------------------------------------------------------------------+
-| [=] OPTIMA      [ Pencarian global............ ]   [tema] [lonceng] [akun] |  <- Header
+| [=] SIKAMI      [ Pencarian global............ ]   [tema] [lonceng] [akun] |  <- Header
 +--------+------------------------------------------------------------------+
 | Dasbor |                                                                   |
 | Daftar>|   JUDUL HALAMAN                                                   |
@@ -228,7 +228,7 @@ KF-13.)_
 ### 4.2.4.4 Rancangan Halaman Input Kegiatan
 
 Rancangan alur kerja halaman ini mengikuti Activity Diagram Alokasi Mitra dan
-Validasi Batas SBM.
+Validasi Batas SBML.
 
 **[WIREFRAME W-04]** Gambar …: Rancangan Halaman Input Kegiatan, Tab Info Dasar dan
 Jadwal
@@ -314,7 +314,7 @@ memastikan hasilnya sebelum menyimpan.
 ```
 +-----------------------------------------------------+
 |  Peringatan Batas Honor Bulanan                      |
-|  Honor beberapa mitra melebihi batas SBM:            |
+|  Honor beberapa mitra melebihi batas SBML:            |
 |   - Budi Santoso, Agustus 2026                       |
 |     Total Rp 3.400.000 dari batas Rp 3.000.000       |
 |   - Siti Aminah, Agustus 2026                        |

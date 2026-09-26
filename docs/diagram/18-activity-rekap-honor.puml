@@ -1,0 +1,57 @@
+@startuml activity-rekap-honor
+' Rincian use case "Melihat Rekap Honor Mitra" (KF-13).
+' Sesuai server/routes/honor.ts: periode dapat berupa bulan+tahun ATAU
+' rentang tanggal bebas; keduanya divalidasi sebelum dihitung.
+!include _gaya.iuml
+
+|Pegawai|
+start
+:Membuka halaman
+Manajemen Honor;
+
+if (Cara memilih periode?) then (Bulan tertentu)
+  :Memilih bulan dan tahun;
+else (Rentang tanggal)
+  :Memilih tanggal mulai
+  dan tanggal selesai;
+endif
+
+|Sistem|
+:Memeriksa kelengkapan dan
+kewajaran periode yang dipilih;
+
+if (Periode sah?) then (tidak)
+  :Menolak dan menampilkan
+  pesan galat;
+  stop
+else (ya)
+endif
+
+:Menjumlahkan honor setiap mitra
+pada periode tersebut dari
+seluruh kegiatan dan seluruh tim;
+:Membandingkan honor puncak bulanan
+tiap mitra dengan batas SBML;
+:Menampilkan tabel rekap beserta
+penanda mitra yang melebihi batas;
+
+|Pegawai|
+if (Mengunduh rekap?) then (ya)
+  :Memilih bentuk berkas
+  PDF atau Excel;
+  |Sistem|
+  :Membentuk berkas di peramban
+  sesuai data yang sedang tampil;
+  |Pegawai|
+  :Menyimpan berkas rekap;
+else (tidak)
+endif
+stop
+
+note right
+  Isi berkas unduhan selalu sama dengan
+  baris yang sedang tampil di layar,
+  mengikuti periode dan pencarian
+  yang sedang dipakai.
+end note
+@enduml

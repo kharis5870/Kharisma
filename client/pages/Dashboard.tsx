@@ -25,7 +25,9 @@ import { id as localeID } from 'date-fns/locale';
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
 import { IKON_PERINGATAN } from "@/lib/statusStyles";
-import { bolehMenyuntingKegiatan } from "@shared/hakKegiatan";
+import {
+    bolehMenyuntingKegiatan, progresBolehDiperbarui, PESAN_PROGRES_BELUM_DIBUKA,
+} from "@shared/hakKegiatan";
 import DashboardCharts from "@/components/DashboardCharts";
 import RiwayatKegiatanPanel from "@/components/RiwayatKegiatanPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -428,6 +430,13 @@ export default function Dashboard() {
     const renderPPLUpdate = (pplList: PPLWithProgress[], search: string) => {
         const milikSaya = (p: PPLWithProgress) => String(p.pml_id) === String(user?.id);
 
+        // Masa persiapan: kotak isian ditutup, angkanya tetap terlihat.
+        // Aturan yang sama dijaga ulang di server (updatePplProgress) — ini
+        // hanya supaya penolakannya terlihat sebelum orang mengetik.
+        const belumDibuka = !progresBolehDiperbarui(
+            updateModalActivity?.tanggalMulaiPengumpulanData,
+            format(new Date(), 'yyyy-MM-dd'));
+
         let tampil = pplList.filter(p => (p.namaPPL || '').toLowerCase().includes(search.toLowerCase()));
 
         if (filterPML === 'hanya-saya') {
@@ -444,7 +453,7 @@ export default function Dashboard() {
         return (
             <div className="space-y-4">
                 {tampil.map(ppl => (
-                    <PPLUpdateCard key={ppl.id} ppl={ppl} handleUpdatePPL={handleUpdatePPL} user={user} revertNonce={revertNonce} progressErrors={progressErrors} />
+                    <PPLUpdateCard key={ppl.id} ppl={ppl} handleUpdatePPL={handleUpdatePPL} user={user} revertNonce={revertNonce} progressErrors={progressErrors} belumDibuka={belumDibuka} />
                 ))}
                 {tampil.length === 0 && (
                     <p className="text-center text-muted-foreground py-4">
@@ -864,6 +873,22 @@ export default function Dashboard() {
                 <Dialog open={!!updateModalActivity} onOpenChange={(isOpen) => { if (!isOpen) setUpdateModalActivity(null); }}>
                     <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                         <DialogHeader><DialogTitle>Update Progress: {updateModalActivity?.namaKegiatan}</DialogTitle></DialogHeader>
+                        {/* Kotak isian yang mati tanpa penjelasan terbaca sebagai
+                            aplikasi rusak. Alasannya disebut sekali di sini,
+                            lengkap dengan tanggal kapan pengisian dibuka. */}
+                        {updateModalActivity && !progresBolehDiperbarui(
+                            updateModalActivity.tanggalMulaiPengumpulanData,
+                            format(new Date(), 'yyyy-MM-dd')) && (
+                            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                                <p>
+                                    {PESAN_PROGRES_BELUM_DIBUKA}{' '}
+                                    Kegiatan ini masih dalam masa persiapan
+                                    {updateModalActivity.tanggalMulaiPengumpulanData
+                                        && ` — pendataan dimulai ${format(parseISO(updateModalActivity.tanggalMulaiPengumpulanData), 'd MMMM yyyy', { locale: localeID })}`}.
+                                </p>
+                            </div>
+                        )}
                         {updateModalActivity && (
                             <div className="flex-grow overflow-hidden flex flex-col">
                                 <Tabs defaultValue="listing" className="flex-grow flex flex-col overflow-hidden">

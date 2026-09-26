@@ -96,6 +96,36 @@ export const bolehMenilaiMitra = (
   return samaDengan(ppl.pml_id, pengguna.id);
 };
 
+/**
+ * Sudah masuk masa pengisian progres?
+ *
+ * Progres baru boleh diisi sejak hari pertama pengumpulan data. Sebelum itu
+ * kegiatan masih dalam persiapan: mitranya belum bekerja, jadi angka apa pun
+ * yang masuk pasti keliru — dan angka keliru itu ikut terbawa ke persentase
+ * kegiatan, ke dasbor, dan ke rekap.
+ *
+ * TIDAK ADA BATAS ATAS, dan itu disengaja. Pendataan sering molor: masih ada
+ * mitra yang menyelesaikan bagiannya setelah tanggal selesai terlewat, dan
+ * menutup pengisian tepat di tanggal itu akan membuat pekerjaan yang benar-
+ * benar terjadi tidak bisa dicatat sama sekali.
+ *
+ * Aturan ini TERPISAH dari `bolehMemperbaruiProgress`: yang satu soal siapa
+ * (PML pengawasnya), yang ini soal kapan. Keduanya harus lolos.
+ *
+ * Kedua tanggal diminta dalam bentuk 'yyyy-MM-dd' supaya perbandingannya tidak
+ * bergantung zona waktu mesin — server membacanya dari database (yang sesinya
+ * sudah +07:00), layar dari tanggal kalender setempat.
+ */
+export const progresBolehDiperbarui = (
+  mulaiPengumpulanData: string | null | undefined,
+  hariIni: string,
+): boolean => {
+  const mulai = String(mulaiPengumpulanData ?? '').slice(0, 10);
+  // Tanggal mulai belum diisi: tidak ada dasar untuk menahan siapa pun.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(mulai)) return true;
+  return hariIni >= mulai;
+};
+
 /** Pesan penolakan yang sama dipakai server dan layar. */
 export const PESAN_BUKAN_PEMILIK_KEGIATAN =
   'Anda hanya dapat mengubah kegiatan yang Anda buat atau yang Anda pimpin sebagai ketua tim.';
@@ -105,3 +135,6 @@ export const PESAN_BUKAN_PML =
 
 export const PESAN_BUKAN_PENILAI =
   'Mitra hanya dapat dinilai oleh PML yang mengawasinya.';
+
+export const PESAN_PROGRES_BELUM_DIBUKA =
+  'Progres baru dapat diisi setelah masa pengumpulan data dimulai.';

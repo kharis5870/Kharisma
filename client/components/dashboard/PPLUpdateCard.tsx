@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { bolehMemperbaruiProgress } from "@shared/hakKegiatan";
+import { bolehMemperbaruiProgress, PESAN_PROGRES_BELUM_DIBUKA } from "@shared/hakKegiatan";
 import { kunciGalat } from "@/lib/progressMitra";
 import { EditableProgressKey, PPLWithProgress, getProgressBarValue } from "@/components/dashboard/logikaDashboard";
 
@@ -23,12 +23,18 @@ import { EditableProgressKey, PPLWithProgress, getProgressBarValue } from "@/com
  * ketika jendela kembali difokuskan. `revertNonce` dan `progressErrors` milik
  * Dashboard karena itu dioper sebagai prop.
  */
-export const PPLUpdateCard = ({ ppl, handleUpdatePPL, user, revertNonce, progressErrors }: { 
-    ppl: PPLWithProgress, 
+export const PPLUpdateCard = ({ ppl, handleUpdatePPL, user, revertNonce, progressErrors,
+    belumDibuka = false }: {
+    ppl: PPLWithProgress,
     handleUpdatePPL: (pplId: number, field: EditableProgressKey, value: string) => void,
     user: any,
     revertNonce: number,
-    progressErrors: Record<string, string>
+    progressErrors: Record<string, string>,
+    /**
+     * Kegiatannya masih dalam masa persiapan. Angkanya tetap ditampilkan —
+     * hanya pengisiannya yang ditutup, bukan pembacaannya.
+     */
+    belumDibuka?: boolean,
 }) => {
     const [localProgress, setLocalProgress] = useState(ppl.progress);
 
@@ -39,7 +45,16 @@ export const PPLUpdateCard = ({ ppl, handleUpdatePPL, user, revertNonce, progres
     useEffect(() => {
         setLocalProgress(ppl.progress);
     }, [ppl.progress, revertNonce]);
-    const isAuthorized = bolehMemperbaruiProgress(user as any, ppl as any);
+    // Dua syarat berbeda yang keduanya harus lolos: SIAPA (PML pengawasnya)
+    // dan KAPAN (sudah masuk masa pengumpulan data). Digabung di sini supaya
+    // setiap kotak isian cukup memeriksa satu nilai.
+    const bolehSecaraWewenang = bolehMemperbaruiProgress(user as any, ppl as any);
+    const isAuthorized = bolehSecaraWewenang && !belumDibuka;
+    const alasanTerkunci = belumDibuka
+        ? PESAN_PROGRES_BELUM_DIBUKA
+        : (!bolehSecaraWewenang
+            ? "Hanya PML yang bersangkutan atau Admin yang dapat mengubah progress"
+            : "");
     const isPendataan = ppl.tahap === 'listing' || ppl.tahap === 'pencacahan';
     const honorDetail = ppl.honorarium?.[0];
     const targetBebanKerja = honorDetail?.bebanKerja || '0';
@@ -117,7 +132,7 @@ export const PPLUpdateCard = ({ ppl, handleUpdatePPL, user, revertNonce, progres
                         disabled={!isAuthorized}
                         aria-invalid={!!galat}
                         aria-errormessage={galat ? `err-${ppl.id}-${field}` : undefined}
-                        title={!isAuthorized ? "Hanya PML yang bersangkutan atau Admin yang dapat mengubah progress" : ""}
+                        title={alasanTerkunci}
                         className={cn(
                             // Panah bawaan disembunyikan supaya hanya ada SATU cara
                             // menambah satu per satu — yang tersimpan seketika.

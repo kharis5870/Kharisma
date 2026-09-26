@@ -120,7 +120,7 @@ tanda tangan token diperiksa, masa berlakunya dicek, nomor versi token dicocokka
 dengan yang tersimpan di basis data, lalu peran dan kepemilikan data pengguna
 diperiksa sesuai jenis permintaannya. Permintaan yang lolos diteruskan ke lapisan
 layanan yang memuat seluruh logika pekerjaan: perhitungan honor, pemeriksaan batas
-SBM, penomoran surat, penilaian, dan penyusunan notifikasi.
+SBML, penomoran surat, penilaian, dan penyusunan notifikasi.
 
 **3. Sisi basis data (MySQL/MariaDB).** Basis data menyimpan seluruh data dalam 18
 tabel yang saling terhubung dengan kunci asing. Server terhubung melalui kumpulan
@@ -210,7 +210,7 @@ yaitu bulan pertama diisi sampai batas honor lalu sisanya dipindahkan ke bulan
 berikutnya. Aturan pembagian ini ditulis di folder bersama (`shared/`) sehingga
 angka yang ditampilkan di peramban dan angka yang disimpan di server pasti sama.
 
-**b. Pemeriksaan batas honor bulanan (SBM).** Sebelum kegiatan disimpan, sistem
+**b. Pemeriksaan batas honor bulanan (SBML).** Sebelum kegiatan disimpan, sistem
 menjumlahkan honor setiap mitra pada tiap bulan dari seluruh kegiatan, termasuk
 kegiatan tim lain, lalu membandingkannya dengan nilai batas yang tersimpan di tabel
 pengaturan. Bila melebihi, server membalas dengan kode 409 beserta daftar mitra,
@@ -359,7 +359,7 @@ pembagiannya sebelum menyimpan.
 
 Peringatan batas honor muncul setelah tombol simpan ditekan dan memuat nama mitra,
 bulan, total honor, serta batasnya. Peringatan ini adalah wujud dari pencegahan
-kelebihan SBM yang sebelumnya hanya dapat diketahui dengan memeriksa berkas
+kelebihan SBML yang sebelumnya hanya dapat diketahui dengan memeriksa berkas
 pengecekan secara manual.
 
 Halaman sunting memakai susunan yang sama dengan halaman input, ditambah panel
@@ -531,7 +531,7 @@ terjadi pada sistem.)*
 
 | No | Rancangan Awal | Umpan Balik | Hasil Perubahan |
 | --- | --- | --- | --- |
-| 1 | Sistem menolak penyimpanan bila honor mitra melebihi batas SBM | Ada keadaan tertentu yang memang harus dilewatkan dengan sepengetahuan Tim Keuangan | Sistem menampilkan peringatan berisi rincian mitra dan bulannya, lalu meminta konfirmasi, bukan menolak |
+| 1 | Sistem menolak penyimpanan bila honor mitra melebihi batas SBML | Ada keadaan tertentu yang memang harus dilewatkan dengan sepengetahuan Tim Keuangan | Sistem menampilkan peringatan berisi rincian mitra dan bulannya, lalu meminta konfirmasi, bukan menolak |
 | 2 | Honor lintas bulan dibagi dalam rupiah | Pembagian harus mengikuti muatan pekerjaan agar sesuai isi surat | Yang dibagi adalah muatan, dan honor tiap bulan dihitung ulang sebesar muatan dikali harga satuan |
 | 3 | Nilai batas honor bulanan hanya dapat diubah Admin | Yang memantau batas honor sehari-hari adalah Tim Keuangan | Hak mengubah batas honor diberikan kepada Tim Keuangan dan Admin |
 | 4 | Progres mitra diperbarui dari halaman kegiatan | PML mengawasi mitra pada beberapa kegiatan sekaligus | Ditambahkan panel pembaruan progres di dasbor yang memuat seluruh mitra yang diawasi |
@@ -546,7 +546,7 @@ terjadi pada sistem.)*
 | SS-02, SS-03 | Halaman masuk dan pesan galat | — |
 | SS-04, SS-05 | Dasbor: kegiatan dan grafik | Ketua Tim |
 | SS-06 | Panel pembaruan progres | PML |
-| SS-07 – SS-10 | Input kegiatan, alokasi, pembebanan lintas bulan, peringatan SBM | Ketua Tim |
+| SS-07 – SS-10 | Input kegiatan, alokasi, pembebanan lintas bulan, peringatan SBML | Ketua Tim |
 | SS-11 | Sunting kegiatan dan riwayat | Ketua Tim |
 | SS-12 – SS-14 | Dokumen kegiatan dan verifikasinya | Ketua Tim dan Tim Keuangan |
 | SS-15, SS-16 | Manajemen honor dan hasil unduhannya | Tim Keuangan |

@@ -30,8 +30,12 @@ Tahap keempat pada metode Modified Waterfall adalah pengujian. Sistem diuji deng
 empat cara yang saling melengkapi: pengujian _black box_ untuk memastikan setiap
 kebutuhan fungsional berjalan sesuai rancangan, pengujian keamanan hak akses untuk
 memastikan pembatasan peran benar-benar diterapkan, pengujian kinerja untuk
-mengukur kecepatan tampilan, dan pengujian kegunaan dengan kuesioner CSUQ untuk
-mengukur penerimaan pengguna. Keempatnya mengacu pada kerangka pikir di Bab III.
+mengukur seberapa cepat pekerjaan administratif dapat diselesaikan dengan sistem
+dibanding cara manual sekaligus memastikan kecepatan pemuatan tampilannya, dan
+pengujian kegunaan dengan kuesioner CSUQ untuk mengukur penerimaan pengguna.
+Keempatnya mengacu pada kerangka pikir di Bab III, dan masing-masing dirancang
+untuk menjawab masalah yang diidentifikasi pada Bab I sebagaimana dirangkum pada
+subbab 5.2.5.1.
 
 ### 5.2.1 Pengujian Fungsionalitas (_Black Box_)
 
@@ -41,7 +45,7 @@ membagi masukan menjadi kelompok yang diperlakukan sama, lalu mengambil satu wak
 tiap kelompok, misalnya kelompok honor di bawah batas dan kelompok honor di atas
 batas. **Boundary Value Analysis** menguji nilai tepat di perbatasan kelompok,
 karena kesalahan program paling sering terjadi di titik itu, misalnya honor yang
-persis sama dengan batas SBM.
+persis sama dengan batas SBML.
 
 Pengujian dilakukan oleh peneliti memakai data uji, dengan mencoba seluruh peran
 pengguna. Setiap kasus uji dikaitkan dengan kebutuhan fungsional di Bab IV agar
@@ -121,7 +125,7 @@ pengujian lewat tampilan saja tidak membuktikan apa-apa.
 
 Dua jenis penyalahgunaan diuji. **Peningkatan hak akses vertikal** adalah upaya
 pengguna berperan rendah menjalankan perintah milik peran lebih tinggi, misalnya
-pegawai biasa mengubah batas SBM. **Peningkatan hak akses horizontal** adalah upaya
+pegawai biasa mengubah batas SBML. **Peningkatan hak akses horizontal** adalah upaya
 pengguna mengakses data milik pengguna lain yang setingkat, misalnya PML menilai
 mitra yang diawasi PML lain.
 
@@ -137,7 +141,7 @@ mitra yang diawasi PML lain.
 | SEC-04 | Horizontal | Mengirim penilaian sambil mengaku sebagai PML lain pada isi permintaan | PML | Ditolak; identitas penilai diambil dari token | Ditolak; identitas penilai diambil dari token, bukan dari isi permintaan. | Berhasil |
 | SEC-05 | Vertikal | Membuat nomor SPK | Pegawai | Ditolak, kode 403 | Ditolak, kode 403. | Berhasil |
 | SEC-06 | Vertikal | Membatalkan atau menghapus surat | Pegawai | Ditolak, kode 403 | Ditolak, kode 403. | Berhasil |
-| SEC-07 | Vertikal | Mengubah batas honor bulanan (SBM) | Pegawai | Ditolak, kode 403 | Ditolak, kode 403. | Berhasil |
+| SEC-07 | Vertikal | Mengubah batas honor bulanan (SBML) | Pegawai | Ditolak, kode 403 | Ditolak, kode 403. | Berhasil |
 | SEC-08 | Vertikal | Menyetujui atau menolak dokumen | Pegawai | Ditolak, kode 403 | Ditolak, kode 403. | Berhasil |
 | SEC-09 | Vertikal | Mengimpor data mitra dari SOBAT | Tim Keuangan | Ditolak, kode 403 | Ditolak, kode 403. | Berhasil |
 | SEC-10 | Vertikal | Menambah, mengubah, atau menghapus akun pengguna | Tim Keuangan | Ditolak, kode 403 | Ditolak, kode 403. | Berhasil |
@@ -161,7 +165,68 @@ tetap berjalan. Hasil ini menunjukkan penerapan prinsip hak akses seminimal mung
 
 ### 5.2.3 Pengujian Kinerja
 
-#### 5.2.3.1 Kecepatan Tampilan (Google Lighthouse)
+Pengujian kinerja pada penelitian ini menjawab pokok masalah pertama, yaitu
+administrasi kontrak dan honor mitra yang dikerjakan berulang secara manual.
+Pertanyaan yang dijawab: **apakah pekerjaan yang sebelumnya manual benar-benar
+menjadi lebih cepat setelah sistem digunakan?**
+
+Pengujian dibagi menjadi dua bagian dengan kedudukan yang berbeda:
+
+| Bagian | Yang diukur | Kedudukannya |
+| --- | --- | --- |
+| 5.2.3.1 Efisiensi waktu kerja | Lama pengerjaan tugas administratif sebelum dan sesudah sistem | **Utama** - menjawab langsung masalah M1.a, M1.b, M1.c, dan M2.c |
+| 5.2.3.2 Kecepatan tampilan (Lighthouse) | Kecepatan pemuatan halaman di peramban | **Pendukung** - memastikan sistem yang dibangun layak dipakai, yaitu memenuhi KNF-03 |
+
+Perbedaan kedudukan ini perlu disebutkan, karena keduanya menjawab hal yang
+berbeda. Pengukuran Lighthouse tidak menjawab masalah administrasi manual; ia
+memastikan bahwa halaman yang dibangun untuk menyelesaikan masalah tersebut cukup
+cepat dimuat sehingga benar-benar dapat dipakai sehari-hari. Halaman dasbor yang
+memuat delapan grafik, misalnya, tidak akan menyelesaikan masalah pemantauan bila
+pemuatannya terlalu lambat untuk dibuka Kepala BPS. Dengan kata lain, Lighthouse
+menguji **syarat** agar solusi dapat bekerja, sedangkan perbandingan waktu kerja
+menguji **hasil** yang dijanjikan penelitian.
+
+#### 5.2.3.1 Efisiensi Waktu Dibanding Cara Manual
+
+Google Lighthouse hanya mengukur kecepatan pemuatan tampilan di peramban, sedangkan
+manfaat utama sistem ini justru terletak pada pekerjaan administratif yang
+sebelumnya dikerjakan manual: mengetik dan menomori SPK/BAST satu per satu,
+mencocokkan batas honor SBML antar-spreadsheet, mencari mitra di suatu wilayah,
+dan menghitung peringkat triwulan. Pengujian ini membandingkan lama waktu
+pengerjaan cara lama dengan cara baru, agar efisiensi yang diklaim pada Bab I
+dan Bab IV dapat ditunjukkan dengan angka, bukan hanya diasumsikan dari fitur
+yang tersedia.
+
+**Cara memperoleh dua angka pembanding:**
+
+- **Kolom "Cara Lama"** diisi dari perkiraan pegawai yang pernah mengerjakannya
+  secara manual, ditanyakan saat wawancara analisis kebutuhan (subbab 4.1.1) atau
+  wawancara terpisah. Tuliskan sebagai perkiraan (_estimasi_), bukan hasil ukur,
+  karena cara lama sudah tidak dipakai lagi sehingga tidak dapat diukur ulang.
+  Contoh pertanyaan: "Biasanya berapa lama waktu yang dibutuhkan untuk membuat
+  10 SPK dengan cara diketik manual?"
+- **Kolom "Cara Baru"** diukur langsung memakai jam saat menjalankan skenario yang
+  sama pada aplikasi, dan dapat memakai data pengujian _black box_ yang sudah ada
+  (BB-32 s.d. BB-38 untuk SPK/BAST, BB-19 s.d. BB-22 untuk SBML, BB-46/BB-47 untuk
+  pemilihan mitra, BB-42/BB-43 untuk peringkat triwulan) tanpa mengulang dari nol.
+
+**Tabel …: Perbandingan Waktu Pengerjaan Cara Lama dan Cara Baru**
+
+| No | Aktivitas | Terkait Masalah | Jumlah Data | Cara Lama (estimasi) | Cara Baru (aplikasi) | Penghematan Waktu |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Membuat dan menomori SPK | M1.a | 10 mitra | … menit | … menit | …% |
+| 2 | Membuat dan menomori BAST | M1.a | 10 mitra | … menit | … menit | …% |
+| 3 | Mengecek batas honor SBML seluruh mitra dalam satu bulan | M1.b | 20 mitra | … menit | … menit | …% |
+| 4 | Mencari mitra di satu kecamatan tertentu | M1.c | 50 mitra terdaftar | … menit | … detik | …% |
+| 5 | Menghitung peringkat mitra satu triwulan | M2.c | 15 mitra | … menit | … detik | …% |
+
+*(Kalimat penutup, sesuaikan dengan hasil sebenarnya:)* Secara rata-rata, kelima
+aktivitas administratif di atas mengalami penghematan waktu sebesar …%. Penghematan
+paling besar terjadi pada …, karena sebelumnya harus …, sedangkan pada aplikasi
+cukup …. Hasil ini menjadi bukti kuantitatif bahwa tujuan khusus 1 dan 2, yaitu
+membangun fitur yang menggantikan pekerjaan administratif manual, tercapai.
+
+#### 5.2.3.2 Kecepatan Tampilan (Google Lighthouse)
 
 Pengujian kinerja dilakukan dengan Google Lighthouse, yaitu alat bawaan peramban
 Google Chrome yang mengukur kecepatan tampilan sebuah halaman web. Lima metrik
@@ -204,46 +269,6 @@ terendah karena memuat delapan grafik sekaligus, sedangkan halaman masuk mempero
 skor tertinggi karena hanya memuat formulir. Hasil ini memenuhi KNF-03 yang
 mensyaratkan perpindahan halaman tanpa memuat ulang seluruh halaman dan pemuatan
 pustaka besar hanya saat dibutuhkan.
-
-#### 5.2.3.2 Efisiensi Waktu Dibanding Cara Manual
-
-Google Lighthouse hanya mengukur kecepatan pemuatan tampilan di peramban, sedangkan
-manfaat utama sistem ini justru terletak pada pekerjaan administratif yang
-sebelumnya dikerjakan manual: mengetik dan menomori SPK/BAST satu per satu,
-mencocokkan batas honor SBML antar-spreadsheet, mencari mitra di suatu wilayah,
-dan menghitung peringkat triwulan. Pengujian ini membandingkan lama waktu
-pengerjaan cara lama dengan cara baru, agar efisiensi yang diklaim pada Bab I
-dan Bab IV dapat ditunjukkan dengan angka, bukan hanya diasumsikan dari fitur
-yang tersedia.
-
-**Cara memperoleh dua angka pembanding:**
-
-- **Kolom "Cara Lama"** diisi dari perkiraan pegawai yang pernah mengerjakannya
-  secara manual, ditanyakan saat wawancara analisis kebutuhan (subbab 4.1.1) atau
-  wawancara terpisah. Tuliskan sebagai perkiraan (_estimasi_), bukan hasil ukur,
-  karena cara lama sudah tidak dipakai lagi sehingga tidak dapat diukur ulang.
-  Contoh pertanyaan: "Biasanya berapa lama waktu yang dibutuhkan untuk membuat
-  10 SPK dengan cara diketik manual?"
-- **Kolom "Cara Baru"** diukur langsung memakai jam saat menjalankan skenario yang
-  sama pada aplikasi, dan dapat memakai data pengujian _black box_ yang sudah ada
-  (BB-32 s.d. BB-38 untuk SPK/BAST, BB-19 s.d. BB-22 untuk SBM, BB-46/BB-47 untuk
-  pemilihan mitra, BB-42/BB-43 untuk peringkat triwulan) tanpa mengulang dari nol.
-
-**Tabel …: Perbandingan Waktu Pengerjaan Cara Lama dan Cara Baru**
-
-| No | Aktivitas | Terkait Masalah | Jumlah Data | Cara Lama (estimasi) | Cara Baru (aplikasi) | Penghematan Waktu |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | Membuat dan menomori SPK | M1.a | 10 mitra | … menit | … menit | …% |
-| 2 | Membuat dan menomori BAST | M1.a | 10 mitra | … menit | … menit | …% |
-| 3 | Mengecek batas honor SBML seluruh mitra dalam satu bulan | M1.b | 20 mitra | … menit | … menit | …% |
-| 4 | Mencari mitra di satu kecamatan tertentu | M1.c | 50 mitra terdaftar | … menit | … detik | …% |
-| 5 | Menghitung peringkat mitra satu triwulan | M2.c | 15 mitra | … menit | … detik | …% |
-
-*(Kalimat penutup, sesuaikan dengan hasil sebenarnya:)* Secara rata-rata, kelima
-aktivitas administratif di atas mengalami penghematan waktu sebesar …%. Penghematan
-paling besar terjadi pada …, karena sebelumnya harus …, sedangkan pada aplikasi
-cukup …. Hasil ini menjadi bukti kuantitatif bahwa tujuan khusus 1 dan 2, yaitu
-membangun fitur yang menggantikan pekerjaan administratif manual, tercapai.
 
 ### 5.2.4 Pengujian Kegunaan dengan CSUQ
 
@@ -311,15 +336,25 @@ seluruh responden:
 > Skor dimensi = (jumlah seluruh jawaban butir dimensi tersebut) ÷ (jumlah butir ×
 > jumlah responden)
 
+Penafsiran skor memakai rentang kelas interval. Dengan skala 1 sampai 7 yang dibagi
+menjadi lima kategori, lebar tiap kelas adalah (7 − 1) ÷ 5 = 1,2.
+
 **Tabel …: Kategori Interpretasi Skor CSUQ**
 
 | Rentang Skor | Kategori          |
 | ------------ | ----------------- |
-| 1,00 – 2,00  | Sangat tidak puas |
-| 2,01 – 3,00  | Tidak puas        |
-| 3,01 – 4,00  | Cukup             |
-| 4,01 – 5,00  | Puas              |
-| 5,01 – 7,00  | Sangat puas       |
+| 1,00 – 2,20  | Sangat tidak puas |
+| 2,21 – 3,40  | Tidak puas        |
+| 3,41 – 4,60  | Cukup             |
+| 4,61 – 5,80  | Puas              |
+| 5,81 – 7,00  | Sangat puas       |
+
+Sebagai pembanding dari pustaka, Sauro dan Lewis (2016) melaporkan rata-rata skor
+keseluruhan PSSUQ/CSUQ dari kumpulan studi kegunaan sebesar 2,82 pada skala aslinya
+yang arahnya terbalik. Bila arah skalanya disamakan dengan kuesioner ini (semakin
+tinggi semakin baik), angka tersebut setara dengan 5,18. Dengan demikian, skor
+keseluruhan di atas 5,18 dapat dinyatakan lebih baik daripada rata-rata sistem yang
+pernah diukur menggunakan kuesioner ini.
 
 _(Kalimat penutup:)_ Skor keseluruhan sebesar … menunjukkan bahwa sistem termasuk
 kategori …. Dimensi … memperoleh skor tertinggi, sedangkan dimensi … memperoleh skor
@@ -336,7 +371,7 @@ terendah sehingga menjadi bahan perbaikan berikutnya.
 | KF-03  | Impor mitra dari SOBAT                                | SS-30, SS-31; BB-09 s.d. BB-11                                                               | Terpenuhi |
 | KF-04  | Pengelolaan kegiatan                                  | SS-07, SS-11; BB-12 s.d. BB-15                                                               | Terpenuhi |
 | KF-05  | Alokasi mitra dan perhitungan honor                   | SS-08, SS-09, SS-17b; BB-16 s.d. BB-18, BB-46, BB-47                                         | Terpenuhi |
-| KF-06  | Validasi batas honor bulanan (SBM)                    | SS-10, SS-15; BB-19 s.d. BB-22                                                               | Terpenuhi |
+| KF-06  | Validasi batas honor bulanan (SBML)                    | SS-10, SS-15; BB-19 s.d. BB-22                                                               | Terpenuhi |
 | KF-07  | Pemantauan progres mitra                              | SS-04, SS-06; BB-23, BB-24                                                                   | Terpenuhi |
 | KF-08  | Repositori tautan dokumen                             | SS-12, SS-13; BB-25, BB-26                                                                   | Terpenuhi |
 | KF-09  | Verifikasi dokumen                                    | SS-14; BB-27, BB-28                                                                          | Terpenuhi |
@@ -374,6 +409,14 @@ fiturnya saja.
 | 2. Pemantauan progres dan penilaian kinerja mitra belum terpusat | M2.a | Progres FASIH dan Non-FASIH tiap tim tersimpan terpisah, tidak terpantau Kepala BPS dalam satu tampilan | 2 | KF-07, KF-13 | _Black box_ BB-23, BB-24, BB-38; keamanan SEC-02; kinerja Lighthouse (dasbor); CSUQ (kualitas informasi) |
 | | M2.b | Tidak ada pengingat otomatis tenggat tahap dan dokumen yang belum lengkap | 2 | KF-10 | _Black box_ BB-29 s.d. BB-31 |
 | | M2.c | Penilaian dapat diubah siapa pun; peringkat dihitung manual; beban mitra, PML, dan tim tidak terlihat | 2 | KF-13, KF-14, KF-15 | _Black box_ BB-39 s.d. BB-43; keamanan SEC-01, SEC-04; efisiensi waktu No. 5 |
+
+**Kedudukan pengujian kinerja pada rantai ini.** Bagian efisiensi waktu (5.2.3.1)
+menjawab M1.a, M1.b, M1.c, dan M2.c secara langsung, sehingga tercantum pada kolom
+bukti di atas. Bagian Lighthouse (5.2.3.2) hanya tercantum pada M2.a, dan itu pun
+sebagai pendukung, bukan sebagai bukti utama. Hal ini disebutkan terbuka karena
+Lighthouse memang mengukur kecepatan pemuatan tampilan, bukan menyelesaikan
+masalah administrasi maupun pemantauan; perannya adalah membuktikan bahwa
+KNF-03 terpenuhi sehingga solusi yang dibangun layak dipakai.
 
 Seluruh rincian masalah memiliki bukti dari _black box_, dan sebagian besar juga
 dari pengujian keamanan atau efisiensi waktu — bukan kebetulan, karena masalah
@@ -421,7 +464,7 @@ sendiri.
    sama dengan tabel di buku, isi sambil menguji, baru disalin ke naskah. Jangan
    mengandalkan ingatan.
 5. **Tangkap layar setiap kasus yang menampilkan pesan penting**, terutama BB-21
-   (peringatan SBM), BB-23, BB-39, dan seluruh kasus yang ditolak sistem. Beri nama
+   (peringatan SBML), BB-23, BB-39, dan seluruh kasus yang ditolak sistem. Beri nama
    berkas sesuai kode kasusnya, misalnya `BB-21.png`, agar mudah dicari saat
    menyusun lampiran.
 
@@ -584,7 +627,7 @@ Pengujian ini menunggu sistem dipakai pegawai. Yang dapat disiapkan sekarang:
 # Lampiran: Kuesioner CSUQ
 
 **Judul:** Kuesioner Evaluasi Kegunaan Sistem Informasi Administrasi dan Pemantauan
-Kegiatan Mitra Statistik (OPTIMA) BPS Kabupaten Bengkulu Selatan
+Kegiatan Mitra Statistik (SIKAMI) BPS Kabupaten Bengkulu Selatan
 
 **Pengantar**
 
@@ -641,7 +684,7 @@ kuesioner):**
 | Kegunaan Sistem (_System Usefulness_)      | 1–8   |
 | Kualitas Informasi (_Information Quality_) | 9–15  |
 | Kualitas Antarmuka (_Interface Quality_)   | 16–18 |
-| Kepuasan Keseluruhan (_Overall_)           | 1–19  |
+| Kepuasan Keseluruhan (_Overall_)           | 1–19 (butir 19 tidak masuk subskala mana pun) |
 
 **Catatan penting mengenai arah skala.** Pada kuesioner CSUQ aslinya, angka 1
 berarti sangat setuju dan angka 7 berarti sangat tidak setuju, sehingga skor kecil

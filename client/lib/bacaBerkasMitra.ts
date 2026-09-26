@@ -12,7 +12,9 @@
  */
 
 import { unduhBlob } from "@/lib/exportUtils";
-import { ALIAS_KOLOM, type KolomMitra } from "@shared/imporMitra";
+import {
+  ALIAS_KOLOM, cariBarisHeader, kolomWajibHilang, petakanKolom, type KolomMitra,
+} from "@shared/imporMitra";
 
 /** Judul kolom pada template, dalam urutan yang paling enak dibaca manusia. */
 export const KOLOM_TEMPLATE: { kolom: KolomMitra; judul: string }[] = [
@@ -89,17 +91,48 @@ export const bacaBerkasMitra = async (berkas: File): Promise<unknown[][]> => {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(await berkas.arrayBuffer());
 
-  const ws = wb.worksheets[0];
-  if (!ws) return [];
+  const isiLembar = (ws: { rowCount: number; getRow: (i: number) => { values: unknown } }) => {
+    const hasil: unknown[][] = [];
+    for (let i = 1; i <= ws.rowCount; i++) {
+      const baris = ws.getRow(i);
+      // `row.values` berbasis 1 dan menyisakan satu slot kosong di depan.
+      const nilai = Array.isArray(baris.values) ? baris.values.slice(1) : [];
+      hasil.push(nilai.map(nilaiSel));
+    }
+    return hasil;
+  };
 
-  const hasil: unknown[][] = [];
-  for (let i = 1; i <= ws.rowCount; i++) {
-    const baris = ws.getRow(i);
-    // `row.values` berbasis 1 dan menyisakan satu slot kosong di depan.
-    const nilai = Array.isArray(baris.values) ? baris.values.slice(1) : [];
-    hasil.push(nilai.map(nilaiSel));
+  if (wb.worksheets.length === 0) return [];
+
+  // LEMBAR MANA YANG DIBACA
+  //
+  // Bukan selalu yang pertama. Daftar mitra kantor ini hidup di dalam buku
+  // kerja berisi puluhan lembar (surat tugas, SPD, visum, kamus kode), dan
+  // lembar "Mitra" ada di urutan ketiga belas. Membaca lembar pertama begitu
+  // saja menghasilkan galat "kolom nama tidak ditemukan" pada berkas yang
+  // jelas-jelas memuat daftar mitra lengkap.
+  //
+  // Yang dipilih adalah lembar dengan kolom dikenali TERBANYAK, memakai
+  // penilai yang sama dengan pemilihan baris header. Untuk berkas berlembar
+  // satu hasilnya tidak berubah sama sekali.
+  let terbaik: unknown[][] | null = null;
+  let skorTerbaik = 0;
+  for (const ws of wb.worksheets) {
+    const baris = isiLembar(ws);
+    const iHeader = cariBarisHeader(baris);
+    if (iHeader < 0) continue;
+    const peta = petakanKolom(baris[iHeader]);
+    if (kolomWajibHilang(peta).length > 0) continue;
+    const skor = (Object.keys(peta) as KolomMitra[]).filter(k => peta[k] !== null).length;
+    if (skor > skorTerbaik) {
+      skorTerbaik = skor;
+      terbaik = baris;
+    }
   }
-  return hasil;
+
+  // Tidak ada lembar yang dikenali: kembalikan lembar pertama apa adanya,
+  // supaya layar pemetaan kolom manual tetap punya isi untuk ditawarkan.
+  return terbaik ?? isiLembar(wb.worksheets[0]);
 };
 
 /** Judul kolom yang dikenali, untuk ditawarkan di layar pemetaan manual. */

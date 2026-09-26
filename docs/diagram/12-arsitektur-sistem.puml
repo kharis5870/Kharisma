@@ -23,7 +23,7 @@ skinparam cloud {
 
 node "Komputer Pengguna\n(Jaringan BPS / FortiClient VPN)" as KLIEN {
   component "Peramban Web" as BROWSER {
-    component "Antarmuka OPTIMA\nReact 18 + TypeScript\n(Single Page Application)" as SPA
+    component "Antarmuka SIKAMI\nReact 18 + TypeScript\n(Single Page Application)" as SPA
     component "Pembuat Berkas\npdfmake, ExcelJS, JSZip\n(dimuat saat dibutuhkan)" as BERKAS
     component "Penyimpanan Token\nlocalStorage" as TOKEN
   }
@@ -33,7 +33,7 @@ node "Server Hosting cPanel BPS  (Node.js + Express, dijalankan lewat Passenger)
   component "Penyaji Berkas Statis\n(hasil build SPA)" as STATIS
   component "RESTful API\n/kharisma/api/**" as API
   component "Lapisan Keamanan\nverifikasi token HMAC-SHA256,\ncek peran & kepemilikan data,\npembatasan percobaan login" as AUTH
-  component "Lapisan Layanan\nlogika honor, SBM, penomoran surat,\npenilaian, notifikasi" as SERVICE
+  component "Lapisan Layanan\nlogika honor, SBML, penomoran surat,\npenilaian, notifikasi" as SERVICE
 }
 
 database "Basis Data\nMySQL / MariaDB\n(18 tabel)" as DB

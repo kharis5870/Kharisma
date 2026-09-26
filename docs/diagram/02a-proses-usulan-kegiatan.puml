@@ -1,0 +1,45 @@
+@startuml activity-usulan-a
+' Gambar 7a: alur proses bisnis sistem usulan, bagian 1 -- dari pembuatan
+' kegiatan dan alokasi mitra sampai ketiga pekerjaan yang berjalan serentak.
+' Dipisah dari bagian 2 agar gambarnya masih terbaca di kertas A4; satu gambar
+' utuh berukuran 1234 x 1312 px dan hurufnya menyusut menjadi 3,9 pt.
+' Rincian tiap proses ada pada diagram 03 s.d. 07.
+!include _gaya.iuml
+
+|Ketua Tim|
+start
+:Membuat kegiatan beserta
+jadwal dan dokumen wajib;
+
+repeat
+  |Ketua Tim|
+  :Mengalokasikan mitra, PML,
+  beban kerja, dan harga;
+  |Sistem|
+  :Membagi muatan per bulan
+  dan memeriksa batas SBML;
+repeat while (Melebihi batas SBML\ndan direvisi?) is (ya) not (tidak)
+
+|Sistem|
+:Menyimpan kegiatan, alokasi,
+dan honor per bulan;
+
+fork
+  |Tim Keuangan|
+  :Membuat SPK mitra
+  per bulan (PDF);
+fork again
+  |PML|
+  :Menginput progres
+  pekerjaan mitra;
+fork again
+  |Ketua Tim|
+  :Mengisi tautan dokumen
+  setiap tahap;
+end fork
+
+|Sistem|
+:Memperbarui dasbor
+dan notifikasi;
+stop
+@enduml

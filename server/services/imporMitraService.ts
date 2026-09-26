@@ -91,14 +91,19 @@ export const terapkanImpor = async (
 ): Promise<HasilImpor> => {
     const { baris, keputusan, nonaktifkan = [], pratinjau } = permintaan;
 
-    const [kecRows] = await db.query<RowDataPacket[]>('SELECT id, nama FROM kecamatan');
-    const [desaRows] = await db.query<RowDataPacket[]>('SELECT id, nama, kecamatan_id FROM desa');
+    // Kode ikut diambil: berkas PALAPA menuliskan wilayah hanya sebagai kode,
+    // tanpa nama sama sekali (lihat cocokkanWilayah).
+    const [kecRows] = await db.query<RowDataPacket[]>('SELECT id, nama, kode FROM kecamatan');
+    const [desaRows] = await db.query<RowDataPacket[]>(
+        'SELECT id, nama, kecamatan_id, kode FROM desa');
     const [mitraRows] = await db.query<RowDataPacket[]>(
         'SELECT id, sobat_id, namaPPL FROM ppl_master');
 
-    const kecamatan: WilayahRef[] = kecRows.map(r => ({ id: Number(r.id), nama: r.nama }));
+    const kecamatan: WilayahRef[] = kecRows.map(r => ({
+        id: Number(r.id), nama: r.nama, kode: r.kode ?? null,
+    }));
     const desa: WilayahRef[] = desaRows.map(r => ({
-        id: Number(r.id), nama: r.nama, kecamatanId: Number(r.kecamatan_id),
+        id: Number(r.id), nama: r.nama, kecamatanId: Number(r.kecamatan_id), kode: r.kode ?? null,
     }));
     const tersimpan = mitraRows as MitraTersimpanDb[];
 

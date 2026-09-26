@@ -23,7 +23,7 @@ PML --|> P
 TK --|> P
 AD --|> P
 
-rectangle "Sistem Informasi OPTIMA" {
+rectangle "Sistem Informasi SIKAMI" {
 
   package "Umum" {
     usecase "Login" as UC_LOGIN
@@ -40,15 +40,15 @@ rectangle "Sistem Informasi OPTIMA" {
 
   package "Operasional Kegiatan" {
     usecase "Menyunting Kegiatan &\nAlokasi Mitra" as UC_SUNTING
-    usecase "Validasi Batas\nHonor (SBM)" as UC_SBM
-    usecase "Konfirmasi Melebihi\nBatas SBM" as UC_KONF
+    usecase "Validasi Batas\nHonor (SBML)" as UC_SBM
+    usecase "Konfirmasi Melebihi\nBatas SBML" as UC_KONF
     usecase "Mengelola Dokumen\nKegiatan" as UC_DOK
     usecase "Menginput Progres\nMitra" as UC_PROGRES
     usecase "Menilai Kinerja\nMitra" as UC_NILAI
   }
 
   package "Administrasi & Keuangan" {
-    usecase "Mengatur Batas\nHonor Bulanan (SBM)" as UC_BATAS
+    usecase "Mengatur Batas\nHonor Bulanan (SBML)" as UC_BATAS
     usecase "Memverifikasi\nDokumen" as UC_VERIF
     usecase "Menolak Dokumen\ndengan Catatan" as UC_TOLAK
     usecase "Mengirim Pengingat\nDokumen" as UC_INGAT
