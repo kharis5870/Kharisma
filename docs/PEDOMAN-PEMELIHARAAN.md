@@ -152,15 +152,35 @@ Perkiraan waktu: 1–2 jam.
 
 ### 3.3 Mengisi struktur basis data
 
-Jalankan seluruh berkas di `db/migrations/` **berurutan menurut tanggal pada
-nama berkasnya**, melalui phpMyAdmin atau baris perintah:
+**Untuk basis data yang benar-benar kosong** (pemasangan baru), jalankan
+**satu berkas saja**: `db/skema-dasar-18-tabel.sql`. Berkas ini berisi
+seluruh 18 tabel dalam bentuk akhirnya — hasil ekspor langsung dari
+database pengembangan (`mysqldump --no-data`), jadi sudah mencakup seluruh
+migrasi sampai yang terbaru. **Jangan** menjalankan berkas di
+`db/migrations/` sesudahnya; semuanya sudah tercakup di dalam skema ini.
+
+```
+mysql -u <pengguna> -p <nama_basis_data> < db/skema-dasar-18-tabel.sql
+```
+
+**Untuk basis data yang sudah berisi sebagian struktur** (server lama yang
+diperbarui, bukan dipasang ulang), jalankan seluruh berkas di
+`db/migrations/` **berurutan menurut tanggal pada nama berkasnya**:
 
 ```
 mysql -u <pengguna> -p <nama_basis_data> < db/migrations/<berkas>.sql
 ```
 
 Urutannya penting. Berkas yang belakangan mengandaikan perubahan berkas
-sebelumnya sudah dijalankan.
+sebelumnya sudah dijalankan, dan **tidak satu pun berkas di folder ini
+membuat tabel dari awal** — semuanya berupa `ALTER TABLE` yang mengandaikan
+ke-18 tabel dasar sudah ada. Menjalankannya pada database kosong akan gagal
+sejak baris pertama.
+
+> **Bila menambah migrasi baru di kemudian hari**, perbarui juga
+> `db/skema-dasar-18-tabel.sql` (ekspor ulang dari database pengembangan
+> dengan `mysqldump --no-data`) supaya pemasangan baru tetap dengan satu
+> berkas saja.
 
 ### 3.4 Memeriksa hasil pemasangan
 

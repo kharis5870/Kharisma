@@ -13,9 +13,15 @@ BPS Kabupaten Bengkulu Selatan
 > per peran membuat setiap orang cukup membaca dua bagian: Bagian 1 yang berlaku
 > untuk semua, dan satu bagian sesuai perannya.
 >
-> Penanda **[SS-xx]** adalah tempat tangkapan layar. Teksnya sudah lengkap dan
-> dapat dibaca tanpa gambar; gambar menyusul. Daftar seluruh tangkapan layar yang
-> dibutuhkan ada di Lampiran A.
+> **Kotak bergaris berkode SS-xx adalah tempat tangkapan layar.** Cara
+> mengisinya di Word: klik di dalam kotak, blok tulisan "Tempel tangkapan layar
+> di sini" lalu hapus, kemudian tempel gambarnya (Ctrl+V). Kotak yang masih
+> kosong akan tetap terlihat bergaris, sehingga mudah memastikan tidak ada yang
+> terlewat.
+>
+> Teks pedoman ini sudah lengkap dan dapat dibaca tanpa gambar sama sekali;
+> gambar sifatnya melengkapi. Daftar seluruh tangkapan layar yang dibutuhkan,
+> beserta apa saja yang harus terlihat pada masing-masing, ada di Lampiran A.
 
 ---
 
@@ -81,7 +87,9 @@ Keuangan pun bisa sekaligus menjadi PML.
 
 ### 1.1 Masuk ke sistem
 
-**[SS-01]** Halaman masuk
+| **SS-01 — Halaman masuk** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka alamat SIKAMI.
 2. Isi **nama pengguna** dan **kata sandi** yang diberikan Admin.
@@ -98,7 +106,9 @@ Sesi Anda berlaku **12 jam**. Setelah itu Anda diminta masuk kembali.
 
 ### 1.2 Mengenal tampilan utama
 
-**[SS-02]** Tampilan dasbor beserta menu di sebelah kiri
+| **SS-02 — Tampilan dasbor beserta menu di sebelah kiri** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Susunan layarnya tetap sama di seluruh halaman:
 
@@ -127,7 +137,9 @@ Menu yang tersedia:
 
 ### 1.3 Membaca dasbor
 
-**[SS-03]** Kartu ringkasan dan grafik pada dasbor
+| **SS-03 — Kartu ringkasan dan grafik pada dasbor** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Dasbor menampilkan seluruh kegiatan yang sedang berjalan dari **semua tim**,
 bukan hanya tim Anda. Inilah yang membuat progres seluruh kantor dapat dilihat
@@ -147,7 +159,9 @@ riwayat kegiatan.
 
 ### 1.4 Notifikasi
 
-**[SS-04]** Daftar notifikasi ketika ikon lonceng diklik
+| **SS-04 — Daftar notifikasi ketika ikon lonceng diklik** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Klik ikon lonceng untuk melihat hal-hal yang memerlukan perhatian Anda.
 Notifikasi yang Anda terima bergantung pada peran dan tugas Anda:
@@ -172,7 +186,9 @@ langsung menuju halamannya.
 
 ### 1.6 Mengganti kata sandi
 
-**[SS-05]** Halaman profil
+| **SS-05 — Halaman profil** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Klik nama akun Anda di pojok kanan atas, lalu pilih **Profil**.
 2. Isi kata sandi lama, kata sandi baru, dan ulangan kata sandi baru.
@@ -201,7 +217,9 @@ memakai komputer bersama.
 
 ### 2.1 Membuat kegiatan baru
 
-**[SS-06]** Formulir kegiatan baru, bagian informasi umum
+| **SS-06 — Formulir kegiatan baru, bagian informasi umum** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka **Dashboard**, lalu klik **Tambah Kegiatan**.
 2. Isi nama kegiatan, tim penanggung jawab, dan Ketua Tim-nya.
@@ -221,7 +239,9 @@ progres ditolak sistem.
 
 ### 2.2 Mengalokasikan mitra
 
-**[SS-07]** Jendela pemilihan mitra beserta penyaring kecamatan dan desa
+| **SS-07 — Jendela pemilihan mitra beserta penyaring kecamatan dan desa** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Pada tahap yang ingin diisi, klik **Pilih dari Daftar PPL**.
 2. Sistem menampilkan mitra yang **aktif** dan **posisinya sesuai tahap
@@ -233,7 +253,9 @@ progres ditolak sistem.
 5. Untuk setiap mitra, isi **PML pengawas** dan **beban kerja**. Honornya terisi
    sendiri sebesar beban kerja dikali harga satuan.
 
-**[SS-08]** Daftar mitra yang sudah dialokasikan beserta kolom honornya
+| **SS-08 — Daftar mitra yang sudah dialokasikan beserta kolom honornya** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 ### 2.3 Bila honor melintasi beberapa bulan
 
@@ -251,7 +273,9 @@ setiap bulan pembebanan.
 
 ### 2.4 Bila muncul peringatan batas SBML
 
-**[SS-09]** Jendela peringatan batas honor
+| **SS-09 — Jendela peringatan batas honor** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Saat kegiatan disimpan, sistem menjumlahkan honor tiap mitra pada bulan yang sama
 **dari seluruh kegiatan dan seluruh tim**, lalu membandingkannya dengan batas
@@ -292,7 +316,9 @@ lain tidak tertimpa tanpa diketahui.
 
 ### 2.7 Mengisi dokumen kegiatan
 
-**[SS-10]** Halaman dokumen kegiatan
+| **SS-10 — Halaman dokumen kegiatan** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka kegiatannya, lalu pilih **Lihat Dokumen**.
 2. Sistem sudah menyiapkan daftar dokumen wajib tiap tahap (SK, Surat Tugas, KAK,
@@ -313,7 +339,9 @@ Perbaiki tautannya, dan statusnya kembali menjadi Menunggu.
 
 ### 3.1 Mengisi progres mitra
 
-**[SS-11]** Panel pembaruan progres
+| **SS-11 — Panel pembaruan progres** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka **Dashboard**.
 2. Pada panel pembaruan progres, pilih kegiatan dan tahap yang ingin diperbarui.
@@ -351,7 +379,9 @@ harus dapat dicatat.
 
 ### 3.3 Menilai mitra
 
-**[SS-12]** Halaman Penilaian Mitra
+| **SS-12 — Halaman Penilaian Mitra** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka menu **Penilaian Mitra**.
 2. Pilih kegiatan dan tahapnya. Sistem hanya menampilkan mitra yang **Anda
@@ -387,7 +417,9 @@ karena hasilnya dipakai sebagai bahan evaluasi dan apresiasi mitra.
 
 ### 4.1 Mengatur batas honor bulanan (SBML)
 
-**[SS-13]** Pengaturan batas honor
+| **SS-13 — Pengaturan batas honor** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Buka pengaturan batas honor, lalu isi nilai batas honor maksimal seorang mitra
 dalam satu bulan. Nilai ini dipakai untuk **seluruh mitra** dan menjadi dasar
@@ -398,7 +430,9 @@ kegiatan yang sudah terlanjur disimpan.
 
 ### 4.2 Memverifikasi dokumen
 
-**[SS-14]** Daftar dokumen yang menunggu persetujuan
+| **SS-14 — Daftar dokumen yang menunggu persetujuan** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka notifikasi, lalu klik dokumen yang menunggu persetujuan.
 2. Buka tautan dokumennya dan periksa isinya.
@@ -419,7 +453,9 @@ tanpa perlu mengirim pengingat.
 
 ### 4.4 Mengatur template surat
 
-**[SS-15]** Halaman Template Surat
+| **SS-15 — Halaman Template Surat** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Buka **Keuangan > Template Surat**. Yang dapat diatur:
 
@@ -434,7 +470,9 @@ tersebut.
 
 ### 4.5 Membuat SPK dan BAST
 
-**[SS-16]** Halaman Generate Surat
+| **SS-16 — Halaman Generate Surat** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka **Keuangan > Generate Surat**.
 2. Pilih kegiatan dan bulan honornya.
@@ -453,7 +491,9 @@ Ketentuan penomoran yang perlu Anda ketahui:
 
 ### 4.6 Riwayat penyuratan
 
-**[SS-17]** Halaman Riwayat Penyuratan
+| **SS-17 — Halaman Riwayat Penyuratan** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Buka **Keuangan > Riwayat Penyuratan**, lalu pilih tahun. Halaman ini menampilkan
 seluruh surat dalam satu tahun, termasuk surat yang dibatalkan dan nomor yang
@@ -472,7 +512,9 @@ tetapi isinya tidak lagi sesuai data adalah masalah administrasi.
 
 ### 4.7 Rekap honor mitra
 
-**[SS-18]** Halaman Manajemen Honor
+| **SS-18 — Halaman Manajemen Honor** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Buka **Manajemen Honor**, lalu tentukan periodenya:
 
@@ -494,7 +536,9 @@ sedang dipakai — jadi pastikan penyaringnya sudah benar sebelum mengunduh.
 
 ### 5.1 Mengelola akun pengguna
 
-**[SS-19]** Manajemen Admin, tab Manajemen Users
+| **SS-19 — Manajemen Admin, tab Manajemen Users** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Buka **Manajemen Admin > Manajemen Users**. Di sini Anda dapat menambah akun,
 mengubah nama dan perannya, serta mengatur ulang kata sandinya.
@@ -518,7 +562,9 @@ berhak menyunting suatu kegiatan dan siapa yang menerima notifikasi tenggat.
 
 ### 5.3 Mengelola data mitra
 
-**[SS-20]** Manajemen Admin, tab Manajemen PPL
+| **SS-20 — Manajemen Admin, tab Manajemen PPL** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Buka **Manajemen Admin > Manajemen PPL**. Data yang disimpan: nama, ID SOBAT,
 posisi (Pendataan atau Pengolahan), kecamatan, desa, alamat, dan nomor telepon.
@@ -530,7 +576,9 @@ tetapi seluruh riwayatnya tetap utuh.
 
 ### 5.4 Mengimpor data mitra dari SOBAT
 
-**[SS-21]** Jendela impor mitra beserta pratinjaunya
+| **SS-21 — Jendela impor mitra beserta pratinjaunya** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka **Manajemen PPL**, lalu klik **Impor**.
 2. Pilih berkas Excel hasil ekspor SOBAT atau PALAPA.
@@ -550,7 +598,9 @@ kosong agar dapat Anda perbaiki lebih dulu.
 
 ### 5.5 Mengarsipkan dan menghapus kegiatan
 
-**[SS-22]** Riwayat kegiatan beserta tombol arsip
+| **SS-22 — Riwayat kegiatan beserta tombol arsip** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 | Tindakan | Akibatnya |
 | --- | --- |

@@ -81,18 +81,214 @@ membandingkan dua kelompok orang yang berbeda, dan layak disebut di Bab III.
 **Deskripsi bagian:**
 
 > Identitas ini hanya dipakai untuk mengelompokkan jawaban. Nama boleh
-> dikosongkan.
+> dikosongkan, dan jawaban Bapak/Ibu tidak akan ditulis atas nama siapa pun di
+> dalam laporan.
 
 | # | Pertanyaan | Jenis | Wajib | Pilihan / Pengaturan |
 | --- | --- | --- | --- | --- |
 | 1 | Nama (boleh dikosongkan) | Jawaban singkat | Tidak | — |
 | 2 | Peran Bapak/Ibu dalam sistem | Pilihan ganda | Ya | Ketua Tim · PML · Tim Keuangan · Admin · Pegawai (di luar peran di atas) |
-| 3 | Sudah berapa lama Bapak/Ibu memakai SIKAMI? | Pilihan ganda | Ya | Kurang dari 1 minggu · 1–4 minggu · Lebih dari 1 bulan |
-| 4 | Sudah berapa lama Bapak/Ibu bekerja di BPS Kabupaten Bengkulu Selatan? | Pilihan ganda | Ya | Kurang dari 1 tahun · 1–3 tahun · Lebih dari 3 tahun |
+| 3 | Sudah berapa lama Bapak/Ibu memakai SIKAMI? | Pilihan ganda | Ya | Baru hari ini · 2–3 hari · 4–7 hari · Lebih dari 1 minggu |
+| 4 | Kira-kira sudah berapa kali Bapak/Ibu membuka dan memakai SIKAMI? | Pilihan ganda | Ya | 1–2 kali · 3–5 kali · Lebih dari 5 kali |
+| 5 | Pekerjaan apa saja yang sudah pernah Bapak/Ibu lakukan di SIKAMI? | Kotak centang | Ya | (daftar di bawah) |
+| 6 | Sudah berapa lama Bapak/Ibu bekerja di BPS Kabupaten Bengkulu Selatan? | Pilihan ganda | Ya | Kurang dari 1 tahun · 1–3 tahun · Lebih dari 3 tahun |
 
-Pertanyaan nomor 4 ditambahkan karena bagian waktu menanyakan cara kerja
+**Pilihan untuk pertanyaan nomor 5** (kotak centang, boleh lebih dari satu):
+
+```
+Melihat dasbor pemantauan kegiatan
+Membuat atau menyunting kegiatan
+Mengalokasikan mitra ke suatu kegiatan
+Mengisi progres mitra yang saya awasi
+Menilai kinerja mitra
+Membuat Surat Perjanjian Kerja atau BAST
+Memeriksa atau menyetujui dokumen kegiatan
+Melihat atau mengunduh rekap honor mitra
+Mengelola data mitra atau mengimpor dari SOBAT
+Belum sempat melakukan apa pun
+```
+
+Pertanyaan nomor 6 tetap ada karena bagian waktu menanyakan cara kerja
 **sebelum** ada sistem. Pegawai yang baru bekerja kurang dari satu tahun mungkin
 tidak pernah mengalaminya, dan itu perlu terlihat saat Anda mengolah data.
+
+---
+
+### 2.1 Kenapa nama dibiarkan boleh kosong
+
+Anda khawatir ditanya penguji, "kok tidak ada nama pengisinya, jangan-jangan itu
+diisi teman Anda sendiri?" Kekhawatiran itu wajar, tetapi **membuat nama menjadi
+wajib justru memperlemah penelitian Anda**, bukan memperkuatnya.
+
+Alasannya: responden Anda adalah pegawai satu kantor yang mengenal Anda secara
+pribadi, dan Anda mahasiswa magang di kantor itu. Bila namanya tercatat, hampir
+pasti penilaian yang muncul cenderung positif — orang sungkan menuliskan
+kelemahan sistem buatan orang yang duduk di ruangan yang sama. Penguji yang
+teliti justru bisa menyerang dari sisi itu: "bagaimana Anda tahu jawabannya
+jujur, padahal responden tahu namanya Anda baca?" Pertanyaan itu jauh lebih
+sulit dijawab daripada pertanyaan soal keaslian responden.
+
+**Dengan jumlah responden yang kecil, jangan menambah butir identitas lain**
+seperti nama tim atau unit kerja. Di kantor dengan sekitar dua puluh pegawai,
+gabungan "peran + tim" sudah cukup untuk menebak orangnya satu per satu, dan
+anonimitasnya hilang tanpa Anda sadari.
+
+### 2.2 Cara menjawab pertanyaan penguji, tanpa mengorbankan anonimitas
+
+Kuncinya: **keaslian responden dibuktikan di luar kuesioner, bukan di dalamnya.**
+Siapkan tiga hal berikut, semuanya mudah dan tidak menuntut nama pengisi.
+
+| Bukti | Cara mendapatkannya | Kekuatannya |
+| --- | --- | --- |
+| **Tangkapan layar penyebaran** | Foto layar saat tautan kuesioner Anda kirim ke grup WhatsApp kantor, dengan nama grup terlihat | Menunjukkan kuesioner memang disebar ke pegawai, bukan ke orang luar |
+| **Daftar hadir atau surat keterangan** | Minta Ketua Tim atau Kepala BPS menandatangani satu lembar keterangan bahwa kuesioner dibagikan kepada N pegawai pada tanggal sekian | Ini bukti paling kuat, dan lazim dilampirkan pada skripsi |
+| **Cap waktu jawaban** | Google Form mencatat waktu tiap jawaban masuk; tangkap layar kolom _Timestamp_ di Google Sheets | Jawaban yang masuk pada jam kerja, di hari kerja, menguatkan bahwa pengisinya pegawai |
+
+Ketiganya masuk **Lampiran**. Dengan itu, pertanyaan penguji terjawab tanpa Anda
+perlu membuka nama siapa pun.
+
+Tambahan penting: **pertanyaan nomor 5 pada tabel di atas adalah bukti terkuat
+Anda.** Jawabannya memperlihatkan bahwa responden benar-benar melakukan pekerjaan
+nyata di dalam sistem — bukan sekadar membuka lalu mengisi kuesioner. Teman di
+luar kantor tidak mungkin bisa menjawabnya secara konsisten dengan perannya.
+
+> **Teks siap salin** — letakkan di **Bab III**, subbab pengujian kegunaan,
+> sesudah kalimat yang menyebutkan siapa respondennya:
+>
+> Identitas responden sengaja tidak diwajibkan. Seluruh responden merupakan
+> pegawai pada satuan kerja tempat penelitian ini dilakukan dan mengenal peneliti
+> secara langsung, sehingga pencantuman nama berpotensi membuat penilaian
+> cenderung positif dan tidak menggambarkan keadaan yang sebenarnya. Keaslian
+> responden tetap dapat ditelusuri melalui bukti penyebaran kuesioner dan
+> keterangan dari satuan kerja yang dilampirkan pada laporan ini, serta melalui
+> butir isian mengenai pekerjaan yang telah dilakukan responden di dalam sistem.
+
+Kalimat itu **mendahului** pertanyaan penguji. Pertanyaan yang sudah terjawab di
+naskah jarang ditanyakan lagi di ruang sidang.
+
+### 2.3 Soal responden yang baru memakai kurang dari satu minggu
+
+Ini **tidak perlu disembunyikan, dan juga bukan cacat yang mematikan.**
+
+Yang perlu Anda ketahui: CSUQ berasal dari keluarga instrumen yang memang dipakai
+**segera sesudah** seseorang memakai sistem — PSSUQ, saudara dekatnya yang
+disusun penulis yang sama, diberikan tepat setelah sesi pengujian selesai (Lewis,
+1995). Jadi mengukur kegunaan setelah pemakaian yang belum lama **bukan
+penyimpangan dari sifat instrumennya**. Yang penting bukan berapa lama sistem
+dipakai, melainkan apakah responden benar-benar mengerjakan sesuatu di dalamnya —
+dan itulah yang ditangkap pertanyaan nomor 4 dan nomor 5.
+
+Karena itu pilihan jawaban pertanyaan nomor 3 saya perhalus. Pilihan lama
+("kurang dari 1 minggu / 1–4 minggu / lebih dari 1 bulan") akan membuat **semua**
+responden Anda jatuh ke satu kotak yang sama, sehingga tidak ada yang bisa
+dibandingkan. Pilihan barunya memecah rentang pendek itu menjadi empat, sehingga
+tetap ada sebaran yang bisa dilaporkan.
+
+> **Teks siap salin** — letakkan di **Bab V**, pada pembahasan hasil CSUQ,
+> sesudah tabel skor:
+>
+> Seluruh responden memakai sistem dalam rentang waktu yang relatif singkat,
+> yaitu kurang dari satu minggu, karena pengujian dilakukan segera setelah sistem
+> diterapkan di satuan kerja. Skor yang diperoleh dengan demikian menggambarkan
+> penilaian pengguna pada masa awal pemakaian, ketika kesan terhadap kemudahan
+> mempelajari sistem masih kuat, dan belum menggambarkan penilaian setelah sistem
+> dipakai sepanjang satu siklus kegiatan penuh. Hal ini perlu diperhatikan dalam
+> membaca hasilnya, terutama pada butir yang berkaitan dengan kelengkapan fungsi
+> sistem, karena sebagian fungsi baru dipakai pada tahap kegiatan yang belum
+> berjalan saat pengujian dilakukan.
+
+Paragraf itu mengubah keterbatasan menjadi kejujuran yang terukur. Penguji
+biasanya menghargai peneliti yang menyebut batas kesimpulannya sendiri, dan
+justru curiga kalau tidak ada keterbatasan yang disebut sama sekali.
+
+---
+
+### 2.4 Berapa responden yang cukup
+
+Pertanyaan ini sering ditanyakan, dan jawabannya lebih melegakan daripada yang
+Anda kira: **tidak ada rumus jumlah sampel minimal yang berlaku di sini**, karena
+Anda tidak sedang mengambil sampel.
+
+Pengguna sistem ini berjumlah sekitar dua puluh orang, dan seluruhnya Anda
+jadikan responden. Dalam metode penelitian, keadaan seperti ini disebut **sampel
+jenuh** atau _total sampling_ — seluruh anggota populasi dijadikan responden
+(Sugiyono, 2020). Rumus Slovin dan sejenisnya tidak berlaku, karena rumus itu
+dipakai untuk memperkirakan keadaan populasi besar dari sebagian kecil
+anggotanya, sedangkan Anda tidak memperkirakan apa pun: Anda menanyai semuanya.
+
+Karena itu yang perlu dilaporkan bukan "jumlah sampel", melainkan **tingkat
+pengembalian**: berapa dari seluruh pengguna yang benar-benar mengisi.
+
+#### Target per peran
+
+Yang jauh lebih penting daripada jumlah total adalah **setiap peran terwakili**.
+Kuesioner yang diisi lima belas orang tetapi seluruhnya PML jauh lebih lemah
+daripada yang diisi sepuluh orang tetapi mencakup semua peran — sebab sistem Anda
+punya modul yang hanya dipakai peran tertentu, dan modul itu tidak akan terwakili
+sama sekali.
+
+| Peran | Jumlah di kantor | Target minimal | Kenapa penting |
+| --- | --- | --- | --- |
+| Ketua Tim | 6 | **3** | Aktor utama pembuatan kegiatan dan alokasi mitra. Tanpa satu pun, modul terpenting Anda tidak punya penilai |
+| Tim Keuangan | 2–4 | **semua** | Satu-satunya pemakai modul surat, verifikasi dokumen, dan batas SBML. Jumlahnya sedikit, jadi tidak boleh ada yang terlewat |
+| Admin | 1 | **1** | Satu-satunya pemakai modul data master dan impor mitra |
+| Perekap penilaian | 1 | **1** | Satu-satunya orang yang bisa membandingkan perekapan peringkat cara lama dengan cara baru |
+| PML | sisanya | **5** | Pengisi progres dan penilaian mitra |
+
+**Batas aman: 12 dari sekitar 20 orang (60 %).** Batas minimal yang masih dapat
+dipertahankan di sidang: **10 orang, asalkan seluruh peran terwakili.**
+
+Jangan mengejar 100 %. Sepuluh jawaban yang diisi dengan sungguh-sungguh jauh
+lebih berguna daripada dua puluh jawaban yang diisi terburu-buru karena dikejar
+tenggat — dan lebih jujur untuk dipertanggungjawabkan.
+
+#### Soal Ketua Tim yang kurang terbiasa dengan aplikasi
+
+Anda menyebut sebagian Ketua Tim berusia lanjut dan kurang terbiasa, sehingga
+terpikir untuk **mewakilkan** pengisiannya. Di sini perlu dibedakan dua hal yang
+terdengar mirip tetapi sangat berbeda akibatnya.
+
+> **Diwakilkan — jangan.** Orang lain mengisi kuesioner atas nama Ketua Tim,
+> dengan penilaian orang itu sendiri. Ini data karangan, dan persis inilah yang
+> dicurigai penguji ketika bertanya "jangan-jangan diisi teman Anda". Satu
+> jawaban seperti ini, bila ketahuan, meruntuhkan kepercayaan terhadap seluruh
+> data Anda — kerugiannya jauh lebih besar daripada kehilangan satu responden.
+
+> **Didampingi — silakan, dan ini cara yang benar.** Anda duduk bersama beliau,
+> mempersilakan beliau mencoba sistemnya sendiri, lalu membacakan pertanyaan
+> kuesionernya satu per satu dan mengeklikkan jawaban **yang beliau sebutkan**.
+> Penilaiannya tetap penilaian beliau; Anda hanya membantu mengoperasikan
+> formulirnya. Cara ini lazim dipakai untuk responden yang kurang terbiasa dengan
+> perangkat digital, dan sah sepenuhnya selama Anda tidak menyarankan jawaban.
+
+Dengan enam Ketua Tim dan waktu sampai Selasa, pendampingan sepuluh menit per
+orang masih sangat mungkin — dan tiga orang saja sudah memenuhi target minimal.
+Datangi langsung ke mejanya; mengandalkan pesan WhatsApp untuk kelompok ini
+hampir pasti tidak berhasil.
+
+**Bila cara pendampingan Anda pakai, tuliskan apa adanya di Bab III.** Menyebutnya
+justru memperkuat, karena menunjukkan Anda sadar akan perbedaan kemampuan
+responden dan menanganinya dengan cara yang benar.
+
+> **Teks siap salin** — Bab III, subbab pengujian kegunaan:
+>
+> Pengisian kuesioner dilakukan secara mandiri oleh responden melalui formulir
+> daring. Bagi sebagian responden yang kurang terbiasa memakai perangkat digital,
+> pengisian dilakukan dengan pendampingan: peneliti membacakan setiap butir
+> pertanyaan dan mengisikan jawaban sesuai yang disebutkan responden, tanpa
+> memberikan saran atau arahan terhadap isi jawabannya.
+
+#### Yang dilaporkan di Bab V
+
+Sebutkan keduanya, jangan hanya jumlah yang mengisi:
+
+> Kuesioner disebarkan kepada seluruh pegawai pengguna sistem yang berjumlah
+> [20] orang, dan terkumpul [12] jawaban, atau [60] persen. Seluruh peran
+> pengguna terwakili, dengan rincian [3] Ketua Tim, [3] Tim Keuangan, [1] Admin,
+> dan [5] PML.
+
+Rincian per peran itulah yang membuat pembaca yakin bahwa hasilnya menggambarkan
+seluruh sisi sistem, bukan hanya satu modul yang kebetulan paling banyak dipakai.
 
 ---
 
@@ -398,3 +594,21 @@ sehingga perkiraan tersebut dinilai cukup mewakili."
 - [ ] Minta izin lebih dulu kepada Kepala BPS atau Ketua Tim sebelum menyebarkan
 - [ ] Sebarkan lewat grup WhatsApp kantor disertai satu kalimat pengantar dan
       tenggat pengisian; tanpa tenggat, sebagian besar tidak akan terisi
+
+## 8. Bukti yang harus dikumpulkan saat menyebar
+
+Tiga hal ini menjawab pertanyaan penguji soal keaslian responden, dan hanya bisa
+diambil **pada saat penyebaran** — tidak bisa dibuat belakangan. Kerjakan
+sekaligus supaya tidak terlupa.
+
+- [ ] **Tangkapan layar pesan penyebaran** di grup WhatsApp kantor, pastikan
+      **nama grupnya terlihat** pada gambar
+- [ ] **Surat keterangan atau daftar hadir** dari Ketua Tim atau Kepala BPS, isinya
+      cukup satu kalimat: kuesioner dibagikan kepada sekian pegawai pada tanggal
+      sekian, disertai tanda tangan. Mintakan sekalian saat Anda minta izin
+- [ ] **Tangkapan layar kolom _Timestamp_** di Google Sheets setelah jawaban
+      terkumpul, memperlihatkan jawaban masuk pada jam dan hari kerja
+- [ ] Ketiganya dimasukkan ke **Lampiran** skripsi
+
+Penjelasan mengapa ketiganya cukup — dan mengapa nama responden tetap boleh
+dikosongkan — ada pada bagian 2.2 di atas.

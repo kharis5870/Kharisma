@@ -99,7 +99,18 @@ const App = () => {
                 saat sidebar tertutup — di situ ikon adalah satu-satunya
                 petunjuk nama menu. */}
             <TooltipProvider delayDuration={200}>
-            <BrowserRouter>
+            {/* basename WAJIB diisi karena aplikasi dipasang di sub-jalur
+                /kharisma, bukan di akar domain. Tanpa ini, React Router
+                mencocokkan "/kharisma/login" dengan rute "/login" dan tidak
+                menemukan apa pun, sehingga setiap halaman jatuh ke NotFound;
+                dan setiap tautan menu mengarah ke "/dashboard" di akar domain
+                yang tidak dilayani Passenger, menghasilkan 404 dari server.
+
+                Nilainya diambil dari BASE_URL bawaan Vite supaya ikut berubah
+                sendiri: "/" saat `pnpm dev`, "/kharisma/" setelah `pnpm build`
+                (lihat `base` di vite.config.ts). Garis miring di ujung dibuang
+                karena React Router mengharapkan basename tanpa itu. */}
+            <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
               <Toaster />
               <Suspense fallback={<MemuatHalaman />}>
               <Routes>
