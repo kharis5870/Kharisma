@@ -18,7 +18,8 @@ export const getAllMasterPPL = async (): Promise<PPLMaster[]> => {
     // tetap terbaca apa pun status orangnya sekarang. Menyeragamkan penyaring
     // ini ke kueri lain akan menghapus sejarah dari layar.
     const [rows] = await db.query<PPLMasterPacket[]>(
-        'SELECT id, namaPPL, posisi FROM ppl_master WHERE aktif = 1 ORDER BY namaPPL ASC');
+        `SELECT id, sobat_id AS sobatId, namaPPL, posisi
+           FROM ppl_master WHERE aktif = 1 ORDER BY namaPPL ASC`);
     return rows;
 };
 
@@ -62,6 +63,17 @@ export const getPplAdminData = async (periode?: PeriodeFilter): Promise<PPLAdmin
             pm.aktif,
             DATE_FORMAT(pm.nonaktifSejak, '%Y-%m-%d') AS nonaktifSejak,
             COUNT(x.id) AS totalKegiatan,
+            -- Rekam jejak penilaian: SELURUH waktu, sengaja DI LUAR penyaring
+            -- periode di atas. Subkueri, bukan JOIN, supaya baris penilaian
+            -- tidak menggandakan hitungan kegiatan pada GROUP BY ini.
+            (SELECT AVG(pn.rata_rata)
+               FROM penilaian_mitra pn
+               JOIN ppl p2 ON p2.id = pn.pplId
+              WHERE p2.ppl_master_id = pm.id) AS rataRataPenilaian,
+            (SELECT COUNT(*)
+               FROM penilaian_mitra pn
+               JOIN ppl p2 ON p2.id = pn.pplId
+              WHERE p2.ppl_master_id = pm.id) AS jumlahPenilaian,
             GROUP_CONCAT(DISTINCT
                 CONCAT_WS(';;',
                     IFNULL(x.namaKegiatan, 'Kegiatan Tidak Ditemukan'),
@@ -108,6 +120,9 @@ export const getPplAdminData = async (periode?: PeriodeFilter): Promise<PPLAdmin
         namaKecamatan: row.namaKecamatan, 
         namaDesa: row.namaDesa,
         totalKegiatan: row.totalKegiatan || 0,
+        rataRataPenilaian: row.rataRataPenilaian === null || row.rataRataPenilaian === undefined
+            ? null : Number(row.rataRataPenilaian),
+        jumlahPenilaian: Number(row.jumlahPenilaian) || 0,
         kegiatanDetails: row.kegiatanDetails ? row.kegiatanDetails.split('||').map((detail: string) => {
             const [nama, tahap] = detail.split(';;');
             return { nama, tahap };

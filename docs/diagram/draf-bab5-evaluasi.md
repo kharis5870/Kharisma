@@ -356,6 +356,82 @@ tinggi semakin baik), angka tersebut setara dengan 5,18. Dengan demikian, skor
 keseluruhan di atas 5,18 dapat dinyatakan lebih baik daripada rata-rata sistem yang
 pernah diukur menggunakan kuesioner ini.
 
+**Tabel …: Skor CSUQ per Peran Pengguna**
+
+Skor keseluruhan sendirian tidak cukup menceritakan hasilnya, karena peran yang
+berbeda memakai bagian sistem yang berbeda pula. PML misalnya hanya bersentuhan
+dengan dua kebutuhan (KF-07 dan KF-14), sedangkan Tim Keuangan bersentuhan dengan
+sembilan kebutuhan sekaligus (KF-06, KF-08 sampai KF-13). Karena itu skor
+per peran ditampilkan terpisah, bukan hanya digabung menjadi satu angka.
+
+| Peran        | n   | Kegunaan Sistem | Kualitas Informasi | Kualitas Antarmuka | Keseluruhan |
+| ------------ | --- | --------------- | ------------------- | ------------------- | ----------- |
+| Ketua Tim    |     |                 |                      |                      |             |
+| PML          |     |                 |                      |                      |             |
+| Tim Keuangan |     |                 |                      |                      |             |
+| Admin        |     |                 |                      |                      |             |
+| **Semua**    |     |                 |                      |                      |             |
+
+Jumlah responden tiap peran kecil, sehingga tabel ini dibaca sebagai gambaran,
+bukan sebagai perbandingan yang diuji secara statistik. Tujuannya menunjukkan pola
+kasar: peran mana yang menilai baik, peran mana yang menilai sedang, dan pada
+dimensi mana perbedaannya paling terlihat.
+
+#### Catatan khusus penilaian PML pada dimensi Kegunaan Sistem
+
+Dimensi Kegunaan Sistem (butir 1–8) memuat pernyataan seperti "saya dapat
+menyelesaikan pekerjaan dengan cepat/efisien menggunakan sistem ini". Bagi PML
+yang mengawasi kegiatan bertanda FASIH, jawabannya berpotensi lebih rendah
+daripada peran lain, dan itu **bukan tanda kesalahan pada sistem atau pada
+pengujian**, melainkan konsekuensi yang memang sudah diperkirakan sejak KNF-07
+dirumuskan: integrasi ke FASIH belum tersambung, sehingga PML pada kegiatan
+tersebut tetap harus mengisi progres di FASIH sekaligus di sistem ini — bukan
+sebagai pengganti, melainkan sebagai tambahan.
+
+Kondisi ini **tidak berlaku untuk seluruh pekerjaan PML**. Pada kegiatan yang
+tidak bertanda FASIH, pengisian di sistem ini menggantikan pengisian di
+spreadsheet, bukan menambahkannya, sehingga tidak ada duplikasi. Penilaian mitra
+(KF-14) juga berlaku untuk seluruh PML tanpa kecuali, dan di situ sistem
+memberikan manfaat yang tidak dimiliki cara lama: hanya PML yang mengawasi mitra
+tersebut yang dapat menilai, menggantikan berkas terbuka yang dapat diubah siapa
+pun (masalah M2.c).
+
+Bila skor PML pada dimensi Kegunaan Sistem memang tampil lebih rendah,
+jelaskan sebab itu secara terbuka, jangan dibiarkan seperti anomali yang tidak
+dijelaskan:
+
+> **Teks siap salin — Bab V, sesudah tabel skor per peran:**
+>
+> Skor dimensi Kegunaan Sistem pada kelompok PML tercatat sedikit lebih rendah
+> dibandingkan peran lain. Pola ini sejalan dengan keterbatasan yang telah
+> disebutkan pada KNF-07, yaitu integrasi ke aplikasi FASIH yang belum
+> tersambung. Bagi PML yang mengawasi kegiatan bertanda FASIH, pengisian
+> progres pada sistem ini menjadi tambahan di samping kewajiban mengisi FASIH,
+> bukan pengganti, sehingga sebagian pekerjaan terasa berulang. Keterbatasan ini
+> tidak berlaku pada penilaian kinerja mitra (KF-14) maupun pada kegiatan yang
+> tidak memakai FASIH, dan diperkirakan akan berkurang dengan sendirinya begitu
+> penyambungan ke FASIH direalisasikan.
+
+Jangan menuliskan kesimpulan ini sebelum datanya benar-benar terkumpul — periksa
+dulu apakah pola tersebut memang muncul. Bila skor PML ternyata tidak berbeda
+jauh dari peran lain, paragraf di atas tidak perlu dipakai; cukup laporkan
+tabelnya apa adanya.
+
+#### Kenapa PML tetap harus diikutkan, bukan dikeluarkan dari pengujian
+
+Satu hal yang perlu ditegaskan bila muncul pertanyaan serupa saat sidang:
+mengeluarkan PML dari pengujian **karena diperkirakan akan menilai rendah**
+adalah praktik yang keliru dalam penelitian, disebut bias seleksi responden.
+Kalau ditemukan, ini jauh lebih merusak kredibilitas Bab V daripada skor rendah
+itu sendiri, karena artinya hasil pengujian sengaja dipilih agar terlihat baik.
+
+Yang benar dilakukan justru sebaliknya: PML tetap diikutkan, skornya dilaporkan
+apa adanya per dimensi, dan bila ada pola yang lebih rendah pada dimensi
+tertentu, dijelaskan sebabnya seperti paragraf di atas. Pola seperti ini bukan
+kegagalan pengujian — justru inilah yang membuat pengujian bernilai, karena
+menunjukkan sistem dinilai dari sudut pandang yang berbeda-beda sesuai
+pekerjaan tiap peran, bukan dari satu sudut pandang saja.
+
 _(Kalimat penutup:)_ Skor keseluruhan sebesar … menunjukkan bahwa sistem termasuk
 kategori …. Dimensi … memperoleh skor tertinggi, sedangkan dimensi … memperoleh skor
 terendah sehingga menjadi bahan perbaikan berikutnya.

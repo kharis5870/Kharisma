@@ -10,6 +10,7 @@ entity "users" as users {
   --
   username : varchar(50) <<UQ>>
   nama_lengkap : varchar(255)
+  nip : varchar(50)
   role : enum
   isPML : tinyint(1)
   tokenVersi : int
@@ -18,10 +19,11 @@ entity "users" as users {
 entity "ketua_tim" as ketua_tim {
   * id : varchar(50) <<PK>>
   --
-  user_id : varchar(50) <<FK>>
-  nama_ketua : varchar(255)
-  nip : varchar(50)
+  * user_id : varchar(50) <<FK>>
+  * tahun : smallint
   tim : varchar(100)
+  ..
+  UQ (tim, tahun)
 }
 
 entity "kegiatan" as kegiatan {

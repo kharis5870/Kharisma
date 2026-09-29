@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -35,7 +36,7 @@ import { PenilaianMitra as PenilaianMitraType, PenilaianRequest } from "@shared/
 import { exportToPdf, exportToExcel, type KolomEkspor } from "@/lib/exportUtils";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { SKALA_NILAI, tingkatMutu } from "@shared/mutuPenilaian";
+import { SKALA_NILAI, tingkatMutu, keSkalaLima, teksBintang, komentarPenilaianSah, rapikanKomentar, PANJANG_MIN_KOMENTAR, PESAN_KOMENTAR_PENDEK } from "@shared/mutuPenilaian";
 import { NADA_TOMBOL_MUTU, NADA_TEKS_MUTU } from "@/lib/statusStyles";
 import { apiClient } from "@/lib/apiClient";
 import { useHalamanAman } from "@/hooks/useHalamanAman";
@@ -56,18 +57,26 @@ function EvaluationModal({ isOpen, onClose, penilaian, onSave, isSaving }: Evalu
   const [sikapPerilaku, setSikapPerilaku] = useState<string>("");
   const [kualitasPekerjaan, setKualitasPekerjaan] = useState<string>("");
   const [ketepatanWaktu, setKetepatanWaktu] = useState<string>("");
+  const [komentar, setKomentar] = useState<string>("");
 
   useEffect(() => {
     if (isOpen && penilaian) {
       setSikapPerilaku(penilaian.sikapPelikaku?.toString() || "");
       setKualitasPekerjaan(penilaian.kualitasPekerjaan?.toString() || "");
       setKetepatanWaktu(penilaian.ketepatanWaktu?.toString() || "");
+      setKomentar(penilaian.komentar ?? "");
     }
   }, [isOpen, penilaian]);
 
   const handleSave = () => {
     if (!sikapPerilaku || !kualitasPekerjaan || !ketepatanWaktu) {
       toast.error("Semua kriteria penilaian harus diisi!");
+      return;
+    }
+    // Komentar wajib — permintaan SOBAT. Server memeriksanya juga; di sini
+    // supaya penolakannya terlihat sebelum permintaan dikirim.
+    if (!komentarPenilaianSah(komentar)) {
+      toast.error(PESAN_KOMENTAR_PENDEK);
       return;
     }
     if (!penilaian || !user) return;
@@ -79,6 +88,7 @@ function EvaluationModal({ isOpen, onClose, penilaian, onSave, isSaving }: Evalu
       sikapPelikaku: parseInt(sikapPerilaku),
       kualitasPekerjaan: parseInt(kualitasPekerjaan),
       ketepatanWaktu: parseInt(ketepatanWaktu),
+      komentar,
       dinilaiOleh_userId: user.id,
     };
     onSave(data);
@@ -173,11 +183,33 @@ function EvaluationModal({ isOpen, onClose, penilaian, onSave, isSaving }: Evalu
               </Card>
             )}
           </div>
+
+          {/* Komentar wajib — permintaan SOBAT. Angka 1-10 saja tidak
+              menjelaskan apa pun ketika mitra mempertanyakan nilainya. */}
+          <div className="space-y-2">
+            <Label htmlFor="komentarPenilaian">
+              Komentar <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              id="komentarPenilaian"
+              value={komentar}
+              onChange={e => setKomentar(e.target.value)}
+              placeholder="Contoh: Teliti dalam mengisi kuesioner, tetapi beberapa dokumen terlambat dikumpulkan."
+              rows={3}
+              aria-invalid={komentar.length > 0 && !komentarPenilaianSah(komentar)}
+            />
+            <p className={cn(
+              "text-xs",
+              komentarPenilaianSah(komentar) ? "text-muted-foreground" : "text-destructive",
+            )}>
+              {rapikanKomentar(komentar).length} / {PANJANG_MIN_KOMENTAR} karakter minimal
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSaving}>Batal</Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || !komentarPenilaianSah(komentar)}>
             {isSaving ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
             ) : (
@@ -318,7 +350,12 @@ export default function PenilaianMitraPage() {
         { header: 'Kualitas Pekerjaan', nilai: (r: PenilaianMitraType) => r.kualitasPekerjaan ?? '-', lebar: 'auto', rataKanan: true },
         { header: 'Ketepatan Waktu', nilai: (r: PenilaianMitraType) => r.ketepatanWaktu ?? '-', lebar: 'auto', rataKanan: true },
         { header: 'Rata-rata', nilai: (r: PenilaianMitraType) => r.rataRata ?? '-', lebar: 'auto', rataKanan: true },
+        { header: 'Rata-rata (skala 1-5)', nilai: (r: PenilaianMitraType) => keSkalaLima(r.rataRata) ?? '-', lebar: 'auto', rataKanan: true },
+        // Mengikuti Form Penilaian Petugas: bintang bulat 1-5, tanpa setengah.
+        { header: 'Bintang', nilai: (r: PenilaianMitraType) => teksBintang(r.rataRata) || '-', lebar: 'auto' },
         { header: 'Status', nilai: (r: PenilaianMitraType) => r.sudahDinilai ? 'Sudah Dinilai' : 'Belum Dinilai', lebar: 'auto' },
+        // Ikut diekspor karena SOBAT memintanya bersama nilainya.
+        { header: 'Komentar', nilai: (r: PenilaianMitraType) => r.komentar ?? '-', lebar: '*' },
       ] as KolomEkspor<PenilaianMitraType>[],
       baris: filteredData,
       namaFile: 'penilaian-mitra',

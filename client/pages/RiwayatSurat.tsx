@@ -42,7 +42,8 @@ import AlertModal from "@/components/AlertModal";
 import KotakCari from "@/components/KotakCari";
 import PaginasiTabel from "@/components/PaginasiTabel";
 import { usePaginasiTabel } from "@/hooks/usePaginasiTabel";
-import { cariRiwayatSurat } from "@/lib/cariSurat";
+import { cariRiwayatSurat, saringBulanSurat, NAMA_BULAN } from "@/lib/cariSurat";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type HasilRapikan = RencanaRapikan & { diterapkan: number };
 
@@ -80,8 +81,13 @@ export default function RiwayatSurat() {
   // Pencarian dan halaman tabel. Lencana jumlah surat di atas tabel tetap
   // menghitung SELURUH tahun, bukan hasil pencarian.
   const [cariSurat, setCariSurat] = useState("");
-  const suratTersaring = useMemo(() => cariRiwayatSurat(surat, cariSurat), [surat, cariSurat]);
-  const paginasiRiwayat = usePaginasiTabel(suratTersaring, 10, cariSurat);
+  // Bulan tanggal SURAT PK. Setahun penuh bisa ratusan baris, sementara yang
+  // dicocokkan dengan buku agenda biasanya satu bulan saja.
+  const [bulan, setBulan] = useState("all");
+  const suratTersaring = useMemo(
+    () => cariRiwayatSurat(saringBulanSurat(surat, bulan), cariSurat),
+    [surat, bulan, cariSurat]);
+  const paginasiRiwayat = usePaginasiTabel(suratTersaring, 10, `${bulan}|${cariSurat}`);
 
   const segarkan = () => queryClient.invalidateQueries({ queryKey: ["riwayatSurat"] });
   const gagal = (title: string) => (error: any) =>
@@ -193,6 +199,7 @@ export default function RiwayatSurat() {
     void exportToExcel({
       judul: "Riwayat Penyuratan Mitra",
       subJudul: `Tahun ${tahun} · ${jumlahAktif} surat berlaku, ${jumlahBatal} batal`
+        + (bulan !== "all" ? ` · ${NAMA_BULAN[Number(bulan) - 1]}` : "")
         + (cariSurat.trim() ? ` · hasil pencarian "${cariSurat.trim()}"` : ""),
       kolom,
       // Mengikuti pencarian yang sedang aktif (semua halaman), seperti ekspor
@@ -235,6 +242,18 @@ export default function RiwayatSurat() {
                     max={2999}
                     onChange={e => setTahun(Number(e.target.value) || new Date().getFullYear())}
                   />
+                </div>
+                <div className="space-y-2 sm:w-44">
+                  <Label htmlFor="bulanRiwayat">Bulan Surat</Label>
+                  <Select value={bulan} onValueChange={setBulan}>
+                    <SelectTrigger id="bulanRiwayat"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua bulan</SelectItem>
+                      {NAMA_BULAN.map((nama, i) => (
+                        <SelectItem key={nama} value={String(i + 1).padStart(2, "0")}>{nama}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2 sm:w-80">
                   <Label htmlFor="cariRiwayat">Cari Surat</Label>

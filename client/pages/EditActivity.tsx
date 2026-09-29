@@ -21,6 +21,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PPL, Dokumen, PPLMaster } from "@shared/api";
 import { periksaTautan } from "@shared/tautanDokumen";
 import { idKetuaTimDikenal, pesanKetuaTimTidakDikenal } from "@shared/ketuaTim";
+import { ketuaTimTahun, tahunUntukKetuaTim } from "@/lib/ketuaTimTahun";
 import { bolehMenyuntingKegiatan } from "@shared/hakKegiatan";
 import { cn } from "@/lib/utils";
 import AlertModal from "@/components/AlertModal";
@@ -36,6 +37,8 @@ import { TahapDokumen, ClientPPL, ClientDokumen, FormState, DateFieldName, TAHAP
 import { fetchActivityDetails, fetchPPLs, fetchKetuaTim, fetchPMLs, updateActivity } from "@/components/edit-kegiatan/apiEditKegiatan";
 import { DokumenContent } from "@/components/edit-kegiatan/DokumenContent";
 import { AlokasiPPLContent } from "@/components/edit-kegiatan/AlokasiPPLContent";
+import PanelImporAlokasi from "@/components/PanelImporAlokasi";
+import type { AlokasiTerimpor } from "@shared/imporAlokasi";
 
 // --- Main Component ---
 export default function EditActivity() {
@@ -141,6 +144,46 @@ export default function EditActivity() {
         });
 
         setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), ...newAllocations]}));
+    }, []);
+
+    /**
+     * Memasukkan alokasi hasil impor Excel ke form, ketiga tahap sekaligus.
+     *
+     * MENAMBAH, bukan mengganti: alokasi yang sudah ada di kegiatan ini tetap
+     * utuh beserta progres dan suntingan tangannya. Baris yang mitranya sudah
+     * dialokasikan di tahap yang sama sudah disingkirkan di dialognya, jadi di
+     * sini tidak ada lagi keputusan yang perlu diambil.
+     *
+     * Metode dan bulan pembebanan sengaja dibiarkan kosong: keduanya tidak ada
+     * di berkas, dan form baru menagihnya kalau rentang honor tahapnya
+     * benar-benar melintasi lebih dari satu bulan.
+     */
+    const terapkanImporAlokasi = useCallback((alokasi: AlokasiTerimpor[]) => {
+        const baru: ClientPPL[] = alokasi.map((a, i) => ({
+            // Indeksnya ikut masuk karena seluruh baris dibuat pada milidetik
+            // yang sama; tanpa itu clientId-nya kembar.
+            clientId: `impor-${Date.now()}-${i}`,
+            ppl_master_id: a.mitraId,
+            namaPPL: a.namaMitra,
+            namaPML: a.namaPml,
+            pml_id: a.pmlId,
+            tahap: a.tahap,
+            bebanKerja: String(a.bebanKerja),
+            besaranHonor: String(a.besaranHonor),
+            honorarium: [{
+                jenis_pekerjaan: a.jenisPekerjaan,
+                bebanKerja: String(a.bebanKerja),
+                besaranHonor: String(a.besaranHonor),
+            }],
+        }));
+        setFormData(prev => ({ ...prev, ppl: [...(prev.ppl || []), ...baru] }));
+
+        // Pindah ke tahap yang paling banyak terisi supaya hasilnya langsung
+        // terlihat, bukan tersembunyi di tab sebelah.
+        const perTahap = alokasi.reduce<Record<string, number>>(
+            (acc, a) => ({ ...acc, [a.tahap]: (acc[a.tahap] ?? 0) + 1 }), {});
+        const tahapTerbanyak = Object.keys(perTahap).sort((a, b) => perTahap[b] - perTahap[a])[0];
+        if (tahapTerbanyak) setPplStageTab(tahapTerbanyak as PPL['tahap']);
     }, []);
     
     useEffect(() => {
@@ -262,6 +305,30 @@ export default function EditActivity() {
             && !idKetuaTimDikenal(ketuaTimList, formData.ketua_tim_id),
         [isInitialDataLoaded, ketuaTimList, formData.ketua_tim_id],
     );
+
+    // Ketua tim dicatat per tahun. Yang ditawarkan adalah kepengurusan tahun
+    // jadwal persiapan kegiatan ini — DITAMBAH ketua tim yang sedang terpilih,
+    // sekalipun dari tahun lain. Tanpa penambahan itu, kegiatan lama yang
+    // dibuka untuk disunting akan kehilangan ketua timnya dari daftar, tampak
+    // kosong, dan tertimpa begitu disimpan.
+    const tahunKetuaTim = useMemo(
+        () => tahunUntukKetuaTim(formData.tanggalMulaiPersiapan),
+        [formData.tanggalMulaiPersiapan]);
+
+    const daftarKetuaTimTampil = useMemo(() => {
+        const tahunIni = ketuaTimTahun(ketuaTimList, tahunKetuaTim);
+        const terpilih = ketuaTimList.find(k => String(k.id) === String(formData.ketua_tim_id));
+        return terpilih && !tahunIni.some(k => k.id === terpilih.id)
+            ? [...tahunIni, terpilih]
+            : tahunIni;
+    }, [ketuaTimList, tahunKetuaTim, formData.ketua_tim_id]);
+
+    // Ketua tim terpilih berasal dari kepengurusan tahun lain: diberi tahu,
+    // TIDAK dikosongkan otomatis — riwayat kegiatan lama justru harus utuh.
+    const ketuaTimBedaTahun = useMemo(() => {
+        const terpilih = ketuaTimList.find(k => String(k.id) === String(formData.ketua_tim_id));
+        return terpilih && Number(terpilih.tahun) !== tahunKetuaTim ? Number(terpilih.tahun) : null;
+    }, [ketuaTimList, formData.ketua_tim_id, tahunKetuaTim]);
 
     // Tim melekat pada master ketua tim, jadi hanya ditampilkan (read-only).
     const timKetuaTerpilih = useMemo(
@@ -915,8 +982,16 @@ export default function EditActivity() {
                                                     tanpa penjelasan. */}
                                                 <Select value={formData.ketua_tim_id ? String(formData.ketua_tim_id) : undefined} onValueChange={(value) => handleFormFieldChange('ketua_tim_id', value)}>
                                                     <SelectTrigger id="ketuaTim" className={cn(ketuaTimTidakDikenal && "border-amber-400 dark:border-amber-700")}><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
-                                                    <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={String(ketua.id)}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
+                                                    <SelectContent>{daftarKetuaTimTampil.map((ketua) => (<SelectItem key={ketua.id} value={String(ketua.id)}>{ketua.namaKetua}{Number(ketua.tahun) !== tahunKetuaTim ? ` (${ketua.tahun})` : ''}</SelectItem>))}</SelectContent>
                                                 </Select>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Ketua tim mengikuti tahun jadwal persiapan — sekarang {tahunKetuaTim}.
+                                                </p>
+                                                {ketuaTimBedaTahun !== null && (
+                                                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                                                        Ketua tim ini kepengurusan {ketuaTimBedaTahun}, sedangkan jadwal persiapannya tahun {tahunKetuaTim}. Dibiarkan apa adanya supaya riwayat kegiatan tidak berubah.
+                                                    </p>
+                                                )}
                                                 {ketuaTimTidakDikenal && (
                                                     <p className="text-sm text-amber-700 dark:text-amber-300">
                                                         {pesanKetuaTimTidakDikenal(String(formData.ketua_tim_id))}
@@ -973,6 +1048,22 @@ export default function EditActivity() {
                             </div>
                         </TabsContent>
                         <TabsContent value="alokasi-ppl" className="mt-6">
+                            {/* Di ATAS ketiga tab: satu berkas mengisi ketiganya sekaligus. */}
+                            <PanelImporAlokasi
+                                pplList={pplList}
+                                pmlList={pmlList}
+                                alokasiSudahAda={(formData.ppl || [])
+                                    .filter(p => p.ppl_master_id)
+                                    .map(p => ({ mitraId: String(p.ppl_master_id), tahap: p.tahap }))}
+                                hargaSatuan={{
+                                    listing: parseHonorNumber(formData.honorariumSettings?.['pengumpulan-data-listing']?.hargaSatuan ?? ''),
+                                    pencacahan: parseHonorNumber(formData.honorariumSettings?.['pengumpulan-data-pencacahan']?.hargaSatuan ?? ''),
+                                    'pengolahan-analisis': parseHonorNumber(formData.honorariumSettings?.['pengolahan-analisis']?.hargaSatuan ?? ''),
+                                }}
+                                namaKegiatan={formData.namaKegiatan}
+                                onTerapkan={terapkanImporAlokasi}
+                                onGagal={(title, message) => setAlertModal({ isOpen: true, title, message })}
+                            />
                             <Tabs value={pplStageTab} onValueChange={(val) => setPplStageTab(val as PPL['tahap'])}>
                                 <TabsList className="grid w-full grid-cols-3">
                                     <TabsTrigger value="listing">Listing</TabsTrigger>

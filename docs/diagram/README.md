@@ -28,6 +28,7 @@ berjalan (terakhir diselaraskan sampai migrasi `2026-09-24`).
 | `16-activity-login.puml`              | Activity diagram otentikasi dan penggantian kata sandi                   | Bab IV, baru      |
 | `17-activity-arsip-hapus.puml`        | Activity diagram pengarsipan dan penghapusan kegiatan                    | Bab IV, baru      |
 | `18-activity-rekap-honor.puml`        | Activity diagram rekap honor mitra                                       | Bab IV, baru      |
+| `19-activity-impor-alokasi.puml`      | Activity diagram impor alokasi mitra satu kegiatan dari Excel            | Bab IV, baru      |
 | `alat/buat_wireframe.py`              | Pembangkit berkas wireframe di atas (hanya untuk membuat ulang dari nol) | —                 |
 | `_gaya.iuml`                          | Gaya bersama semua diagram PlantUML                                      | —                 |
 | `draf-revisi-bab4.md`                 | Draf teks revisi KF/KNF, tabel aktor, use case, dan basis data           | —                 |
@@ -37,6 +38,7 @@ berjalan (terakhir diselaraskan sampai migrasi `2026-09-24`).
 | `draf-bab5-evaluasi.md`               | Draf Bab V bagian evaluasi, panduan pengujian, dan kuesioner CSUQ        | —                 |
 | `draf-bab5-penerapan-pemeliharaan.md` | Draf Bab V bagian penerapan (deployment) dan pemeliharaan (maintenance)  | —                 |
 | `draf-revisi-pustaka.md`              | Konversi 28 sitasi IEEE ke APA 7, rujukan yang perlu ditambah, dan koreksi pustaka | —                 |
+| `PANDUAN-REVISI-PEMBARUAN-TERBARU.md` | Revisi naskah untuk enam pembaruan sistem terakhir (ketua tim per tahun, komentar penilaian, bintang, skala 1–5, penyaring tahun, impor alokasi) | —                 |
 | `out/`                                | Hasil ekspor SVG semua diagram PlantUML, siap dimasukkan ke Word         | —                 |
 
 ## Melihat dan mengekspor diagram PlantUML (`.puml`)

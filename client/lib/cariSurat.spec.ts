@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { DataKontrakMitra, RiwayatSuratItem } from "@shared/api";
-import { cariMitraSurat, cariRiwayatSurat } from "./cariSurat";
+import { cariMitraSurat, cariRiwayatSurat, saringBulanSurat, NAMA_BULAN } from "./cariSurat";
 
 const mitra = (nama: string, isi: Partial<DataKontrakMitra> = {}): DataKontrakMitra =>
   ({ pplMasterId: nama, nama, baris: [], totalHonor: 0, ...isi });
@@ -48,5 +48,36 @@ describe("pencarian Riwayat Penyuratan", () => {
 
   it("nomor surat ditemukan baik dari nomor SPK maupun dari catatan surat lain", () => {
     expect(cariRiwayatSurat(data, "015").map(s => s.namaPPL)).toEqual(["Budi", "Siti"]);
+  });
+});
+
+describe("saringBulanSurat", () => {
+  const data = [
+    surat("Budi", { tanggalSurat: "2026-09-08" }),
+    surat("Siti", { tanggalSurat: "2026-10-01" }),
+    surat("Ani", { tanggalSurat: "2026-09-30" }),
+  ];
+
+  it("hanya surat pada bulan itu", () => {
+    expect(saringBulanSurat(data, "09").map(s => s.namaPPL)).toEqual(["Budi", "Ani"]);
+    expect(saringBulanSurat(data, "10").map(s => s.namaPPL)).toEqual(["Siti"]);
+  });
+
+  it("tanggal 1 tidak jatuh ke bulan sebelumnya", () => {
+    // Membaca bulan lewat `new Date` akan menggeser tanggal 1 pukul 00:00 WIB
+    // ke bulan sebelumnya di mesin yang berjalan UTC.
+    expect(saringBulanSurat(data, "10").map(s => s.namaPPL)).toEqual(["Siti"]);
+  });
+
+  it("nilai selain 01-12 berarti semua bulan", () => {
+    expect(saringBulanSurat(data, "all")).toHaveLength(3);
+    expect(saringBulanSurat(data, "")).toHaveLength(3);
+    expect(saringBulanSurat(data, "13")).toHaveLength(3);
+  });
+
+  it("dua belas nama bulan tersedia untuk pilihan", () => {
+    expect(NAMA_BULAN).toHaveLength(12);
+    expect(NAMA_BULAN[0]).toBe("Januari");
+    expect(NAMA_BULAN[11]).toBe("Desember");
   });
 });

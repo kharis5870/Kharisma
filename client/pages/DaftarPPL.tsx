@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PPLAdminData, PPLMaster, Kecamatan, Desa } from "@shared/api";
+import { teksBintang } from "@shared/mutuPenilaian";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/apiClient";
 import { useHalamanAman } from "@/hooks/useHalamanAman";
@@ -255,6 +256,17 @@ export default function DaftarPPL() {
             if (sortConfig.key === 'status') {
                 aValue = a.totalKegiatan > 0 ? 1 : 0;
                 bValue = b.totalKegiatan > 0 ? 1 : 0;
+            } else if (sortConfig.key === 'rataRataPenilaian') {
+                // BELUM PERNAH DINILAI selalu di bawah, ke arah mana pun
+                // diurutkan. Tanpa ini `null` diperlakukan sebagai 0 oleh
+                // perbandingan JavaScript, sehingga mitra yang belum dinilai
+                // berbaur dengan yang dinilai buruk — dua hal yang sangat
+                // berbeda ketika memilih mitra untuk kegiatan baru.
+                const adaA = a.rataRataPenilaian !== null && a.rataRataPenilaian !== undefined;
+                const adaB = b.rataRataPenilaian !== null && b.rataRataPenilaian !== undefined;
+                if (!adaA || !adaB) return adaA === adaB ? 0 : (adaA ? -1 : 1);
+                aValue = a.rataRataPenilaian;
+                bValue = b.rataRataPenilaian;
             } else {
                 aValue = a[sortConfig.key as keyof PPLAdminData] as any;
                 bValue = b[sortConfig.key as keyof PPLAdminData] as any;
@@ -398,6 +410,8 @@ export default function DaftarPPL() {
       { header: "Alamat", nilai: p => p.alamat || "-" },
       { header: "No. Telepon", nilai: p => p.noTelepon || "-" },
       { header: "Jumlah Kegiatan", nilai: p => p.totalKegiatan, rataKanan: true },
+      { header: "Bintang (rekam jejak)", nilai: p => teksBintang(p.rataRataPenilaian) || "-" },
+      { header: "Jumlah Penilaian", nilai: p => p.jumlahPenilaian ?? 0, rataKanan: true },
       { header: "Status", nilai: p => (p.totalKegiatan > 0 ? "Aktif" : "Non Aktif") },
     ];
     void exportToExcel({
@@ -568,6 +582,9 @@ export default function DaftarPPL() {
             <TableHead className="w-[140px] text-center">
                 <div onClick={() => handleSort('totalKegiatan')} className="flex items-center justify-center gap-1 cursor-pointer">Kegiatan{getSortIcon('totalKegiatan')}</div>
             </TableHead>
+            <TableHead className="w-[150px] text-center">
+                <div onClick={() => handleSort('rataRataPenilaian')} className="flex items-center justify-center gap-1 cursor-pointer">Bintang{getSortIcon('rataRataPenilaian')}</div>
+            </TableHead>
             <TableHead className="w-[160px] text-center">Informasi Detail</TableHead>
             <TableHead className="w-[120px] text-center">
                 <div onClick={() => handleSort('status')} className="flex items-center justify-center gap-1 cursor-pointer">Status{getSortIcon('status')}</div>
@@ -575,9 +592,9 @@ export default function DaftarPPL() {
         </TableRow>
     </TableHeader>
     <TableBody>
-        {isLoading ? ( <TableRow><TableCell colSpan={8} className="text-center">Memuat...</TableCell></TableRow> ) : 
+        {isLoading ? ( <TableRow><TableCell colSpan={9} className="text-center">Memuat...</TableCell></TableRow> ) : 
         paginatedData.length === 0 ? (
-            <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Tidak ada data PPL</TableCell></TableRow>
+            <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Tidak ada data PPL</TableCell></TableRow>
         ) : (
             paginatedData.map((ppl, index) => {
                 const isActive = ppl.totalKegiatan > 0;
@@ -629,6 +646,24 @@ export default function DaftarPPL() {
                             <Button variant="link" className="p-0 h-auto text-blue-600 dark:text-blue-300" onClick={(e) => { e.stopPropagation(); handleOpenDetailModal(ppl); }}>
                                 {ppl.totalKegiatan} Kegiatan
                             </Button>
+                        </TableCell>
+                        {/* Rekam jejak SEPANJANG WAKTU — sengaja tidak mengikuti
+                            penyaring periode, yang menyaring honor. Jumlah
+                            penilaian ikut ditampilkan: satu nilai 9 dan
+                            rata-rata 8,5 dari dua belas penilaian sama-sama
+                            empat bintang, padahal keyakinannya jauh berbeda. */}
+                        <TableCell className="text-center">
+                            {ppl.rataRataPenilaian === null || ppl.rataRataPenilaian === undefined ? (
+                                <span className="text-muted-foreground">—</span>
+                            ) : (
+                                <span
+                                    title={`Rata-rata ${ppl.rataRataPenilaian.toFixed(2)} dari ${ppl.jumlahPenilaian} penilaian, seluruh triwulan`}
+                                    className="whitespace-nowrap"
+                                >
+                                    <span className="text-amber-500">{teksBintang(ppl.rataRataPenilaian)}</span>
+                                    <span className="text-xs text-muted-foreground ml-1">({ppl.jumlahPenilaian})</span>
+                                </span>
+                            )}
                         </TableCell>
                         <TableCell className="text-center">
                             <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenInfoModal(ppl); }}>

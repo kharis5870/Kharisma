@@ -21,6 +21,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Kegiatan } from "@shared/api";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
+import { cocokTahun, tahunTersedia, type SaringTahun } from "@/lib/tahunKegiatan";
+import FilterTahun from "@/components/dashboard/FilterTahun";
 import { id as localeID } from 'date-fns/locale';
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
@@ -74,6 +76,9 @@ export default function Dashboard() {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [timFilter, setTimFilter] = useState("all");
+    // Penyaring tahun kegiatan. Kendalinya satu komponen (FilterTahun) supaya
+    // mode rentang tidak menambah kolom di baris filter.
+    const [saringTahun, setSaringTahun] = useState<SaringTahun>({ mode: 'semua' });
     const [progressView, setProgressView] = useState<'keseluruhan' | 'listing' | 'pencacahan' | 'pengolahan'>('keseluruhan');
     const [progressType, setProgressType] = useState<ProgressTypeFilter>('approved');
     const [pplSearchView, setPplSearchView] = useState("");
@@ -185,6 +190,10 @@ export default function Dashboard() {
         return Array.from(set).sort();
     }, [activeActivities]);
 
+    // Tahun diambil dari tanggal mulai persiapan; aturannya di @/lib/tahunKegiatan.
+    const daftarTahun = useMemo(() => tahunTersedia(activeActivities), [activeActivities]);
+
+
     const filteredActivities = useMemo(() => {
         return activeActivities.filter(activity => {
             const { status, warnings } = activity.dynamicStatus;
@@ -192,9 +201,10 @@ export default function Dashboard() {
             const matchesStatus = statusFilter === "all" ||
                 (statusFilter === "warning" ? warnings.length > 0 : status === statusFilter);
             const matchesTim = timFilter === "all" || activity.timKetua === timFilter;
-            return matchesSearch && matchesStatus && matchesTim;
+            const matchesTahun = cocokTahun(activity, saringTahun);
+            return matchesSearch && matchesStatus && matchesTim && matchesTahun;
         });
-    }, [activeActivities, searchTerm, statusFilter, timFilter]);
+    }, [activeActivities, searchTerm, statusFilter, timFilter, saringTahun]);
 
     // Kartu statistik dihapus karena grafik sudah menampilkannya lebih baik.
     // Yang tersisa hanya daftar kegiatan bermasalah, untuk dropdown Peringatan.
@@ -586,6 +596,11 @@ export default function Dashboard() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {/* Penyaring tahun, untuk mengarsip dan mengelompokkan
+                            secara jangka panjang. Tahunnya dari tanggal mulai
+                            persiapan — awal kegiatan. */}
+                        <FilterTahun daftarTahun={daftarTahun} saring={saringTahun} onUbah={setSaringTahun} />
                     </div>
                 </div>
 

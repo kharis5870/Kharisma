@@ -5,11 +5,14 @@ import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
 import AlertModal from "@/components/AlertModal";
 import { periksaPassword, PANJANG_MIN_PASSWORD } from "@shared/aturanPassword";
-import { UserX } from "lucide-react";
+import { UserX, CopyPlus, PenLine } from "lucide-react";
 import ImporMitraDialog from "@/components/ImporMitraDialog";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useAdmin } from "@/contexts/AdminContext";
-import { UserData, KetuaTimData, PPLAdminData, Kecamatan, Desa, DAFTAR_TIM } from "@shared/api";
+import { UserData, KetuaTimData, PPLAdminData, Kecamatan, Desa } from "@shared/api";
+import { opsiTim, samakanNamaTim } from "@/lib/daftarTim";
+import PilihTim from "@/components/admin/PilihTim";
+import PilihAkunKetuaTim from "@/components/admin/PilihAkunKetuaTim";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +73,14 @@ const FormError = ({ message }: { message: string | null }) => {
   );
 };
 
+/**
+ * Tahun bawaan saat menambah ketua tim: tahun berjalan.
+ *
+ * Kepengurusan dicatat per tahun (lihat migrasi 2026-09-28), dan yang hampir
+ * selalu dimaksud adalah tahun ini. Tahun lain tetap bisa dipilih di formnya.
+ */
+const TAHUN_BERJALAN = new Date().getFullYear();
+
 export default function ManajemenAdmin() {
   const {
     userList,
@@ -84,7 +95,9 @@ export default function ManajemenAdmin() {
     addPPLAdmin,
     removePPLAdmin,
     ubahAktifPPLAdmin,
-    updatePPLAdmin
+    updatePPLAdmin,
+    salinKetuaTim,
+    gantiNamaTim
   } = useAdmin();
   
   const { data: kecamatanList = [] } = useQuery({ queryKey: ['kecamatan'], queryFn: fetchKecamatan });
@@ -95,6 +108,13 @@ export default function ManajemenAdmin() {
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
   const [showAddKetuaTimModal, setShowAddKetuaTimModal] = useState(false);
+  const [showSalinModal, setShowSalinModal] = useState(false);
+  const [salinDari, setSalinDari] = useState<number>(TAHUN_BERJALAN);
+  const [salinKe, setSalinKe] = useState<number>(TAHUN_BERJALAN + 1);
+  const [showGantiTimModal, setShowGantiTimModal] = useState(false);
+  const [timLama, setTimLama] = useState("");
+  const [timBaru, setTimBaru] = useState("");
+  const [gantiSemuaTahun, setGantiSemuaTahun] = useState(true);
   const [showAddPPLModal, setShowAddPPLModal] = useState(false);
   const [showEditPPLModal, setShowEditPPLModal] = useState(false);
   const [showDeletePPLModal, setShowDeletePPLModal] = useState(false);
@@ -109,6 +129,7 @@ export default function ManajemenAdmin() {
   
   const [formError, setFormError] = useState<string | null>(null);
 
+  // `nip` ikut di sini sejak NIP pindah dari ketua_tim ke akun.
   const [newUserData, setNewUserData] = useState<UserData>({
     id: "",
     username: "",
@@ -121,10 +142,16 @@ export default function ManajemenAdmin() {
   const [deleteUserId, setDeleteUserId] = useState("");
   const [deleteUserName, setDeleteUserName] = useState("");
   
+  // Penyaring tahun kepengurusan. Setelah beberapa tahun, daftar ketua tim
+  // berisi semua angkatan sekaligus; yang dicari sehari-hari hanya tahun ini.
+  const [ketuaTimTahunFilter, setKetuaTimTahunFilter] = useState("all");
+
   const [newKetuaTimData, setNewKetuaTimData] = useState<KetuaTimData>({
     id: "",
+    tahun: TAHUN_BERJALAN,
+    // Diisi dari akun yang dipilih saat disimpan; tidak pernah diketik sendiri.
     nama: "",
-    nip: "",
+    userId: "",
     tim: ""
   });
   const [editKetuaTimData, setEditKetuaTimData] = useState<KetuaTimData | null>(null);
@@ -175,29 +202,42 @@ export default function ManajemenAdmin() {
   const isValidUsername = (username: string) => username.trim().length >= 3;
 
   const isValidNamaLengkap = (nama: string) => nama.trim().length >= 2;
-  const isValidNip = (nip: string) => nip.trim().length >= 10;
+  // NIP boleh dikosongkan; yang diperiksa hanya bentuknya bila diisi. Menahan
+  // pembuatan akun demi satu nomor yang bisa dilengkapi kapan saja tidak ada
+  // gunanya, dan akun tanpa NIP tetap bisa menjadi ketua tim.
+  const isValidNip = (nip: string | null | undefined) => {
+    const teks = String(nip ?? '').trim();
+    return teks === '' || teks.length >= 10;
+  };
   const isValidTelepon = (telepon: string) => /^\d{10,}$/.test(telepon.trim());
   const isValidAlamat = (alamat: string) => alamat.trim().length >= 5;
   
   const isDuplicateUserId = (id: string, excludeId?: string) => userList.some(user => user.id.toLowerCase() === id.toLowerCase() && user.id !== excludeId);
   const isDuplicateUsername = (username: string, excludeId?: string) => userList.some(user => user.username.toLowerCase() === username.toLowerCase() && user.id !== excludeId);
   const isDuplicateKetuaTimId = (id: string, excludeId?: string) => ketuaTimList.some(kt => kt.id.toLowerCase() === id.toLowerCase() && kt.id !== excludeId);
-  const isDuplicateNip = (nip: string, excludeId?: string) => ketuaTimList.some(kt => kt.nip === nip && kt.id !== excludeId);
+  // NIP kini milik akun, jadi kekembarannya diperiksa terhadap daftar akun.
+  // NIP kosong tidak pernah dianggap kembar: "belum diisi" bukan sebuah nomor.
+  const isDuplicateNip = (nip: string | null | undefined, excludeId?: string) => {
+    const teks = String(nip ?? '').trim();
+    return teks !== '' && userList.some(u => String(u.nip ?? '').trim() === teks && u.id !== excludeId);
+  };
   const isDuplicatePPLId = (id: string, excludeId?: string) => pplAdminList.some(ppl => ppl.id.toLowerCase() === id.toLowerCase() && ppl.id !== excludeId);
   const isDuplicatePPLTelepon = (telepon: string, excludeId?: string) => pplAdminList.some(ppl => ppl.noTelepon === telepon && ppl.id !== excludeId);
   
   const handleAddUser = () => {
     setFormError(null);
-    const { id, username, password, namaLengkap, role, isPML } = newUserData;
+    const { id, username, password, namaLengkap, nip, role, isPML } = newUserData;
     if (!isValidUserId(id)) { setFormError("ID User harus diisi!"); return; }
     if (!isValidUsername(username)) { setFormError("Username harus minimal 3 karakter!"); return; }
     { const galatPassword = periksaPassword(password, username); if (galatPassword) { setFormError(galatPassword); return; } }
     if (!isValidNamaLengkap(namaLengkap)) { setFormError("Nama lengkap harus minimal 2 karakter!"); return; }
+    if (!isValidNip(nip)) { setFormError("NIP minimal 10 karakter, atau kosongkan saja."); return; }
     if (isDuplicateUserId(id)) { setFormError("ID User sudah ada!"); return; }
     if (isDuplicateUsername(username)) { setFormError("Username sudah ada!"); return; }
-    
-    addUser({ id: id.trim(), username: username.trim(), password, namaLengkap: namaLengkap.trim(), role, isPML });
-    setNewUserData({ id: "", username: "", password: "", namaLengkap: "", role: "user", isPML: false });
+    if (isDuplicateNip(nip)) { setFormError("NIP sudah dipakai akun lain!"); return; }
+
+    addUser({ id: id.trim(), username: username.trim(), password, namaLengkap: namaLengkap.trim(), nip: String(nip ?? '').trim(), role, isPML });
+    setNewUserData({ id: "", username: "", password: "", namaLengkap: "", nip: "", role: "user", isPML: false });
     setShowAddUserModal(false);
     setSuccessMessage(`User "${username}" berhasil ditambahkan!`);
     setShowSuccessModal(true);
@@ -206,13 +246,15 @@ export default function ManajemenAdmin() {
   const handleEditUser = () => {
     setFormError(null);
     if (!editUserData) return;
-    const { username, password, namaLengkap } = editUserData;
+    const { username, password, namaLengkap, nip } = editUserData;
     if (!isValidUsername(username)) { setFormError("Username harus minimal 3 karakter!"); return; }
     if (password) { const galatPassword = periksaPassword(password, username); if (galatPassword) { setFormError(galatPassword); return; } }
     if (!isValidNamaLengkap(namaLengkap)) { setFormError("Nama lengkap harus minimal 2 karakter!"); return; }
+    if (!isValidNip(nip)) { setFormError("NIP minimal 10 karakter, atau kosongkan saja."); return; }
     if (isDuplicateUsername(username, editUserData.id)) { setFormError("Username sudah ada!"); return; }
-    
-    updateUser(editUserData.id, { ...editUserData, username: username.trim(), namaLengkap: namaLengkap.trim() });
+    if (isDuplicateNip(nip, editUserData.id)) { setFormError("NIP sudah dipakai akun lain!"); return; }
+
+    updateUser(editUserData.id, { ...editUserData, username: username.trim(), namaLengkap: namaLengkap.trim(), nip: String(nip ?? '').trim() });
     setShowEditUserModal(false);
     setSuccessMessage(`User "${username}" berhasil diperbarui!`);
     setShowSuccessModal(true);
@@ -231,40 +273,79 @@ export default function ManajemenAdmin() {
   
   const handleAddKetuaTim = () => {
     setFormError(null);
-    const { id, nama, nip, tim } = newKetuaTimData;
+    const { id, tahun, tim, userId } = newKetuaTimData;
     if (!isValidUserId(id)) { setFormError("ID Ketua Tim harus diisi!"); return; }
-    if (!isValidNamaLengkap(nama)) { setFormError("Nama harus minimal 2 karakter!"); return; }
-    if (!isValidNip(nip)) { setFormError("NIP harus minimal 10 karakter!"); return; }
+    // Akun adalah sumber nama dan NIP, jadi tanpa akun barisnya tidak punya
+    // nama sama sekali dan akan hilang dari dropdown ketua tim.
+    if (!userId) { setFormError("Pilih akun pengguna untuk ketua tim ini!"); return; }
     if (isDuplicateKetuaTimId(id)) { setFormError("ID Ketua Tim sudah ada!"); return; }
-    if (isDuplicateNip(nip)) { setFormError("NIP sudah ada!"); return; }
 
-    addKetuaTim({ id: id.trim(), nama: nama.trim(), nip: nip.trim(), tim: tim || null });
-    setNewKetuaTimData({ id: "", nama: "", nip: "", tim: "" });
+    // Tim dirapikan saat disimpan: spasi berlebih dibuang, dan ejaan yang
+    // sudah ada dipakai bila hanya beda huruf besar-kecil — kalau tidak,
+    // "pertanian" menjadi tim kedua di filter dan grafik Dashboard.
+    const namaAkun = userList.find(u => u.id === userId)?.namaLengkap ?? '';
+    addKetuaTim({ id: id.trim(), tahun, nama: namaAkun, userId, tim: samakanNamaTim(tim, opsiTimTersedia) });
+    setNewKetuaTimData({ id: "", tahun: TAHUN_BERJALAN, nama: "", userId: "", tim: "" });
     setShowAddKetuaTimModal(false);
-    setSuccessMessage(`Ketua Tim "${nama}" berhasil ditambahkan!`);
+    setSuccessMessage(`Ketua Tim "${namaAkun}" berhasil ditambahkan!`);
     setShowSuccessModal(true);
   };
   
   const handleEditKetuaTim = () => {
     setFormError(null);
     if (!editKetuaTimData) return;
-    const { nama, nip } = editKetuaTimData;
-    
-    if (!isValidNamaLengkap(nama)) { setFormError("Nama harus minimal 2 karakter!"); return; }
-    if (!isValidNip(nip)) { setFormError("NIP harus minimal 10 karakter!"); return; }
-    if (isDuplicateNip(nip, editKetuaTimData.id)) { setFormError("NIP sudah ada!"); return; }
-    
-    updateKetuaTim(editKetuaTimData.id, { ...editKetuaTimData, nama: nama.trim(), nip: nip.trim() });
+    const { userId } = editKetuaTimData;
+
+    if (!userId) { setFormError("Pilih akun pengguna untuk ketua tim ini!"); return; }
+
+    const namaAkun = userList.find(u => u.id === userId)?.namaLengkap ?? editKetuaTimData.nama;
+    updateKetuaTim(editKetuaTimData.id, {
+      ...editKetuaTimData, nama: namaAkun,
+      tim: samakanNamaTim(editKetuaTimData.tim, opsiTimTersedia),
+    });
     setShowEditKetuaTimModal(false);
-    setSuccessMessage(`Ketua Tim "${nama}" berhasil diperbarui!`);
+    setSuccessMessage(`Ketua Tim "${namaAkun}" berhasil diperbarui!`);
     setShowSuccessModal(true);
   };
   
+  // Sama seperti handleDeleteUser: ketua tim yang masih memegang kegiatan
+  // DITOLAK server, jadi hasilnya harus ditunggu. Sebelumnya pesan berhasil
+  // muncul seketika tanpa menunggu jawaban — penolakan apa pun lewat tanpa
+  // terlihat, dan barisnya seolah-olah sudah terhapus.
+  const handleSalinKetuaTim = () => {
+    setShowSalinModal(false);
+    salinKetuaTim({ dariTahun: salinDari, keTahun: salinKe }, {
+      onSuccess: (hasil) => {
+        const catatan = hasil.dilewati.length > 0
+          ? ` ${hasil.dilewati.length} tim dilewati karena sudah ada: ${hasil.dilewati.join(', ')}.`
+          : '';
+        setSuccessMessage(`${hasil.disalin} ketua tim disalin ke tahun ${salinKe}.${catatan}`);
+        setShowSuccessModal(true);
+      },
+      onError: (e) => setAlertModal({ isOpen: true, title: "Gagal Menyalin", message: e.message }),
+    });
+  };
+
+  const handleGantiNamaTim = () => {
+    setShowGantiTimModal(false);
+    gantiNamaTim(
+      { lama: timLama, baru: timBaru, tahun: gantiSemuaTahun ? null : ketuaTimTahunAktif },
+      {
+        onSuccess: (hasil) => {
+          setSuccessMessage(`Nama tim diubah menjadi "${timBaru}" pada ${hasil.diubah} kepengurusan.`);
+          setShowSuccessModal(true);
+          setTimLama(""); setTimBaru("");
+        },
+        onError: (e) => setAlertModal({ isOpen: true, title: "Nama Tim Tidak Diubah", message: e.message }),
+      });
+  };
+
   const handleDeleteKetuaTim = () => {
-    removeKetuaTim(deleteKetuaTimId);
     setShowDeleteKetuaTimModal(false);
-    setSuccessMessage(`Ketua Tim "${deleteKetuaTimName}" berhasil dihapus!`);
-    setShowSuccessModal(true);
+    removeKetuaTim(deleteKetuaTimId, {
+      onSuccess: () => { setSuccessMessage(`Ketua Tim "${deleteKetuaTimName}" berhasil dihapus!`); setShowSuccessModal(true); },
+      onError: (e) => setAlertModal({ isOpen: true, title: "Ketua Tim Tidak Dihapus", message: e.message }),
+    });
   };
 
   const handleAddPPL = () => {
@@ -374,7 +455,7 @@ export default function ManajemenAdmin() {
   };
   
   const filteredAndSortedUsers = useMemo(() => userList.filter(user => user.username.toLowerCase().includes(userSearchTerm.toLowerCase()) || user.namaLengkap.toLowerCase().includes(userSearchTerm.toLowerCase())).sort((a, b) => { if (!userSortConfig) return 0; const { key, direction } = userSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [userList, userSearchTerm, userSortConfig]);
-  const filteredAndSortedKetuaTim = useMemo(() => ketuaTimList.filter(kt => kt.nama.toLowerCase().includes(ketuaTimSearchTerm.toLowerCase()) || kt.nip.includes(ketuaTimSearchTerm)).sort((a, b) => { if (!ketuaTimSortConfig) return 0; const { key, direction } = ketuaTimSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [ketuaTimList, ketuaTimSearchTerm, ketuaTimSortConfig]);
+  const filteredAndSortedKetuaTim = useMemo(() => ketuaTimList.filter(kt => (ketuaTimTahunFilter === 'all' || String(kt.tahun) === ketuaTimTahunFilter) && (kt.nama.toLowerCase().includes(ketuaTimSearchTerm.toLowerCase()) || String(kt.nip ?? '').includes(ketuaTimSearchTerm))).sort((a, b) => { if (!ketuaTimSortConfig) return 0; const { key, direction } = ketuaTimSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [ketuaTimList, ketuaTimSearchTerm, ketuaTimSortConfig, ketuaTimTahunFilter]);
   const filteredAndSortedPPL = useMemo(() => pplAdminList.filter(ppl => ppl.namaPPL.toLowerCase().includes(pplSearchTerm.toLowerCase()) || ppl.id.toLowerCase().includes(pplSearchTerm.toLowerCase()) || ppl.alamat.toLowerCase().includes(pplSearchTerm.toLowerCase()) || ppl.noTelepon.includes(pplSearchTerm)).sort((a, b) => { if (!pplSortConfig) return 0; const { key, direction } = pplSortConfig; let aValue = a[key] as any; let bValue = b[key] as any; if (typeof aValue === 'string') aValue = aValue.toLowerCase(); if (typeof bValue === 'string') bValue = bValue.toLowerCase(); if (aValue < bValue) return direction === 'asc' ? -1 : 1; if (aValue > bValue) return direction === 'asc' ? 1 : -1; return 0; }), [pplAdminList, pplSearchTerm, pplSortConfig]);
 
   const getRoleBadgeColor = (role: string) => { switch (role) { case 'admin': return 'bg-red-600'; case 'supervisor': return 'bg-blue-600'; case 'user': return 'bg-green-600'; default: return 'bg-muted-foreground'; } };
@@ -389,6 +470,21 @@ export default function ManajemenAdmin() {
     totalTim: new Set(ketuaTimList.map(kt => kt.tim).filter(Boolean)).size,
   }), [ketuaTimList]);
   const pplStats = useMemo(() => ({ totalPPL: pplAdminList.length }), [pplAdminList]);
+
+  // Pilihan tim tumbuh mengikuti data: begitu satu ketua tim bertim "Pertanian"
+  // disimpan, tim itu muncul sendiri di daftar berikutnya. Daftar bawaan di
+  // `shared/api.ts` tinggal menjadi benih, bukan batas.
+  // Tahun yang sedang dilihat; dipakai mode "hanya tahun ini" saat mengganti
+  // nama tim. Bila penyaringnya "Semua tahun", yang dipakai tahun berjalan.
+  const ketuaTimTahunAktif = ketuaTimTahunFilter === 'all'
+    ? TAHUN_BERJALAN : Number(ketuaTimTahunFilter);
+
+  const tahunKetuaTimTersedia = useMemo(
+    () => [...new Set(ketuaTimList.map(kt => kt.tahun).filter(Boolean))].sort((a, b) => b - a),
+    [ketuaTimList]);
+
+  const opsiTimTersedia = useMemo(
+    () => opsiTim(ketuaTimList.map(kt => kt.tim)), [ketuaTimList]);
 
 
   // PERBAIKAN: Logika paginasi untuk setiap tab
@@ -514,6 +610,15 @@ export default function ManajemenAdmin() {
                         <CardTitle>Daftar Ketua Tim</CardTitle>
                         <div className="flex gap-4">
                             <div className="sm:w-64"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" /><Input type="text" placeholder="Cari nama atau NIP..." value={ketuaTimSearchTerm} onChange={(e) => setKetuaTimSearchTerm(e.target.value)} className="pl-10"/></div></div>
+                            <Select value={ketuaTimTahunFilter} onValueChange={setKetuaTimTahunFilter}>
+                              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">Semua tahun</SelectItem>
+                                {tahunKetuaTimTersedia.map(t => (<SelectItem key={t} value={String(t)}>{t}</SelectItem>))}
+                              </SelectContent>
+                            </Select>
+                            <Button variant="outline" onClick={() => setShowSalinModal(true)}><CopyPlus className="w-4 h-4 mr-2"/>Salin Tahun</Button>
+                            <Button variant="outline" onClick={() => { setTimLama(opsiTimTersedia[0] ?? ""); setTimBaru(opsiTimTersedia[0] ?? ""); setShowGantiTimModal(true); }}><PenLine className="w-4 h-4 mr-2"/>Ganti Nama Tim</Button>
                             <Button onClick={openAddKetuaTimModal} className="bg-bps-green-600 hover:bg-bps-green-700"><Plus className="w-4 h-4 mr-2"/>Tambah Ketua Tim</Button>
                         </div>
                     </div>
@@ -524,10 +629,12 @@ export default function ManajemenAdmin() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-[15%]"><button onClick={() => handleKetuaTimSort('id')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">ID{getSortIcon('id', ketuaTimSortConfig)}</button></TableHead>
-                                    <TableHead className="w-[35%]"><button onClick={() => handleKetuaTimSort('nama')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">Nama{getSortIcon('nama', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[30%]"><button onClick={() => handleKetuaTimSort('nama')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">Nama{getSortIcon('nama', ketuaTimSortConfig)}</button></TableHead>
+                                    <TableHead className="w-[10%]"><button onClick={() => handleKetuaTimSort('tahun')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">Tahun{getSortIcon('tahun', ketuaTimSortConfig)}</button></TableHead>
                                     <TableHead className="w-[20%]"><button onClick={() => handleKetuaTimSort('nip')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">NIP{getSortIcon('nip', ketuaTimSortConfig)}</button></TableHead>
                                     <TableHead className="w-[20%]"><button onClick={() => handleKetuaTimSort('tim')} className="flex items-center gap-1 hover:bg-muted/50 p-1 rounded -ml-1">Tim{getSortIcon('tim', ketuaTimSortConfig)}</button></TableHead>
-                                    <TableHead className="w-[20%]">Akun</TableHead>
+                                    {/* Kolom "Akun" dihapus: nama pada kolom Nama SUDAH nama akunnya, jadi
+                                        menampilkannya lagi hanya mengulang isi yang sama. */}
                                     <TableHead className="w-[15%]">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -536,8 +643,10 @@ export default function ManajemenAdmin() {
                                     <TableRow key={ketuaTim.id}>
                                         <TableCell className="font-medium truncate">{ketuaTim.id}</TableCell>
                                         <TableCell className="font-medium truncate">{ketuaTim.nama}</TableCell>
-                                        <TableCell className="truncate">{ketuaTim.nip}</TableCell>
-                                        <TableCell className="truncate">{ketuaTim.tim ? <Badge variant="outline">{ketuaTim.tim}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell><TableCell className="truncate">{ketuaTim.namaUser ? <span className="text-sm">{ketuaTim.namaUser}</span> : <Badge variant="outline" className="text-muted-foreground">Belum ditautkan</Badge>}</TableCell>
+                                        <TableCell className="truncate">{ketuaTim.tahun}</TableCell>
+                                        {/* NIP ikut akunnya. Kosong bukan kesalahan: diisi kapan saja lewat tab Users. */}
+                                        <TableCell className="truncate">{ketuaTim.nip || <span className="text-muted-foreground">Belum diisi</span>}</TableCell>
+                                        <TableCell className="truncate">{ketuaTim.tim ? <Badge variant="outline">{ketuaTim.tim}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
                                         <TableCell><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEditKetuaTimModal(ketuaTim)} className="text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:text-blue-300"><Edit className="w-4 h-4"/></Button><Button variant="outline" size="sm" onClick={() => openDeleteKetuaTimModal(ketuaTim)} className="text-red-600 dark:text-red-300 hover:text-red-700 dark:text-red-300"><Trash2 className="w-4 h-4"/></Button></div></TableCell>
                                     </TableRow>
                                 )))}
@@ -639,10 +748,37 @@ export default function ManajemenAdmin() {
             description={alertModal.message}
         />
         <ConfirmationModal isOpen={showDeleteUserModal} onClose={() => setShowDeleteUserModal(false)} onConfirm={handleDeleteUser} title="Konfirmasi Hapus User" description={`Apakah Anda yakin ingin menghapus user "${deleteUserName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
+        {showSalinModal && <Dialog open={showSalinModal} onOpenChange={setShowSalinModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Salin Kepengurusan</DialogTitle></DialogHeader><div className="space-y-4 py-4">
+          <p className="text-sm text-muted-foreground">Menyalin seluruh ketua tim satu tahun ke tahun lain. Tim yang di tahun tujuan sudah ada akan dilewati, bukan ditimpa.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label htmlFor="salinDari">Dari tahun</Label><Input id="salinDari" type="number" min={2000} max={2100} value={salinDari} onChange={e => setSalinDari(Number(e.target.value))} /></div>
+            <div className="space-y-2"><Label htmlFor="salinKe">Ke tahun</Label><Input id="salinKe" type="number" min={2000} max={2100} value={salinKe} onChange={e => setSalinKe(Number(e.target.value))} /></div>
+          </div>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowSalinModal(false)}>Batal</Button><Button onClick={handleSalinKetuaTim}><CopyPlus className="w-4 h-4 mr-2"/>Salin</Button></div>
+        </div></DialogContent></Dialog>}
+
+        {showGantiTimModal && <Dialog open={showGantiTimModal} onOpenChange={setShowGantiTimModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Ganti Nama Tim</DialogTitle></DialogHeader><div className="space-y-4 py-4">
+          <p className="text-sm text-muted-foreground">Mengubah nama sebuah tim di semua ketua tim yang memakainya — tanpa membuat tim baru yang menumpuk di dropdown dan grafik.</p>
+          <div className="space-y-2"><Label htmlFor="timLama">Tim yang diganti</Label>
+            <Select value={timLama} onValueChange={setTimLama}>
+              <SelectTrigger id="timLama"><SelectValue placeholder="Pilih tim" /></SelectTrigger>
+              <SelectContent>{opsiTimTersedia.map(t => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2"><Label htmlFor="timBaru">Nama baru</Label><Input id="timBaru" value={timBaru} onChange={e => setTimBaru(e.target.value)} placeholder="Contoh: Neraca dan Analisis Statistik" /></div>
+          <div className="flex items-start gap-2 rounded-md border p-3">
+            <input id="gantiSemua" type="checkbox" className="mt-1" checked={gantiSemuaTahun} onChange={e => setGantiSemuaTahun(e.target.checked)} />
+            <Label htmlFor="gantiSemua" className="text-sm font-normal">Terapkan ke semua tahun
+              <span className="block text-xs text-muted-foreground">Dimatikan berarti hanya kepengurusan {ketuaTimTahunAktif} yang berubah; tahun sebelumnya tetap memakai nama lama.</span>
+            </Label>
+          </div>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowGantiTimModal(false)}>Batal</Button><Button onClick={handleGantiNamaTim} disabled={!timLama || !timBaru.trim()}><PenLine className="w-4 h-4 mr-2"/>Ganti Nama</Button></div>
+        </div></DialogContent></Dialog>}
+
         <ConfirmationModal isOpen={showDeleteKetuaTimModal} onClose={() => setShowDeleteKetuaTimModal(false)} onConfirm={handleDeleteKetuaTim} title="Konfirmasi Hapus Ketua Tim" description={`Apakah Anda yakin ingin menghapus ketua tim "${deleteKetuaTimName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         <ConfirmationModal isOpen={showDeletePPLModal} onClose={() => setShowDeletePPLModal(false)} onConfirm={handleDeletePPL} title="Konfirmasi Hapus PPL" description={`Apakah Anda yakin ingin menghapus PPL "${deletePPLName}"? Tindakan ini tidak dapat dibatalkan.`} confirmLabel="Ya, Hapus" cancelLabel="Batal" variant="danger" icon={<Trash2 className="w-6 h-6" />}/>
         
-        {showAddUserModal && <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Tambah User Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newUserId">ID User</Label><Input id="newUserId" value={newUserData.id} readOnly className="bg-muted text-muted-foreground"/><p className="text-xs text-muted-foreground">Dibuat otomatis.</p></div><div className="space-y-2"><Label htmlFor="newUsername">Username *</Label><Input id="newUsername" value={newUserData.username} onChange={(e) => setNewUserData(prev => ({ ...prev, username: e.target.value }))} placeholder="Masukkan username"/></div><div className="space-y-2"><Label htmlFor="newPassword">Password *</Label><div className="relative"><Input id="newPassword" type={showPassword ? "text" : "password"} value={newUserData.password} onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))} placeholder={`Masukkan password (minimal ${PANJANG_MIN_PASSWORD} karakter)`}/><Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div><div className="space-y-2"><Label htmlFor="newNamaLengkap">Nama Lengkap *</Label><Input id="newNamaLengkap" value={newUserData.namaLengkap} onChange={(e) => setNewUserData(prev => ({ ...prev, namaLengkap: e.target.value }))} placeholder="Masukkan nama lengkap"/></div><div className="space-y-2"><Label htmlFor="newRole">Role *</Label><Select value={newUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setNewUserData(prev => ({ ...prev, role: value }))}><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+        {showAddUserModal && <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Tambah User Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newUserId">ID User</Label><Input id="newUserId" value={newUserData.id} readOnly className="bg-muted text-muted-foreground"/><p className="text-xs text-muted-foreground">Dibuat otomatis.</p></div><div className="space-y-2"><Label htmlFor="newUsername">Username *</Label><Input id="newUsername" value={newUserData.username} onChange={(e) => setNewUserData(prev => ({ ...prev, username: e.target.value }))} placeholder="Masukkan username"/></div><div className="space-y-2"><Label htmlFor="newPassword">Password *</Label><div className="relative"><Input id="newPassword" type={showPassword ? "text" : "password"} value={newUserData.password} onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))} placeholder={`Masukkan password (minimal ${PANJANG_MIN_PASSWORD} karakter)`}/><Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div><div className="space-y-2"><Label htmlFor="newNamaLengkap">Nama Lengkap *</Label><Input id="newNamaLengkap" value={newUserData.namaLengkap} onChange={(e) => setNewUserData(prev => ({ ...prev, namaLengkap: e.target.value }))} placeholder="Masukkan nama lengkap"/></div><div className="space-y-2"><Label htmlFor="newNip">NIP</Label><Input id="newNip" value={newUserData.nip ?? ''} onChange={(e) => setNewUserData(prev => ({ ...prev, nip: e.target.value }))} placeholder="Boleh dikosongkan"/><p className="text-xs text-muted-foreground">Opsional, bisa diisi kapan saja. Dipakai bila akun ini dijadikan ketua tim, dan begitu diisi langsung berlaku untuk semua tahun kepengurusannya.</p></div><div className="space-y-2"><Label htmlFor="newRole">Role *</Label><Select value={newUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setNewUserData(prev => ({ ...prev, role: value }))}><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
   <div className="space-y-0.5">
     <Label htmlFor="isPML-new">Status PML</Label>
     <p className="text-[0.8rem] text-muted-foreground">Aktifkan jika user ini adalah seorang PML.</p>
@@ -653,7 +789,7 @@ export default function ManajemenAdmin() {
     onCheckedChange={(checked) => setNewUserData(prev => ({ ...prev, isPML: checked }))}
   />
 </div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddUserModal(false)}>Batal</Button><Button onClick={handleAddUser} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
-        {showAddKetuaTimModal && <Dialog open={showAddKetuaTimModal} onOpenChange={setShowAddKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Tambah Ketua Tim Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newKetuaTimId">ID Ketua Tim</Label><Input id="newKetuaTimId" value={newKetuaTimData.id} readOnly className="bg-muted text-muted-foreground"/><p className="text-xs text-muted-foreground">Dibuat otomatis.</p></div><div className="space-y-2"><Label htmlFor="newKetuaTimNama">Nama *</Label><Input id="newKetuaTimNama" value={newKetuaTimData.nama} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nama: e.target.value }))} placeholder="Masukkan nama ketua tim"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimNip">NIP *</Label><Input id="newKetuaTimNip" value={newKetuaTimData.nip} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, nip: e.target.value }))} placeholder="Masukkan NIP (minimal 10 karakter)"/></div><div className="space-y-2"><Label htmlFor="newKetuaTimTim">Tim</Label><Select value={newKetuaTimData.tim || undefined} onValueChange={(val) => setNewKetuaTimData(prev => ({ ...prev, tim: val }))}><SelectTrigger id="newKetuaTimTim"><SelectValue placeholder="Pilih tim..." /></SelectTrigger><SelectContent>{DAFTAR_TIM.map(t => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent></Select></div><div className="space-y-2"><Label htmlFor="newKetuaTimUser">Akun Pengguna</Label><Select value={newKetuaTimData.userId || "__none__"} onValueChange={(val) => setNewKetuaTimData(prev => ({ ...prev, userId: val === "__none__" ? null : val }))}><SelectTrigger id="newKetuaTimUser"><SelectValue placeholder="Belum ditautkan" /></SelectTrigger><SelectContent><SelectItem value="__none__">— Belum ditautkan —</SelectItem>{userList.map(u => (<SelectItem key={u.id} value={u.id}>{u.namaLengkap} ({u.username})</SelectItem>))}</SelectContent></Select><p className="text-xs text-muted-foreground">Menentukan siapa yang menerima notifikasi kegiatan tim ini.</p></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddKetuaTimModal(false)}>Batal</Button><Button onClick={handleAddKetuaTim} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
+        {showAddKetuaTimModal && <Dialog open={showAddKetuaTimModal} onOpenChange={setShowAddKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Tambah Ketua Tim Baru</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="newKetuaTimId">ID Ketua Tim</Label><Input id="newKetuaTimId" value={newKetuaTimData.id} readOnly className="bg-muted text-muted-foreground"/><p className="text-xs text-muted-foreground">Dibuat otomatis.</p></div><div className="space-y-2"><Label htmlFor="newKetuaTimTahun">Tahun Kepengurusan *</Label><Input id="newKetuaTimTahun" type="number" min={2000} max={2100} value={newKetuaTimData.tahun} onChange={(e) => setNewKetuaTimData(prev => ({ ...prev, tahun: Number(e.target.value) }))}/><p className="text-xs text-muted-foreground">Ketua tim dicatat per tahun. Untuk pergantian tahun depan, tambahkan baris baru — jangan sunting yang lama, karena kegiatan tahun sebelumnya ikut berubah namanya.</p></div><PilihAkunKetuaTim id="newKetuaTimUser" nilai={newKetuaTimData.userId} daftarUser={userList} onUbah={(userId) => setNewKetuaTimData(prev => ({ ...prev, userId }))} /><PilihTim id="newKetuaTimTim" nilai={newKetuaTimData.tim} opsi={opsiTimTersedia} onUbah={(tim) => setNewKetuaTimData(prev => ({ ...prev, tim }))} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowAddKetuaTimModal(false)}>Batal</Button><Button onClick={handleAddKetuaTim} className="bg-bps-green-600 hover:bg-bps-green-700"><Save className="w-4 h-4 mr-2" />Simpan</Button></div></div></DialogContent></Dialog>}
         {showAddPPLModal && <Dialog open={showAddPPLModal} onOpenChange={setShowAddPPLModal}>
     <DialogContent>
         <DialogHeader>
@@ -732,7 +868,7 @@ export default function ManajemenAdmin() {
     </DialogContent>
 </Dialog>}
         
-        {editUserData && <Dialog open={showEditUserModal} onOpenChange={setShowEditUserModal}><DialogContent><DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editUsername">Username *</Label><Input id="editUsername" value={editUserData.username} onChange={e => setEditUserData({...editUserData, username: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editNamaLengkap">Nama Lengkap *</Label><Input id="editNamaLengkap" value={editUserData.namaLengkap} onChange={e => setEditUserData({...editUserData, namaLengkap: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editPassword">Password (kosongkan jika tidak diubah)</Label><Input id="editPassword" type="password" onChange={e => setEditUserData({...editUserData, password: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editRole">Role *</Label><Select value={editUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setEditUserData({...editUserData, role: value})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+        {editUserData && <Dialog open={showEditUserModal} onOpenChange={setShowEditUserModal}><DialogContent><DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editUsername">Username *</Label><Input id="editUsername" value={editUserData.username} onChange={e => setEditUserData({...editUserData, username: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editNamaLengkap">Nama Lengkap *</Label><Input id="editNamaLengkap" value={editUserData.namaLengkap} onChange={e => setEditUserData({...editUserData, namaLengkap: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editNip">NIP</Label><Input id="editNip" value={editUserData.nip ?? ''} onChange={e => setEditUserData({...editUserData, nip: e.target.value})} placeholder="Boleh dikosongkan" /><p className="text-xs text-muted-foreground">Dipakai bila akun ini menjadi ketua tim; berlaku untuk semua tahun kepengurusannya sekaligus.</p></div><div className="space-y-2"><Label htmlFor="editPassword">Password (kosongkan jika tidak diubah)</Label><Input id="editPassword" type="password" onChange={e => setEditUserData({...editUserData, password: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editRole">Role *</Label><Select value={editUserData.role} onValueChange={(value: 'admin' | 'user' | 'supervisor') => setEditUserData({...editUserData, role: value})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="supervisor">Supervisor</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
   <div className="space-y-0.5">
     <Label htmlFor="isPML-edit">Status PML</Label>
     <p className="text-[0.8rem] text-muted-foreground">Aktifkan jika user ini adalah seorang PML.</p>
@@ -743,7 +879,7 @@ export default function ManajemenAdmin() {
     onCheckedChange={(checked) => setEditUserData({...editUserData, isPML: checked})}
   />
 </div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditUserModal(false)}>Batal</Button><Button onClick={handleEditUser}>Simpan</Button></div></div></DialogContent></Dialog>}
-        {editKetuaTimData && <Dialog open={showEditKetuaTimModal} onOpenChange={setShowEditKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Edit Ketua Tim</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editKtNama">Nama *</Label><Input id="editKtNama" value={editKetuaTimData.nama} onChange={e => setEditKetuaTimData({...editKetuaTimData, nama: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editKtNip">NIP *</Label><Input id="editKtNip" value={editKetuaTimData.nip} onChange={e => setEditKetuaTimData({...editKetuaTimData, nip: e.target.value})} /></div><div className="space-y-2"><Label htmlFor="editKtTim">Tim</Label><Select value={editKetuaTimData.tim || undefined} onValueChange={val => setEditKetuaTimData({...editKetuaTimData, tim: val})}><SelectTrigger id="editKtTim"><SelectValue placeholder="Pilih tim..." /></SelectTrigger><SelectContent>{DAFTAR_TIM.map(t => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent></Select></div><div className="space-y-2"><Label htmlFor="editKetuaTimUser">Akun Pengguna</Label><Select value={editKetuaTimData.userId || "__none__"} onValueChange={(val) => setEditKetuaTimData({ ...editKetuaTimData, userId: val === "__none__" ? null : val })}><SelectTrigger id="editKetuaTimUser"><SelectValue placeholder="Belum ditautkan" /></SelectTrigger><SelectContent><SelectItem value="__none__">— Belum ditautkan —</SelectItem>{userList.map(u => (<SelectItem key={u.id} value={u.id}>{u.namaLengkap} ({u.username})</SelectItem>))}</SelectContent></Select><p className="text-xs text-muted-foreground">Menentukan siapa yang menerima notifikasi kegiatan tim ini.</p></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditKetuaTimModal(false)}>Batal</Button><Button onClick={handleEditKetuaTim}>Simpan</Button></div></div></DialogContent></Dialog>}
+        {editKetuaTimData && <Dialog open={showEditKetuaTimModal} onOpenChange={setShowEditKetuaTimModal}><DialogContent><DialogHeader><DialogTitle>Edit Ketua Tim</DialogTitle></DialogHeader><div className="space-y-4 py-4"><FormError message={formError} /><div className="space-y-2"><Label htmlFor="editKtTahun">Tahun Kepengurusan *</Label><Input id="editKtTahun" type="number" min={2000} max={2100} value={editKetuaTimData.tahun} onChange={e => setEditKetuaTimData({...editKetuaTimData, tahun: Number(e.target.value)})} /></div><PilihAkunKetuaTim id="editKetuaTimUser" nilai={editKetuaTimData.userId} daftarUser={userList} onUbah={(userId) => setEditKetuaTimData({ ...editKetuaTimData, userId })} /><PilihTim key={editKetuaTimData.id} id="editKtTim" nilai={editKetuaTimData.tim} opsi={opsiTimTersedia} onUbah={(tim) => setEditKetuaTimData({ ...editKetuaTimData, tim })} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowEditKetuaTimModal(false)}>Batal</Button><Button onClick={handleEditKetuaTim}>Simpan</Button></div></div></DialogContent></Dialog>}
         {editPPLData && <Dialog open={showEditPPLModal} onOpenChange={setShowEditPPLModal}>
           <DialogContent>
             <DialogHeader><DialogTitle>Edit PPL</DialogTitle></DialogHeader>

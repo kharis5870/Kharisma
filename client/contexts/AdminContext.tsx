@@ -26,6 +26,13 @@ const addKetuaTimAPI = (data: KetuaTimData): Promise<KetuaTimData> => apiClient.
 const updateKetuaTimAPI = ({ id, data }: { id: string, data: KetuaTimData }): Promise<KetuaTimData> => apiClient.put<KetuaTimData>(`/admin/ketua-tim/${id}`, data);
 const deleteKetuaTimAPI = (id: string): Promise<void> => apiClient.delete(`/admin/ketua-tim/${id}`);
 
+export interface HasilSalinKetuaTim { disalin: number; dilewati: string[] }
+const salinKetuaTimAPI = (data: { dariTahun: number; keTahun: number }): Promise<HasilSalinKetuaTim> =>
+  apiClient.post<HasilSalinKetuaTim>('/admin/ketua-tim/salin', data);
+
+const gantiNamaTimAPI = (data: { lama: string; baru: string; tahun?: number | null }): Promise<{ diubah: number }> =>
+  apiClient.put<{ diubah: number }>('/admin/tim/ganti-nama', data);
+
 const addPPLAPI = (data: PPLAdminData): Promise<PPLAdminData> => apiClient.post<PPLAdminData>('/admin/ppl', data);
 const updatePPLAPI = ({ id, data }: { id: string, data: PPLAdminData }): Promise<PPLAdminData> => apiClient.put<PPLAdminData>(`/admin/ppl/${id}`, data);
 const deletePPLAPI = (id: string): Promise<void> => apiClient.delete(`/admin/ppl/${id}`);
@@ -42,6 +49,8 @@ interface AdminContextType {
   addKetuaTim: UseMutationResult<KetuaTimData, Error, KetuaTimData>['mutate'];
   updateKetuaTim: (id: string, data: KetuaTimData) => void;
   removeKetuaTim: UseMutationResult<void, Error, string>['mutate'];
+  salinKetuaTim: UseMutationResult<HasilSalinKetuaTim, Error, { dariTahun: number; keTahun: number }>['mutate'];
+  gantiNamaTim: UseMutationResult<{ diubah: number }, Error, { lama: string; baru: string; tahun?: number | null }>['mutate'];
   pplAdminList: PPLAdminData[];
   addPPLAdmin: UseMutationResult<PPLAdminData, Error, PPLAdminData>['mutate'];
   updatePPLAdmin: (id: string, data: PPLAdminData) => void;
@@ -88,6 +97,10 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const ktAddMutation = useAdminMutation(addKetuaTimAPI, ['ketuaTimAdmin']);
   const ktUpdateMutation = useAdminMutation(updateKetuaTimAPI, ['ketuaTimAdmin']);
   const ktDeleteMutation = useAdminMutation(deleteKetuaTimAPI, ['ketuaTimAdmin']);
+  const ktSalinMutation = useAdminMutation(salinKetuaTimAPI, ['ketuaTimAdmin']);
+  // Nama tim ikut tampil di kegiatan (JOIN ke ketua_tim), jadi daftar kegiatan
+  // juga harus disegarkan setelah penggantian nama.
+  const timGantiNamaMutation = useAdminMutation(gantiNamaTimAPI, ['ketuaTimAdmin']);
 
   const pplAddMutation = useAdminMutation(addPPLAPI, ['pplAdmin']);
   const pplUpdateMutation = useAdminMutation(updatePPLAPI, ['pplAdmin']);
@@ -110,6 +123,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     addKetuaTim: ktAddMutation.mutate,
     updateKetuaTim: (id: string, data: KetuaTimData) => ktUpdateMutation.mutate({ id, data }),
     removeKetuaTim: ktDeleteMutation.mutate,
+    salinKetuaTim: ktSalinMutation.mutate,
+    gantiNamaTim: timGantiNamaMutation.mutate,
     pplAdminList,
     addPPLAdmin: pplAddMutation.mutate,
     updatePPLAdmin: (id: string, data: PPLAdminData) => pplUpdateMutation.mutate({ id, data }),

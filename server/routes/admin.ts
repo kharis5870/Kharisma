@@ -48,6 +48,14 @@ router.get('/pml', tangani(async (_req, res) => res.json(await adminService.getA
 router.get('/ketua-tim', tangani(async (_req, res) => res.json(await adminService.getAllKetuaTim())));
 router.post('/ketua-tim', wajibAdmin, tangani(async (req, res) => res.status(201).json(await adminService.createKetuaTim(req.body))));
 router.put('/ketua-tim/:id', wajibAdmin, tangani(async (req, res) => res.json(await adminService.updateKetuaTim(req.params.id, req.body))));
+// Menyalin kepengurusan satu tahun ke tahun berikutnya, dan mengganti nama
+// sebuah tim di seluruh baris yang memakainya. Keduanya wewenang admin.
+router.post('/ketua-tim/salin', wajibAdmin, tangani(async (req, res) =>
+    res.json(await adminService.salinKetuaTim(req.body?.dariTahun, req.body?.keTahun))));
+
+router.put('/tim/ganti-nama', wajibAdmin, tangani(async (req, res) =>
+    res.json(await adminService.gantiNamaTim(req.body?.lama, req.body?.baru, req.body?.tahun))));
+
 router.delete('/ketua-tim/:id', wajibAdmin, tangani(async (req, res) => {
     await adminService.deleteKetuaTim(req.params.id);
     res.status(204).send();

@@ -103,6 +103,12 @@ export interface HonorariumSettingsMap {
 
 export interface PPLMaster {
   id: string;
+  /**
+   * Penanda mitra di aplikasi SOBAT. Ikut dibawa ke pemilih mitra karena impor
+   * alokasi mencocokkan baris berkas lewat ID ini lebih dulu: nama bisa kembar
+   * dan bisa berbeda ejaannya, ID SOBAT tidak.
+   */
+  sobatId?: string | null;
   namaPPL: string;
   posisi: 'Pendataan' | 'Pengolahan' | 'Pendataan/Pengolahan';
   alamat: string;    
@@ -151,8 +157,11 @@ export const DAFTAR_TIM = [
 
 export interface KetuaTim {
   id: string;
+  /** Dibaca dari akun tertaut (`users.nama_lengkap`), bukan disimpan di sini. */
   namaKetua: string;
-  nip?: string;
+  nip?: string | null;
+  /** Tahun kepengurusan; lihat `KetuaTimData.tahun`. */
+  tahun?: number;
   /** Tim/bidang yang dipimpin, mis. "Produksi". */
   tim?: string | null;
   /** Akun `users` yang memegang ketua tim ini. Penentu penerima notifikasi. */
@@ -454,19 +463,46 @@ export interface UserData {
     username: string;
     password?: string;
     namaLengkap: string;
+    /**
+     * NIP pegawai. Boleh kosong: tidak semua akun punya NIP tercatat saat
+     * dibuat, dan menahan pembuatan akun demi satu nomor yang bisa dilengkapi
+     * kapan saja tidak ada gunanya.
+     *
+     * Tinggal DI SINI, bukan di `ketua_tim`, karena NIP milik orang bukan milik
+     * jabatan — mengisinya sekali langsung berlaku untuk seluruh tahun
+     * kepengurusan orang itu.
+     */
+    nip?: string | null;
     role: 'admin' | 'supervisor' | 'user';
     isPML?: boolean;
 }
 
+/**
+ * Satu baris kepengurusan: siapa memimpin tim apa pada tahun berapa.
+ *
+ * Tabel ini menyimpan JABATAN, bukan orang. Orang yang menjabat dua tahun
+ * berturut-turut punya dua baris dengan `id` berbeda, dan yang menyatakan
+ * keduanya orang yang sama adalah `userId`.
+ */
 export interface KetuaTimData {
     id: string;
+    /**
+     * Nama dan NIP pemegang jabatan ini, DIBACA dari akunnya — tidak disimpan
+     * di baris ini. Hanya untuk ditampilkan; mengubahnya dilakukan di menu
+     * Users, dan perubahannya langsung berlaku untuk semua tahunnya.
+     */
     nama: string;
-    nip: string;
+    nip?: string | null;
+    /**
+     * Tahun kepengurusan. Susunan tim kerja BPS berubah tiap tahun, jadi
+     * pergantian ketua tim dilakukan dengan MENAMBAH baris tahun berikutnya —
+     * bukan menyunting yang lama, yang akan ikut mengubah ketua tim pada
+     * kegiatan tahun-tahun sebelumnya.
+     */
+    tahun: number;
     tim?: string | null;
-    /** Akun `users` yang ditautkan. Kosong = belum ditautkan. */
-    userId?: string | null;
-    /** Nama lengkap akun tertaut, hanya untuk ditampilkan. */
-    namaUser?: string | null;
+    /** Akun `users` pemegang jabatan ini. Wajib — sumber nama dan NIP-nya. */
+    userId: string;
 }
 
 export interface PPLAdminData {
@@ -504,6 +540,23 @@ export interface PPLAdminData {
         tahap: string;
         sub_tahap?: 'listing' | 'updating' | null; 
     }[];
+    /**
+     * Rata-rata SELURUH penilaian mitra ini, dari semua triwulan dan semua
+     * kegiatan — rekam jejak, bukan potret satu periode.
+     *
+     * SENGAJA TIDAK mengikuti penyaring periode di Daftar PPL: penyaring itu
+     * menyaring honor, sedangkan bintang bicara mutu orangnya. Membuatnya ikut
+     * berarti artinya berubah-ubah mengikuti sesuatu yang tak berhubungan.
+     *
+     * Null berarti mitra ini belum pernah dinilai sama sekali.
+     */
+    rataRataPenilaian?: number | null;
+    /**
+     * Banyaknya penilaian di balik angka itu. Ditampilkan bersama bintangnya:
+     * satu nilai 9 dan rata-rata 8,5 dari dua belas penilaian sama-sama empat
+     * bintang, padahal keyakinannya jauh berbeda.
+     */
+    jumlahPenilaian?: number;
 }
 
 /**
@@ -602,6 +655,8 @@ export interface PenilaianMitra {
   kualitasPekerjaan: number | null;
   ketepatanWaktu: number | null;
   rataRata: number | null;
+  /** Komentar penilai; kosong untuk penilaian sebelum kolom ini ada. */
+  komentar?: string | null;
   sudahDinilai: boolean;
   tanggalPenilaian?: string | null; 
   dinilaiOleh?: string | null;
@@ -616,6 +671,8 @@ export interface PenilaianRequest {
   sikapPelikaku: number;
   kualitasPekerjaan: number;
   ketepatanWaktu: number;
+  /** Wajib diisi, minimal 20 karakter — lihat `komentarPenilaianSah`. */
+  komentar: string;
 }
 
 export interface RekapPenilaian {

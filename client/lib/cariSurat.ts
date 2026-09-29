@@ -33,3 +33,27 @@ export const cariRiwayatSurat = (data: RiwayatSuratItem[], kataKunci: string): R
         s.status === "batal" ? "batal" : "berlaku",
       ]))
     : data;
+
+/** Nama bulan untuk pilihan filter, indeks 0 = Januari. */
+export const NAMA_BULAN = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+] as const;
+
+/**
+ * Menyaring riwayat surat menurut BULAN tanggal suratnya.
+ *
+ * Bulan diambil dari teks 'yyyy-MM-dd' yang dikirim server (kuerinya memakai
+ * DATE_FORMAT), bukan lewat `new Date` — mengubahnya menjadi Date lalu membaca
+ * `getMonth()` mengikuti zona waktu mesin, dan surat tanggal 1 bisa jatuh ke
+ * bulan sebelumnya.
+ *
+ * `bulan` berupa dua digit '01'–'12'; nilai lain berarti semua bulan.
+ */
+export const saringBulanSurat = (
+  data: RiwayatSuratItem[],
+  bulan: string,
+): RiwayatSuratItem[] =>
+  /^(0[1-9]|1[0-2])$/.test(bulan)
+    ? data.filter(s => String(s.tanggalSurat ?? '').slice(5, 7) === bulan)
+    : data;

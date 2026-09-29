@@ -3,7 +3,7 @@
 import express from 'express';
 import { getPenilaianList, saveOrUpdatePenilaian, getRekapPenilaian } from '../services/penilaianService';
 // Jalur relatif, BUKAN @shared — lihat catatan di kontrakService.ts.
-import { nilaiPenilaianSah } from '../../shared/mutuPenilaian';
+import { nilaiPenilaianSah, komentarPenilaianSah, PESAN_KOMENTAR_PENDEK } from '../../shared/mutuPenilaian';
 import { wajibPenilaiMitra } from '../auth/kepemilikan';
 
 const router = express.Router();
@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
 // Hanya PML yang mengawasi mitra itu (atau admin) — lihat wajibPenilaiMitra.
 router.post('/', wajibPenilaiMitra, async (req, res) => {
   try {
-    const { kegiatanId, sikapPelikaku, kualitasPekerjaan, ketepatanWaktu } = req.body;
+    const { kegiatanId, sikapPelikaku, kualitasPekerjaan, ketepatanWaktu, komentar } = req.body;
     const ppl = res.locals.pplDinilai as { id: number; kegiatanId: number; pml_id: string | null };
 
     // kegiatanId dari klien hanya dicocokkan, tidak dipercaya: yang disimpan
@@ -50,6 +50,12 @@ router.post('/', wajibPenilaiMitra, async (req, res) => {
       }
     }
 
+    // Komentar wajib, sama seperti di layar. Diperiksa juga di sini karena
+    // permintaan langsung ke API tidak melewati layar.
+    if (!komentarPenilaianSah(komentar)) {
+      return res.status(400).json({ message: PESAN_KOMENTAR_PENDEK });
+    }
+
     // Identitas penilai dan PML diambil dari token dan database, BUKAN dari
     // badan permintaan — nilai kiriman klien tidak membuktikan apa pun.
     const result = await saveOrUpdatePenilaian({
@@ -60,6 +66,7 @@ router.post('/', wajibPenilaiMitra, async (req, res) => {
       sikapPelikaku,
       kualitasPekerjaan,
       ketepatanWaktu,
+      komentar,
     });
     res.status(200).json({ message: 'Penilaian berhasil disimpan', data: result });
   } catch (error) {

@@ -6,7 +6,7 @@
 // lalu Export > PNG / PDF.
 //
 // Disusun dari struktur database yang sedang berjalan (mysqldump --no-data),
-// sampai migrasi 2026-09-24-kunci-nomor-dan-versi.sql. Relasi bertanda
+// sampai migrasi 2026-09-28-hapus-isi-pasal.sql. Relasi bertanda
 // "logis" tidak memiliki FOREIGN KEY di database, tetapi secara makna memang
 // merujuk ke tabel tersebut.
 // =====================================================================
@@ -103,17 +103,23 @@ Table users {
   username varchar(50) [not null, unique]
   password varchar(255) [not null, note: 'hash bcrypt']
   nama_lengkap varchar(255) [not null]
+  nip varchar(50) [note: 'NIP pegawai; boleh kosong, dilengkapi kapan saja']
   role role_pengguna [not null, default: 'user']
   isPML tinyint(1) [not null, default: 0]
   tokenVersi int [not null, default: 0, note: 'naik saat ganti password; mencabut sesi lama']
 }
 
+// Tabel JABATAN, bukan tabel orang: siapa memimpin tim apa pada tahun berapa.
+// Nama dan NIP pemegangnya dibaca dari `users` lewat `user_id`.
 Table ketua_tim {
   id varchar(50) [pk]
-  user_id varchar(50) [ref: > users.id, note: 'akun pengguna ketua tim']
-  nama_ketua varchar(255) [not null]
-  nip varchar(50)
+  user_id varchar(50) [not null, ref: > users.id, note: 'sumber nama dan NIP ketua tim']
+  tahun smallint [not null, note: 'tahun kepengurusan; pergantian ketua tim = baris baru']
   tim varchar(100)
+  indexes {
+    (tim, tahun) [unique]
+    tahun
+  }
 }
 
 Table kecamatan {
@@ -256,6 +262,7 @@ Table penilaian_mitra {
   sikap_perilaku int [note: '1-10']
   kualitas_pekerjaan int [note: '1-10']
   ketepatan_waktu int [note: '1-10']
+  komentar text [note: 'komentar penilai; wajib diisi saat menyimpan']
   rata_rata decimal(4,2)
   dinilai_oleh_userId varchar(50) [note: 'users.id penilai (relasi logis)']
   tanggal_penilaian timestamp
@@ -317,7 +324,6 @@ Table template_surat {
   satker_alamat text
   kota varchar(100)
   pengadilan_negeri varchar(255)
-  isi_pasal longtext [note: 'JSON daftar pasal']
   is_aktif tinyint(1) [not null, default: 1]
   updatedAt timestamp
   updatedBy varchar(50)

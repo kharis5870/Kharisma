@@ -3,6 +3,8 @@
 import { RowDataPacket } from 'mysql2';
 import pool from '../db';
 import { RekapPenilaian, PenilaianRequest } from '../../shared/api';
+// Jalur relatif: nilai runtime, alias @shared tidak tersedia di kode server.
+import { rapikanKomentar } from '../../shared/mutuPenilaian';
 import db from '../db';
 
 /**
@@ -79,6 +81,7 @@ export const getPenilaianList = async (tahun?: number, triwulan?: number) => {
             pn.kualitas_pekerjaan AS kualitasPekerjaan,
             pn.ketepatan_waktu AS ketepatanWaktu,
             pn.rata_rata AS rataRata,
+            pn.komentar AS komentar,
             (CASE WHEN pn.id IS NOT NULL THEN 1 ELSE 0 END) AS sudahDinilai,
             pn.tanggal_penilaian AS tanggalPenilaian,
             (SELECT nama_lengkap FROM users WHERE id = pn.dinilai_oleh_userId) AS dinilaiOleh
@@ -108,6 +111,7 @@ export const saveOrUpdatePenilaian = async (data: PenilaianRequest) => {
   // penilaianId sengaja tidak dipakai: kuerinya ON DUPLICATE KEY UPDATE, jadi
   // baris lama dikenali dari UNIQUE KEY (pplId, kegiatanId), bukan dari id.
   const { sikapPelikaku, kualitasPekerjaan, ketepatanWaktu, pplId, kegiatanId, pmlId, dinilaiOleh_userId } = data;
+  const komentar = rapikanKomentar(data.komentar);
 
   // Hitung rata-rata
   const rataRata = ((sikapPelikaku + kualitasPekerjaan + ketepatanWaktu) / 3).toFixed(2);
@@ -116,12 +120,13 @@ export const saveOrUpdatePenilaian = async (data: PenilaianRequest) => {
   // atau UPDATE jika sudah ada data dengan pplId dan kegiatanId yang sama.
   // Ini dimungkinkan karena kita membuat UNIQUE KEY di tabel.
   const query = `
-    INSERT INTO penilaian_mitra (pplId, kegiatanId, pmlId, sikap_perilaku, kualitas_pekerjaan, ketepatan_waktu, rata_rata, dinilai_oleh_userId)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO penilaian_mitra (pplId, kegiatanId, pmlId, sikap_perilaku, kualitas_pekerjaan, ketepatan_waktu, komentar, rata_rata, dinilai_oleh_userId)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       sikap_perilaku = VALUES(sikap_perilaku),
       kualitas_pekerjaan = VALUES(kualitas_pekerjaan),
       ketepatan_waktu = VALUES(ketepatan_waktu),
+      komentar = VALUES(komentar),
       rata_rata = VALUES(rata_rata),
       dinilai_oleh_userId = VALUES(dinilai_oleh_userId),
       pmlId = VALUES(pmlId);
@@ -134,6 +139,7 @@ export const saveOrUpdatePenilaian = async (data: PenilaianRequest) => {
     sikapPelikaku,
     kualitasPekerjaan,
     ketepatanWaktu,
+    komentar,
     rataRata,
     dinilaiOleh_userId
   ]);

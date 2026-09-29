@@ -7,6 +7,7 @@ import { DOKUMEN_WAJIB as mandatoryDocs } from '@/lib/dokumenWajib';
 import { produce } from 'immer';
 import { persist } from 'zustand/middleware';
 import { Dokumen, PPLMaster, PPL, Kegiatan } from "@shared/api";
+import type { AlokasiTerimpor } from "@shared/imporAlokasi";
 import type { MetodePembebanan } from "@shared/pembebananHonor";
 import { bulanPembebananSetelahUbah, rentangHonorBawaan, FORMAT_TANGGAL } from "@/lib/honorPeriode";
 import { format } from "date-fns";
@@ -116,6 +117,8 @@ export type Actions = {
   updateHonorariumSetting: (tahap: keyof State['honorariumSettings'], field: keyof HonorariumSettings, value: string) => void;
   addPPL: (tahap: PPL['tahap']) => void;
   addBulkPPLs: (ppls: PPLMaster[], tahap: PPL['tahap']) => void;
+  /** Menambahkan alokasi hasil impor berkas Excel; lihat ImporAlokasiDialog. */
+  tambahAlokasiImpor: (alokasi: AlokasiTerimpor[]) => void;
   removePPL: (id: string) => void;
   updatePPL: (id: string, field: keyof PPLItem, value: any) => void;
   updatePPLBebanKerja: (pplId: string, jenisPekerjaan: HonorariumDetail['jenis_pekerjaan'], bebanKerja: string) => void;
@@ -284,6 +287,44 @@ const useInputKegiatanStore = create<State & Actions>()(
             return newPpl;
         });
         state.pplAllocations.push(...newAllocations);
+      })),
+
+      /**
+       * Menambahkan alokasi hasil impor berkas, ketiga tahap sekaligus.
+       *
+       * MENAMBAH, bukan mengganti: alokasi yang sudah disusun tangan sebelum
+       * impor tetap utuh. Baris yang mitranya sudah punya alokasi di tahap yang
+       * sama sudah disingkirkan lebih dulu oleh `tandaiSudahDialokasikan`, jadi
+       * di sini tidak ada lagi keputusan yang perlu diambil.
+       *
+       * Honor dan beban kerjanya sudah dihitung `susunAlokasiImpor` dari harga
+       * satuan yang berlaku saat impor, dan tetap ikut dihitung ulang bila harga
+       * satuannya diubah setelah ini lewat `updateHonorariumSetting`.
+       *
+       * Metode dan bulan pembebanan sengaja dibiarkan kosong: keduanya tidak
+       * ada di berkas, dan form baru menagihnya kalau rentang honor tahapnya
+       * benar-benar melintasi lebih dari satu bulan.
+       */
+      tambahAlokasiImpor: (alokasi) => set(produce((state: State) => {
+        const stempel = Date.now();
+        alokasi.forEach((a, i) => {
+          state.pplAllocations.push({
+            // Indeksnya ikut masuk ke id karena seluruh baris dibuat pada
+            // milidetik yang sama; tanpa itu idnya kembar dan React kehilangan
+            // jejak kartu mana yang mana.
+            id: `impor-${stempel}-${i}`,
+            ppl_master_id: a.mitraId,
+            namaPPL: a.namaMitra,
+            namaPML: a.namaPml,
+            pml_id: a.pmlId ?? undefined,
+            tahap: a.tahap,
+            honorarium: [{
+              jenis_pekerjaan: a.jenisPekerjaan,
+              bebanKerja: String(a.bebanKerja),
+              besaranHonor: String(a.besaranHonor),
+            }],
+          });
+        });
       })),
 
       removePPL: (id) => set(state => ({ pplAllocations: state.pplAllocations.filter((ppl) => ppl.id !== id) })),

@@ -1,0 +1,31 @@
+-- db/migrations/2026-09-28-hapus-isi-pasal.sql
+--
+-- Membuang kolom `template_surat.isi_pasal`.
+--
+-- Kolom ini dibuat pada migrasi 2026-09-08-fitur-baru.sql dengan rencana
+-- menyimpan dua belas pasal Surat Perjanjian Kerja sebagai JSON, supaya isinya
+-- bisa disunting dari layar tanpa mengubah kode. Rencana itu tidak pernah
+-- dikerjakan: isi pasalnya tertulis langsung di `client/lib/kontrakPdf.ts`, dan
+-- `updateTemplate` tidak pernah menulis ke kolom ini, sehingga tidak ada jalan
+-- baginya untuk terisi.
+--
+-- Dibuang, bukan dibiarkan, karena kolom yang menjanjikan sesuatu tetapi selalu
+-- kosong lebih membingungkan daripada kolom yang tidak ada — pembaca skema
+-- akan mengira ada kemampuan menyunting pasal yang sebenarnya tidak pernah ada.
+--
+-- Aman dijalankan kapan saja: tidak ada satu baris kode pun yang membacanya.
+-- Bila kelak isi pasal memang ingin bisa disunting dari layar, kolomnya dibuat
+-- lagi bersama fiturnya sekalian, bukan disiapkan bertahun-tahun sebelumnya.
+--
+-- PERIKSA DULU. Kolom ini TIDAK ADA di database pengembangan sekalipun migrasi
+-- 2026-09-08 mendefinisikannya, jadi riwayat kedua database memang berbeda.
+-- Bila kolomnya tidak ada, perintah di bawah gagal dengan galat 1091 — itu
+-- tidak merusak apa pun, cukup dilewati.
+--
+--     SHOW COLUMNS FROM template_surat LIKE 'isi_pasal';
+--
+-- Ditulis polos tanpa `IF EXISTS` karena database penerapan di cPanel memakai
+-- MySQL, yang tidak mengenal klausa itu pada ALTER TABLE — hanya MariaDB yang
+-- menerimanya, dan memakainya membuat migrasi ini ditolak di server.
+
+ALTER TABLE template_surat DROP COLUMN isi_pasal;

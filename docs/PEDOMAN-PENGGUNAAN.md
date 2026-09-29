@@ -152,7 +152,11 @@ Yang perlu diperhatikan:
 - **Grafik progres** per tahap pekerjaan: Listing, Pencacahan, dan Pengolahan.
 - **Daftar kegiatan** di bagian bawah, lengkap dengan persentase kemajuan tiap
   tahap. Klik satu kegiatan untuk melihat rinciannya.
-- **Penyaring** di atas daftar: menurut tim, tahap, atau bulan.
+- **Penyaring** di atas daftar: menurut tim, tahap, bulan, atau **tahun**.
+
+Penyaring tahun memakai tanggal mulai persiapan kegiatan. Gunanya terasa setelah
+sistem dipakai beberapa tahun: tanpa penyaring itu, daftar kegiatan memuat semua
+angkatan sekaligus, padahal yang dicari sehari-hari hanya tahun berjalan.
 
 Kegiatan yang sudah diarsipkan tidak tampil di sini. Untuk melihatnya, buka
 riwayat kegiatan.
@@ -237,6 +241,19 @@ memakai komputer bersama.
 menentukan kapan PML boleh mulai mengisi progres — sebelum tanggal itu, pengisian
 progres ditolak sistem.
 
+**Pilihan Ketua Tim mengikuti tahun jadwal persiapan.** Kepengurusan ketua tim
+dicatat per tahun, jadi daftar yang muncul hanya ketua tim tahun itu. Selama
+jadwal persiapan belum diisi, yang dipakai tahun berjalan.
+
+Bila daftarnya kosong, berarti kepengurusan tahun tersebut belum didaftarkan
+Admin. Sistem menawarkan memakai kepengurusan tahun sebelumnya; pakai tawaran itu
+bila susunan timnya memang belum berganti, atau minta Admin mendaftarkan
+kepengurusan tahun baru lebih dulu.
+
+Bila Anda mengubah jadwal persiapan ke tahun yang berbeda, pilihan ketua tim
+dikosongkan dan harus dipilih ulang. Ini disengaja: orang yang tadi dipilih belum
+tentu pengurus tahun yang baru.
+
 ### 2.2 Mengalokasikan mitra
 
 | **SS-07 — Jendela pemilihan mitra beserta penyaring kecamatan dan desa** |
@@ -257,7 +274,64 @@ progres ditolak sistem.
 | :--- |
 | _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
-### 2.3 Bila honor melintasi beberapa bulan
+### 2.3 Mengisi alokasi dari berkas Excel
+
+Bila daftar alokasinya sudah ada dalam bentuk tabel di komputer Anda, seluruh
+barisnya dapat dimasukkan sekaligus tanpa mengisi satu per satu di layar. Ini
+menolong pada kegiatan besar yang memegang puluhan mitra.
+
+| **SS-23 — Dialog Impor Alokasi Mitra pada langkah peninjauan** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
+
+1. Buka tab **Alokasi PPL**, lalu klik **Impor Alokasi dari Excel** di atas
+   ketiga tab tahap.
+2. Klik **Unduh Template Excel** bila Anda belum punya berkasnya.
+3. Isi berkasnya, lalu unggah.
+4. Periksa pratinjaunya, lalu klik **Masukkan Alokasi**.
+
+Berkasnya memuat lima kolom:
+
+| Kolom | Diisi apa |
+| --- | --- |
+| SOBAT ID | Penanda mitra di aplikasi SOBAT. Paling andal, dipakai lebih dulu bila diisi |
+| Nama Mitra | Dipakai bila SOBAT ID kosong |
+| Tahap | Listing, Pencacahan, atau Pengolahan |
+| PML | Nama PML pengawas. Nama panggilan sudah cukup |
+| Beban Kerja | Bilangan bulat lebih dari nol |
+
+**Satu berkas mengisi ketiga tahap sekaligus.** Kolom Tahap yang menentukan
+setiap baris masuk ke tab mana, jadi Anda tidak perlu mengunggah berkas yang sama
+tiga kali. Urutan kolomnya boleh berbeda dan berkasnya boleh punya kolom
+tambahan — yang dicocokkan judulnya, bukan urutannya.
+
+**Nama PML tidak harus lengkap.** "Edianto" sudah cukup untuk "Edianto, S.E".
+Bila nama yang Anda tulis cocok ke lebih dari satu pegawai, sistem menyebut siapa
+saja yang cocok dan mengosongkan PML baris itu — Anda tinggal memilihnya di kartu
+alokasinya. Sistem tidak pernah menebak, karena menebak berarti pengawasan dan
+penilaian mitra jatuh ke pegawai yang keliru tanpa ada pesan kesalahan.
+
+Tiga hal **tidak** diisi di berkas:
+
+- **Harga satuan**, karena harga adalah setelan per tahap di kegiatan ini. Honor
+  tiap baris dihitung dari beban kerja dikali harga satuan tahapnya. Bila harga
+  satuannya belum diisi, barisnya tetap masuk dengan honor Rp 0 dan akan terhitung
+  sendiri begitu harganya diketik.
+- **Bulan dan cara pembebanan honor**, karena keduanya hanya ditanyakan bila
+  rentang honor tahapnya melewati lebih dari satu bulan. Aturlah di kartu
+  alokasinya, seperti dijelaskan pada bagian 2.4.
+
+Pada langkah peninjauan, tiap baris digolongkan menjadi **siap**, **perlu
+diperiksa**, atau **tidak bisa dipakai**. Baris yang tidak bisa dipakai dilewati,
+bukan menggagalkan seluruh berkas: perbaiki barisnya di Excel lalu impor lagi.
+Mitra yang sudah masuk tidak akan terisi dua kali, jadi mengimpor berkas yang
+sama dua kali tidak melipatgandakan honornya.
+
+**Data belum tersimpan setelah impor.** Hasilnya masuk ke formulir yang sedang
+terbuka, persis seperti Anda mengetiknya sendiri, dan baru tersimpan ketika Anda
+menekan Simpan Kegiatan.
+
+### 2.4 Bila honor melintasi beberapa bulan
 
 Bila masa kerja mitra melewati batas bulan, sistem menanyakan cara membagi
 muatannya:
@@ -271,7 +345,7 @@ muatannya:
 Pembagian ini menentukan **berapa banyak SPK** yang nanti dibuat: satu SPK untuk
 setiap bulan pembebanan.
 
-### 2.4 Bila muncul peringatan batas SBML
+### 2.5 Bila muncul peringatan batas SBML
 
 | **SS-09 — Jendela peringatan batas honor** |
 | :--- |
@@ -292,7 +366,7 @@ Anda punya dua pilihan:
 Sistem **tidak menolak** penyimpanan, hanya memperingatkan lalu meminta
 konfirmasi. Keputusannya tetap di tangan Anda, tetapi keputusannya tercatat.
 
-### 2.5 Membatalkan kegiatan yang baru saja dibuat
+### 2.6 Membatalkan kegiatan yang baru saja dibuat
 
 Sesaat setelah kegiatan tersimpan, muncul jendela konfirmasi berisi tombol
 **Batalkan** selama sekitar enam detik. Klik tombol itu bila Anda keliru
@@ -304,7 +378,7 @@ langsung dipakai orang lain — mitranya dikontrak atau progresnya diisi — dan
 pembatalan yang terlambat akan ikut menghapus pekerjaan orang lain. Bila memang
 perlu dihapus, hubungi Admin.
 
-### 2.6 Menyunting kegiatan
+### 2.7 Menyunting kegiatan
 
 Buka kegiatannya dari dasbor, lalu klik **Edit**. Anda hanya dapat menyunting
 kegiatan yang **Anda buat sendiri** atau yang **Anda pimpin sebagai Ketua Tim**.
@@ -314,7 +388,7 @@ menyimpan kegiatan yang sama saat halaman Anda terbuka. **Muat ulang halaman**,
 lalu ulangi perubahan Anda. Sistem sengaja menolak menyimpan agar perubahan orang
 lain tidak tertimpa tanpa diketahui.
 
-### 2.7 Mengisi dokumen kegiatan
+### 2.8 Mengisi dokumen kegiatan
 
 | **SS-10 — Halaman dokumen kegiatan** |
 | :--- |
@@ -391,7 +465,24 @@ harus dapat dicatat.
    - sikap dan perilaku;
    - kualitas pekerjaan;
    - ketepatan waktu.
-4. Simpan. Rata-ratanya dihitung sendiri oleh sistem.
+4. Tulis **komentar** penilaian Anda, minimal 20 karakter.
+5. Simpan. Rata-ratanya dihitung sendiri oleh sistem.
+
+**Komentar wajib diisi.** Tombol Simpan tetap mati sampai komentarnya cukup
+panjang, dan penghitung karakter di bawah kotaknya menunjukkan kekurangannya.
+Ketentuan ini mengikuti penilaian mitra pada aplikasi SOBAT, dan gunanya bukan
+sekadar memenuhi syarat: angka 1 sampai 10 tidak menjelaskan apa pun ketika mitra
+mempertanyakan nilainya, atau ketika mitra yang sama diusulkan lagi tahun depan
+oleh PML yang berbeda. Tulislah yang konkret, misalnya "Teliti mengisi kuesioner
+dan selalu tepat waktu", bukan "bagus".
+
+Penilaian yang sudah tersimpan sebelum ketentuan ini berlaku tetap ada dan tidak
+perlu diisi ulang komentarnya.
+
+Setelah tersimpan, sistem menampilkan **bintang 1 sampai 5** sebagai ringkasan
+rata-ratanya. Bintangnya mengikuti Form Penilaian Petugas yang dipakai BPS
+Kabupaten Bengkulu Selatan, dan tidak mengenal setengah bintang — rata-rata 8,67
+menjadi empat bintang, bukan empat setengah.
 
 Mitra yang diawasi PML lain **tidak dapat Anda nilai**, dan batasan ini
 ditegakkan di sisi server — bukan sekadar disembunyikan dari layar.
@@ -410,6 +501,12 @@ mitra dengan rata-rata yang sama: mitra yang lebih banyak membantu didahulukan.
 
 Rekapnya dapat diunduh ke PDF atau Excel. Seluruh pegawai dapat melihatnya,
 karena hasilnya dipakai sebagai bahan evaluasi dan apresiasi mitra.
+
+Berkas unduhannya memuat rata-rata dalam **dua skala sekaligus**: skala 1–10
+seperti yang Anda isi, dan skala 1–5 beserta bintangnya untuk dilaporkan ke
+SOBAT. Nilai yang tersimpan di sistem tetap skala 1–10; skala 1–5 hanya dihitung
+saat mengunduh, supaya penilaian lama tidak berubah artinya dan peringkat antar
+mitra tetap sebanding.
 
 ---
 
@@ -459,10 +556,18 @@ tanpa perlu mengirim pengingat.
 
 Buka **Keuangan > Template Surat**. Yang dapat diatur:
 
-- data Pejabat Pembuat Komitmen dan satuan kerja;
-- pola penomoran surat;
-- isi pasal-pasal SPK dan BAST;
-- uraian tugas dan kode beban anggaran.
+- nama, NIP, dan jabatan Pejabat Pembuat Komitmen;
+- nama, alamat, dan kota satuan kerja, serta domisili hukum yang dipakai Pasal 12;
+- pola penomoran SPK dan BAST.
+
+**Isi pasal-pasal SPK dan BAST tidak dapat diubah dari layar.** Rumusan pasalnya
+tetap, dan yang berubah-ubah hanyalah data pada daftar di atas, yang lalu
+disisipkan ke kepala surat, Pasal 1, Pasal 2, dan Pasal 12. Bila rumusan pasalnya
+memang perlu berubah, sampaikan kepada pengelola sistem.
+
+**Uraian tugas dan kode beban anggaran juga tidak diatur di sini**, melainkan di
+**Keuangan > Generate Surat** pada langkah pertama, karena keduanya berbeda untuk
+tiap kegiatan dan tiap tahap.
 
 **Aturlah template sebelum membuat surat pertama.** Surat yang sudah terbit tidak
 ikut berubah ketika template diubah, karena isinya sudah disalin ke dalam surat
@@ -541,7 +646,12 @@ sedang dipakai — jadi pastikan penyaringnya sudah benar sebelum mengunduh.
 | _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Buka **Manajemen Admin > Manajemen Users**. Di sini Anda dapat menambah akun,
-mengubah nama dan perannya, serta mengatur ulang kata sandinya.
+mengubah nama, NIP, dan perannya, serta mengatur ulang kata sandinya.
+
+**NIP boleh dikosongkan** dan dilengkapi kapan saja. NIP inilah yang dipakai bila
+akun tersebut ditetapkan sebagai ketua tim, dan begitu diisi langsung berlaku
+untuk seluruh tahun kepengurusan orang itu — tidak perlu diketik ulang tiap
+tahun.
 
 Peran yang tersedia:
 
@@ -556,9 +666,67 @@ Admin cukup dipegang satu atau dua orang.
 
 ### 5.2 Mengelola Ketua Tim
 
-Buka **Manajemen Admin > Manajemen Ketua Tim**. Di sini nama ketua tim
-dihubungkan dengan akun penggunanya. Hubungan inilah yang menentukan siapa yang
-berhak menyunting suatu kegiatan dan siapa yang menerima notifikasi tenggat.
+| **SS-24 — Manajemen Admin, tab Manajemen Ketua Tim beserta penyaring tahun** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
+
+Buka **Manajemen Admin > Manajemen Ketua Tim**. Satu baris di sini menyatakan
+**siapa memimpin tim apa pada tahun berapa**. Tautan ke akun penggunanya itulah
+yang menentukan siapa yang berhak menyunting suatu kegiatan dan siapa yang
+menerima notifikasi tenggat.
+
+#### Menambah ketua tim
+
+Isiannya hanya tiga: **tahun kepengurusan**, **akun pengguna**, dan **tim**.
+
+Nama dan NIP tidak diketik, melainkan mengikuti akun yang Anda pilih. NIP akun
+itu ditampilkan sebagai keterangan di bawah pilihannya; bila masih kosong,
+kepengurusannya tetap dapat disimpan dan NIP-nya dilengkapi kapan saja di tab
+Manajemen Users.
+
+Karena nama diambil dari akun, **setiap ketua tim wajib punya akun**. Bila orang
+yang bersangkutan belum punya, buatkan akunnya lebih dulu.
+
+#### Pergantian tahun
+
+Kepengurusan dicatat per tahun karena susunan tim kerja BPS berubah setiap tahun.
+**Untuk pergantian tahun, tambahkan baris baru — jangan menyunting yang lama.**
+Menyunting baris lama akan ikut mengubah ketua tim pada kegiatan tahun-tahun
+sebelumnya, dan riwayatnya berubah tanpa ada yang tahu.
+
+Agar tidak mendaftarkan ulang satu per satu, pakai tombol **Salin Kepengurusan**:
+pilih tahun asal dan tahun tujuan, lalu seluruh pasangan orang-dan-tim disalin
+sekaligus. Tim yang di tahun tujuan sudah terisi akan dilewati, bukan
+menggagalkan penyalinan, dan sistem menyebutkan berapa yang disalin dan berapa
+yang dilewati.
+
+Satu tim hanya boleh punya satu ketua pada tahun yang sama. Bila Anda mencoba
+menambah yang kedua, sistem menolaknya — dua baris serupa tidak dapat dibedakan
+siapa pun yang melihat daftar pilihan di formulir kegiatan.
+
+Gunakan **penyaring tahun** di atas daftar untuk melihat satu angkatan saja.
+Kepengurusan tahun-tahun lama sengaja tidak dihapus, karena kegiatan lama masih
+menunjuk kepadanya.
+
+#### Mengganti nama tim
+
+Bila sebuah tim berganti nama — misalnya "IPDS" menjadi "IPDTI & Analisis" —
+gunakan tombol **Ganti Nama Tim**. Pilih tim lama, ketik nama barunya, lalu
+tentukan cakupannya:
+
+| Centang "ubah semua tahun" | Akibatnya |
+| --- | --- |
+| Menyala | Seluruh kepengurusan tim itu ikut berganti nama, termasuk tahun-tahun sebelumnya |
+| Padam | Hanya kepengurusan tahun yang sedang disaring yang berganti nama; tahun lain tetap memakai nama lamanya |
+
+Pilihan kedua dipakai bila nama lama memang benar untuk tahun-tahun sebelumnya.
+Bila Anda memakainya, wajar bila nama lama masih muncul sebagai pilihan tim —
+kepengurusan tahun lalu memang masih memakai nama itu, dan itu bukan kekeliruan.
+
+Daftar pilihan tim disusun dari tim yang benar-benar tercatat di data, bukan dari
+daftar tetap. Tim yang benar-benar baru ditambahkan lewat pilihan terakhir
+**"+ Tim lainnya…"** pada kotak pemilih tim, tanpa perlu meminta perubahan kode
+kepada pengelola sistem.
 
 ### 5.3 Mengelola data mitra
 
@@ -635,6 +803,11 @@ ini bila ada data yang berubah tanpa diketahui siapa yang mengubahnya.
 | Berkas PDF atau Excel tidak jadi terunduh | Unduhan diblokir peramban | Izinkan unduhan untuk alamat SIKAMI, lalu coba lagi |
 | Angka di dasbor terasa keliru | Progres belum diperbarui PML | Periksa lewat riwayat kegiatan siapa yang terakhir memperbaruinya |
 | Surat sudah terbit tetapi isinya tidak sesuai | Honor direvisi setelah surat dibuat | Tim Keuangan membuka Riwayat Penyuratan, lalu Perbarui Isi Surat |
+| Pilihan Ketua Tim kosong saat membuat kegiatan | Kepengurusan tahun jadwal persiapan belum didaftarkan | Pakai tawaran kepengurusan tahun sebelumnya, atau minta Admin mendaftarkannya |
+| Tombol Simpan pada penilaian mitra tetap mati | Komentar belum diisi atau kurang dari 20 karakter | Lihat penghitung karakter di bawah kotak komentar |
+| Baris impor alokasi ditandai tidak bisa dipakai | Mitra tidak dikenali, nama mitra kembar, tahap keliru, beban kerja bukan bilangan bulat, atau mitranya sudah dialokasikan di tahap itu | Baca alasannya pada baris tersebut, perbaiki di Excel, lalu impor lagi |
+| Honor hasil impor alokasi tertulis Rp 0 | Harga satuan tahap itu belum diisi | Isi harga satuannya di kartu tahap; seluruh honor terhitung ulang sendiri |
+| Nama tim lama masih muncul sebagai pilihan | Penggantian nama hanya dilakukan untuk satu tahun | Ganti Nama Tim dengan centang "ubah semua tahun" dinyalakan |
 
 Bila masalahnya tidak ada dalam daftar ini, catat **apa yang Anda lakukan**,
 **pesan yang muncul**, dan **jam kejadiannya**, lalu sampaikan kepada pengelola
@@ -661,7 +834,7 @@ dimasukkan ke pedoman ini.
 | SS-09 | Peringatan SBML | Jendela peringatan beserta nama mitra, bulan, dan batasnya |
 | SS-10 | Dokumen kegiatan | Daftar dokumen wajib dengan status beragam |
 | SS-11 | Pembaruan progres | Panel progres dengan beberapa mitra terisi |
-| SS-12 | Penilaian Mitra | Tiga aspek penilaian dan rata-ratanya |
+| SS-12 | Penilaian Mitra | Tiga aspek penilaian, kotak komentar terisi, dan bintangnya |
 | SS-13 | Pengaturan batas honor | Kolom nilai batas SBML |
 | SS-14 | Verifikasi dokumen | Tombol setujui dan tolak, beserta kolom catatan revisi |
 | SS-15 | Template Surat | Bagian data PPK dan pola penomoran |
@@ -672,3 +845,8 @@ dimasukkan ke pedoman ini.
 | SS-20 | Manajemen PPL | Daftar mitra beserta kecamatan dan desanya |
 | SS-21 | Impor mitra | Pratinjau ringkasan sebelum diterapkan |
 | SS-22 | Riwayat kegiatan | Tombol arsipkan, dan pesan penolakan penghapusan |
+| SS-23 | Impor alokasi | Langkah peninjauan, dengan baris siap dan baris bermasalah beserta alasannya |
+| SS-24 | Manajemen Ketua Tim | Daftar kepengurusan, penyaring tahun, dan tombol Salin Kepengurusan |
+| SS-25 | Tambah Ketua Tim | Modal berisi tahun, pemilih akun beserta keterangan NIP, dan pemilih tim |
+| SS-26 | Ganti Nama Tim | Modal beserta centang "ubah semua tahun kepengurusan" |
+| SS-27 | Tambah User | Formulir akun yang memperlihatkan isian NIP opsional |

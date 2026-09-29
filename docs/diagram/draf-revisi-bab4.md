@@ -368,6 +368,36 @@ Tabel berikut diletakkan di awal subbab agar pembaca langsung melihat perubahann
 | Penilaian mitra         | Dicatat di berkas yang dapat diubah siapa pun yang memiliki tautannya                                                                  | Hanya PML yang mengawasi mitra tersebut yang dapat menilai, dan pembatasan ditegakkan di sisi server                                                | Berkas terbuka menjadi berkas dengan hak akses                          |
 | Pemeringkatan           | Dihitung ulang manual tiap triwulan dengan menggabungkan dua berkas                                                                    | Dihitung otomatis dari data penilaian dan jumlah kegiatan yang sudah tersimpan dalam satu basis data                                                | Perhitungan manual menjadi otomatis                                     |
 
+### Bukti dari bentuk diagram itu sendiri, bukan hanya dari teksnya
+
+Selain tabel di atas, ada dua fakta yang terlihat langsung dari **bentuk**
+Gambar 7 tanpa perlu membaca narasinya, dan berguna sebagai jawaban cepat bila
+penguji bertanya saat sidang di mana letak perubahannya.
+
+Pertama, **lajur "Sistem" sama sekali tidak ada pada Gambar 5** (proses
+berjalan) — seluruh lajurnya berisi pelaku manusia, karena FASIH dan
+spreadsheet pada proses lama hanyalah alat yang dijalankan manusia, bukan
+pelaku yang bertindak sendiri. Pada Gambar 7, lajur "Sistem" muncul pada lima
+aktivitas: memeriksa batas SBML, menyimpan data dalam satu transaksi,
+memperbarui dasbor dan notifikasi, mengirim notifikasi penolakan dokumen, dan
+menghitung peringkat mitra. Kelima aktivitas itu pada proses lama dikerjakan
+manusia; pada sistem usulan dikerjakan sistem tanpa perlu dijalankan satu per
+satu oleh penggunanya.
+
+Kedua, **struktur percabangan serentak (_fork_) tidak ada pada Gambar 5**, yang
+seluruhnya berurutan. Pada Gambar 7a, pembuatan SPK, penginputan progres, dan
+pengisian tautan dokumen digambarkan sebagai tiga cabang yang berjalan
+bersamaan, bukan menunggu giliran seperti pada proses berjalan.
+
+> **Catatan mengenai keterbatasan gambar ini.** Dua manfaat pada daftar inti
+> sistem **tidak tergambar** di Gambar 7, karena diagram ini sengaja dibuat
+> sebagai gambaran umum satu siklus kegiatan: (1) penyaringan mitra menurut
+> kecamatan dan desa, yang barulah tergambar pada diagram rinci nomor 3
+> (`03-activity-alokasi-sbm`), dan (2) pengunduhan rekap honor dan penilaian,
+> yang tergambar pada diagram nomor 10 (`18-activity-rekap-honor`). Bila
+> ditanya soal kedua manfaat ini saat sidang, arahkan ke kedua diagram
+> tersebut, jangan mengklaim keduanya ada di Gambar 7.
+
 ### Apa yang dimaksud dengan data terpusat
 
 Istilah "data terpusat" pada penelitian ini berarti sembilan jenis data yang

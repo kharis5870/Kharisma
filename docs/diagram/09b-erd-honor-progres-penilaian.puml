@@ -65,6 +65,7 @@ entity "penilaian_mitra" as penilaian_mitra {
   sikap_perilaku : int
   kualitas_pekerjaan : int
   ketepatan_waktu : int
+  komentar : text
   rata_rata : decimal(4,2)
   dinilai_oleh_userId : varchar(50)
   tanggal_penilaian : timestamp

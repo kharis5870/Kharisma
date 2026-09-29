@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
 import { ArrowLeft, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileDown, Sheet } from "lucide-react";
 import { exportToPdf, exportToExcel, type KolomEkspor } from "@/lib/exportUtils";
+import { keSkalaLima, teksBintang } from "@shared/mutuPenilaian";
 import { useQuery } from "@tanstack/react-query";
 import type { RekapPenilaian } from "@shared/api";
 import { apiClient } from "@/lib/apiClient";
@@ -82,6 +83,11 @@ export default function RekapPenilaian() {
             { header: 'Nama PPL', nilai: (r: RekapPenilaian) => r.namaPPL, lebar: '*' },
             { header: 'Total Kegiatan', nilai: (r: RekapPenilaian) => r.totalKegiatan, lebar: 'auto', rataKanan: true },
             { header: 'Rata-rata Nilai', nilai: (r: RekapPenilaian) => r.rataRataNilai ?? 0, lebar: 'auto', rataKanan: true },
+            // Skala SOBAT. Ditambahkan di SAMPING nilai aslinya, bukan
+            // menggantikannya: rekap ini juga dipakai internal, dan peringkat
+            // antar-mitra hanya sebanding bila skalanya satu.
+            { header: 'Rata-rata (skala 1-5)', nilai: (r: RekapPenilaian) => keSkalaLima(r.rataRataNilai) ?? 0, lebar: 'auto', rataKanan: true },
+            { header: 'Bintang', nilai: (r: RekapPenilaian) => teksBintang(r.rataRataNilai) || '-', lebar: 'auto' },
             { header: 'Nilai Akhir', nilai: (r: RekapPenilaian) => r.nilaiAkhir ?? 0, lebar: 'auto', rataKanan: true },
         ] as KolomEkspor<RekapPenilaian>[],
         baris: sortedData,

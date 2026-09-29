@@ -1,6 +1,6 @@
 // client/pages/InputKegiatan.tsx
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import SuccessModal from "@/components/SuccessModal";
@@ -22,6 +22,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import useInputKegiatanStore, { TahapHonor } from "@/stores/useInputKegiatanStore";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { bulanDalamRentang, keTeksTanggal, keTanggal, pembebananBelumLengkap } from "@/lib/honorPeriode";
+import { ketuaTimTahun, tahunCadangan, tahunUntukKetuaTim } from "@/lib/ketuaTimTahun";
 import { Badge } from "@/components/ui/badge";
 import { PPLMaster, KetuaTim, Kegiatan, PPL, Dokumen } from "@shared/api";
 import { periksaTautan } from "@shared/tautanDokumen";
@@ -39,6 +40,8 @@ type DateFieldName =
 import { formatHonor, parseHonor, parseHonorNumber } from "@/lib/angka";
 import { AlokasiPPLContent } from "@/components/input-kegiatan/AlokasiPPLContent";
 import { DokumenContent } from "@/components/input-kegiatan/DokumenContent";
+import PanelImporAlokasi from "@/components/PanelImporAlokasi";
+import { fetchPPLs, fetchPMLs } from "@/components/input-kegiatan/dataInputKegiatan";
 
 const createActivity = async (data: any): Promise<Kegiatan> => {
     return apiClient.post<Kegiatan>('/kegiatan', data);
@@ -67,6 +70,15 @@ export default function InputKegiatan() {
     const [peringatanKelengkapan, setPeringatanKelengkapan] = useState<{ daftar: KelompokPeringatan[]; bypassHonorLimit: boolean } | null>(null);
     const [showAutoPopulateMessage, setShowAutoPopulateMessage] = useState(false);
     const [addedPPLCount, setAddedPPLCount] = useState(0);
+    /**
+     * Ringkasan hasil impor Excel; null selama belum ada impor.
+     *
+     * Dibuat terpisah dari pesan "Pilih dari Daftar PPL" di atas karena satu
+     * berkas impor mengisi beberapa tahap sekaligus, sedangkan pesan itu selalu
+     * menyebut satu tahap yang sedang dibuka — kalimat yang akan salah begitu
+     * berkasnya memuat Listing dan Pencacahan bersamaan.
+     */
+    const [pesanImpor, setPesanImpor] = useState<string | null>(null);
     const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
     
     const store = useInputKegiatanStore();
@@ -84,6 +96,27 @@ export default function InputKegiatan() {
     ] as { label: string; mulai: DateFieldName; selesai: DateFieldName }[];
 
     const storeActions = useInputKegiatanStore.getState();
+
+    // ---------------------------------------------------------------- impor
+    // Bahan untuk impor alokasi dari Excel. Daftar mitra dan PML memakai kunci
+    // kueri yang sama dengan kartu alokasi di bawah, jadi tidak ada permintaan
+    // tambahan ke server — React Query memakai kembali hasil yang sudah ada.
+    const { data: pplMasterList = [] } = useQuery({ queryKey: ['pplMaster'], queryFn: fetchPPLs });
+    const { data: pmlUserList = [] } = useQuery({ queryKey: ['pmls'], queryFn: fetchPMLs });
+
+    const alokasiSudahAda = useMemo(
+        () => store.pplAllocations
+            .filter(p => p.ppl_master_id)
+            .map(p => ({ mitraId: String(p.ppl_master_id), tahap: p.tahap })),
+        [store.pplAllocations]);
+
+    // Harga satuan diambil dari setelan tahap yang sedang berlaku di form, bukan
+    // dari berkasnya: berkas impor tidak boleh menjadi sumber harga kedua.
+    const hargaSatuanTahap = useMemo(() => ({
+        listing: parseHonorNumber(store.honorariumSettings['pengumpulan-data-listing'].hargaSatuan),
+        pencacahan: parseHonorNumber(store.honorariumSettings['pengumpulan-data-pencacahan'].hargaSatuan),
+        'pengolahan-analisis': parseHonorNumber(store.honorariumSettings['pengolahan-analisis'].hargaSatuan),
+    }), [store.honorariumSettings]);
 
     const jumlahTahapDokumen = 2 + (store.adaPengolahan ? 1 : 0) + (store.adaDiseminasi ? 1 : 0);
     // Tab yang sedang dibuka bisa lenyap saat tahapnya dimatikan. Tanpa ini,
@@ -131,6 +164,35 @@ export default function InputKegiatan() {
 
     // Tim melekat pada master ketua tim, jadi cukup ditampilkan (read-only)
     // begitu ketua tim dipilih — tidak perlu diinput ulang per kegiatan.
+    // Diisi hanya bila pengguna menyetujui memakai kepengurusan tahun lain
+    // karena tahun kegiatannya belum didaftarkan.
+    const [tahunPakai, setTahunPakai] = useState<number | null>(null);
+
+    // Ketua tim dicatat per tahun; yang ditawarkan hanya kepengurusan tahun
+    // jadwal persiapan kegiatan ini (tahun berjalan selama jadwal kosong).
+    const tahunKetuaTim = useMemo(
+        () => tahunUntukKetuaTim(store.tanggalMulaiPersiapan),
+        [store.tanggalMulaiPersiapan]);
+
+    const ketuaTimTahunIni = useMemo(
+        () => ketuaTimTahun(ketuaTimList, tahunPakai ?? tahunKetuaTim),
+        [ketuaTimList, tahunKetuaTim, tahunPakai]);
+
+    const tahunCadanganTersedia = useMemo(
+        () => tahunCadangan(ketuaTimList, tahunKetuaTim),
+        [ketuaTimList, tahunKetuaTim]);
+
+    // Jadwal persiapan berganti tahun: pilihan ketua tim dikosongkan, karena
+    // orang yang sudah dipilih mungkin bukan pengurus tahun yang baru. Tahun
+    // cadangan yang sempat disetujui ikut dilupakan.
+    const tahunSebelumnya = useRef(tahunKetuaTim);
+    useEffect(() => {
+        if (tahunSebelumnya.current === tahunKetuaTim) return;
+        tahunSebelumnya.current = tahunKetuaTim;
+        setTahunPakai(null);
+        if (store.ketua_tim_id) store.updateFormField('ketua_tim_id', '');
+    }, [tahunKetuaTim, store]);
+
     const timKetuaTerpilih = useMemo(
         () => ketuaTimList.find(k => String(k.id) === String(store.ketua_tim_id))?.tim,
         [ketuaTimList, store.ketua_tim_id],
@@ -445,6 +507,11 @@ export default function InputKegiatan() {
                    <p className="text-blue-800 dark:text-blue-300 text-sm">✅ {addedPPLCount} PPL telah ditambahkan ke Tahap {pplStageTab.replace('-', ' ')}.</p>
                </div>
            )}
+           {pesanImpor && (
+               <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 rounded-lg">
+                   <p className="text-green-800 dark:text-green-300 text-sm">✅ {pesanImpor}</p>
+               </div>
+           )}
          </div>
          <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(false); }} className="space-y-8">
            <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
@@ -464,8 +531,25 @@ export default function InputKegiatan() {
                                  <div className="space-y-2"><Label htmlFor="ketuaTim">Nama Ketua Tim *</Label>
                                      <Select value={store.ketua_tim_id} onValueChange={(value: string) => store.updateFormField('ketua_tim_id', value)}>
                                          <SelectTrigger id="ketuaTim"><SelectValue placeholder="Pilih ketua tim" /></SelectTrigger>
-                                         <SelectContent>{ketuaTimList.map((ketua) => (<SelectItem key={ketua.id} value={String(ketua.id)}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
+                                         <SelectContent>{ketuaTimTahunIni.map((ketua) => (<SelectItem key={ketua.id} value={String(ketua.id)}>{ketua.namaKetua}</SelectItem>))}</SelectContent>
                                      </Select>
+                                     <p className="text-xs text-muted-foreground">
+                                         Ketua tim mengikuti tahun jadwal persiapan — sekarang {tahunPakai ?? tahunKetuaTim}.
+                                     </p>
+                                     {ketuaTimTahunIni.length === 0 && (
+                                         <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                                             Belum ada ketua tim untuk tahun {tahunKetuaTim}.{' '}
+                                             {tahunCadanganTersedia !== null ? (
+                                                 <>Mau pakai kepengurusan {tahunCadanganTersedia} saja?{' '}
+                                                 <button type="button" className="underline underline-offset-2 font-medium"
+                                                     onClick={() => setTahunPakai(tahunCadanganTersedia)}>
+                                                     Ya, pakai {tahunCadanganTersedia}
+                                                 </button></>
+                                             ) : (
+                                                 <>Tambahkan dulu di Manajemen Admin &rsaquo; Manajemen Ketua Tim.</>
+                                             )}
+                                         </div>
+                                     )}
                                      {/* Tim mengikuti master ketua tim, diatur di Manajemen Admin. */}
                                      {timKetuaTerpilih && (
                                          <p className="text-sm text-muted-foreground">Tim: <Badge variant="outline">{timKetuaTerpilih}</Badge></p>
@@ -522,6 +606,31 @@ export default function InputKegiatan() {
                </TabsContent>
                
                 <TabsContent value="alokasi-ppl" className="mt-6">
+                  {/* Di ATAS ketiga tab, karena satu berkas mengisi ketiganya
+                      sekaligus; tombol di dalam kartu "Listing" yang juga
+                      menambah alokasi Pencacahan akan menyesatkan. */}
+                  <PanelImporAlokasi
+                      pplList={pplMasterList}
+                      pmlList={pmlUserList}
+                      alokasiSudahAda={alokasiSudahAda}
+                      hargaSatuan={hargaSatuanTahap}
+                      namaKegiatan={store.namaKegiatan}
+                      onTerapkan={(alokasi) => {
+                          storeActions.tambahAlokasiImpor(alokasi);
+                          // Pindah ke tahap yang paling banyak terisi supaya
+                          // hasilnya langsung terlihat, bukan tersembunyi di
+                          // tab sebelah.
+                          const terbanyak = alokasi.reduce<Record<string, number>>(
+                              (acc, a) => ({ ...acc, [a.tahap]: (acc[a.tahap] ?? 0) + 1 }), {});
+                          const tahapTerbanyak = Object.keys(terbanyak)
+                              .sort((a, b) => terbanyak[b] - terbanyak[a])[0];
+                          if (tahapTerbanyak) setPplStageTab(tahapTerbanyak as PPL['tahap']);
+                          const rincian = Object.entries(terbanyak)
+                              .map(([t, n]) => `${n} ${t.replace('-', ' ')}`).join(', ');
+                          setPesanImpor(`${alokasi.length} alokasi masuk dari berkas (${rincian}). Belum tersimpan sampai kegiatan ini disimpan.`);
+                      }}
+                      onGagal={(title, message) => setAlertModal({ isOpen: true, title, message })}
+                  />
                   <Tabs value={pplStageTab} onValueChange={(val) => setPplStageTab(val as PPL['tahap'])}>
                       <TabsList className="grid w-full grid-cols-3">
                           <TabsTrigger value="listing">Listing</TabsTrigger>

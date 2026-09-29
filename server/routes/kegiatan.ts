@@ -108,7 +108,13 @@ router.post('/', async (req, res) => {
     if (error.statusCode) {
       return res.status(error.statusCode).json({ message: error.message, details: error.details });
     }
-    res.status(500).json({ message: 'Error creating kegiatan' });
+    // Dulu SEMUA galat tak terduga dibalas kalimat mati "Error creating
+    // kegiatan" — pengguna di lapangan menerimanya sebagai "Terjadi Kesalahan"
+    // tanpa satu pun petunjuk, dan menduga-duga tab mana yang salah. Kini
+    // alasannya diterjemahkan oleh aturan yang sama dengan seluruh API:
+    // galat masukan (mis. relasi yang tidak ada) menjadi kalimat yang bisa
+    // dibaca, sementara nama tabel dan kolom tetap tidak bocor ke layar.
+    kirimGalat(res, error, 'Gagal menyimpan kegiatan. Coba lagi, dan bila tetap gagal hubungi admin.');
   }
 });
 

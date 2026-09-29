@@ -9,7 +9,10 @@ export const getKegiatanWithRelations = async (whereClause: string, params: any[
     const query = `
         SELECT
             k.*,
-            kt.nama_ketua AS namaKetua,
+            -- Nama ketua tim dibaca dari akunnya, bukan dari baris kepengurusan:
+            -- sejak migrasi 2026-09-28-ketua-tim-ikut-akun, nama hanya tersimpan
+            -- di satu tempat sehingga koreksi ejaan berlaku untuk semua tahun.
+            ktu.nama_lengkap AS namaKetua,
             kt.tim AS timKetua,
             -- Akun users yang memegang ketua tim ini. Dipakai untuk menentukan
             -- hak edit. JANGAN membandingkan user.id ke k.ketua_tim_id: kedua
@@ -27,6 +30,9 @@ export const getKegiatanWithRelations = async (whereClause: string, params: any[
             DATE_FORMAT(k.tanggalSelesaiHonorPengolahan, '%Y-%m-%d') AS tanggalSelesaiHonorPengolahan
         FROM kegiatan k
         LEFT JOIN ketua_tim kt ON k.ketua_tim_id = kt.id
+        -- Tetap LEFT JOIN walau kepengurusan wajib berakun: kegiatan yang ketua
+        -- timnya sudah dihapus punya kt NULL, dan barisnya harus tetap terbaca.
+        LEFT JOIN users ktu ON ktu.id = kt.user_id
         ${whereClause}
     `;
     const [kegiatanRows] = await db.query<KegiatanPacket[]>(query, params);
