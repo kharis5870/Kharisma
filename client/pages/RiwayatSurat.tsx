@@ -298,12 +298,23 @@ export default function RiwayatSurat() {
               )}
             </div>
 
-            {(data?.celah?.length ?? 0) > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Nomor kosong adalah nomor yang suratnya sudah dihapus permanen. Jejak penghapusannya
-                tetap tersimpan di log penyuratan, dan &quot;Rapikan Nomor&quot; bisa merapatkannya.
-              </p>
-            )}
+            {/* SELALU DIRENDER, TINGGINYA DIKUNCI DUA BARIS.
+                Sebelumnya paragraf ini hanya muncul bila ada celah nomor, yaitu
+                baru sesudah data tiba. Kelahirannya mendorong seluruh wilayah
+                tabel di bawahnya turun, dan pergeseran itulah yang diukur
+                Lighthouse sebagai Cumulative Layout Shift — audit "Avoid large
+                layout shifts" menunjuk `div.overflow-x-auto` pembungkus tabel
+                sebagai satu-satunya elemen yang bergeser.
+                Dengan paragraf ini selalu ada dan bertinggi tetap, tepi atas
+                tabel tidak pernah berpindah. Keadaan "tidak ada celah" pun jadi
+                terjawab, bukan didiamkan. */}
+            <p className="min-h-[2rem] text-xs text-muted-foreground">
+              {isLoading
+                ? "Memeriksa kelengkapan nomor surat pada tahun ini..."
+                : (data?.celah?.length ?? 0) > 0
+                  ? "Nomor kosong adalah nomor yang suratnya sudah dihapus permanen. Jejak penghapusannya tetap tersimpan di log penyuratan, dan \"Rapikan Nomor\" bisa merapatkannya."
+                  : "Seluruh nomor surat pada tahun ini berurutan tanpa celah."}
+            </p>
 
             <div className="overflow-x-auto">
               <Table>

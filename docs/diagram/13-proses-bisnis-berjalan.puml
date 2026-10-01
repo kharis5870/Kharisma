@@ -11,6 +11,32 @@
 ' kembali ke atas bila hasil pemeriksaan belum sesuai.
 !include _gaya.iuml
 
+' UKURAN HURUF DAN PEMENGGALAN LABEL — jangan dikembalikan ke satu baris.
+'
+' Diagram ini punya enam lajur, sehingga lebarnya besar dan tulisannya mengecil
+' ketika dipasang selebar halaman. Terukur: pada bentuk lamanya, huruf 12 pt di
+' dalam gambar selebar 1277 piksel hanya setara 4,26 pt ketika dipasang selebar
+' 16 cm — terlalu kecil untuk dibaca pada naskah cetak.
+'
+' Memperbesar huruf saja tidak menolong, karena kotaknya ikut melebar: naik ke
+' 18 pt hanya menambah 10 persen. Yang menolong adalah MEMPERSEMPIT lajurnya,
+' yaitu memenggal label menjadi lebih banyak baris pendek. Lebar gambar turun
+' dari 1277 menjadi 1158 piksel, dan tingginya naik, sehingga gambarnya memakai
+' ruang ke bawah yang memang masih tersedia di halaman.
+'
+' Gabungan pemenggalan label dan huruf 15 pt menghasilkan huruf setara 5,14 pt,
+' yaitu 21 persen lebih besar daripada bentuk lamanya.
+skinparam defaultFontSize 15
+skinparam activityFontSize 15
+skinparam activityDiamondFontSize 14
+skinparam swimlaneTitleFontSize 16
+
+' GARIS PENUTUP ATAS, BAWAH, DAN PEMISAH JUDUL tidak dibuat di berkas ini,
+' karena PlantUML tidak menyediakannya — `skinparam swimlaneTitleBackgroundColor`
+' sudah dicoba dan tidak dihormati versi yang dipakai. Ketiganya ditambahkan ke
+' SVG hasil ekspor oleh `alat/tutup_swimlane.py`, yang WAJIB dijalankan ulang
+' setiap kali diagram ini diekspor ulang.
+
 |#F5F5F5|Kepala BPS|
 |#F7FAFF|Ketua Tim|
 |#FFFDF2|Tim Keuangan|
@@ -20,28 +46,33 @@
 
 |Kepala BPS|
 start
-:Menugaskan kegiatan
-kepada Ketua Tim;
+:Menugaskan
+kegiatan kepada
+Ketua Tim;
 
 |Ketua Tim|
 :Menyusun rencana dan
 jadwal kegiatan;
 
 repeat
-  :Mengisi mitra, PML, dan
-  beban kerja di spreadsheet;
+  :Mengisi mitra, PML,
+  dan beban kerja
+  di spreadsheet;
 
   |Tim Keuangan|
-  :Memindahkan data mitra dan
-  mengecek batas SBML manual;
+  :Memindahkan data
+  mitra dan mengecek
+  batas SBML manual;
 repeat while (Ada yang melebihi\nbatas SBML?) is (ya) not (tidak)
 
-:Mengetik, menomori, dan
-mencetak SPK satu per satu;
+:Mengetik, menomori,
+dan mencetak SPK
+satu per satu;
 
 |Mitra Statistik|
-:Menandatangani SPK dan
-bekerja di lapangan;
+:Menandatangani
+SPK dan bekerja
+di lapangan;
 
 |PML|
 if (Kegiatan menggunakan\naplikasi FASIH?) then (ya)
@@ -53,16 +84,20 @@ else (tidak)
 endif
 
 |Ketua Tim|
-:Memantau progres lewat
-FASIH atau spreadsheet;
+:Memantau progres
+lewat FASIH atau
+spreadsheet;
 
 repeat
-  :Mengumpulkan dokumen
-  kegiatan ke folder daring;
+  :Mengumpulkan
+  dokumen kegiatan
+  ke folder daring;
 
   |Tim Keuangan|
-  :Memeriksa kelengkapan dokumen;
-repeat while (Dokumen sudah lengkap?) is (belum) not (lengkap)
+  :Memeriksa
+  kelengkapan
+  dokumen;
+repeat while (Dokumen sudah\nlengkap?) is (belum) not (lengkap)
 
 :Memastikan tugas SPK
 sudah diselesaikan;
@@ -75,7 +110,9 @@ BAST satu per satu;
 di spreadsheet;
 
 |Perekap Penilaian|
-:Menghitung peringkat mitra
-per triwulan secara manual;
+:Menghitung
+peringkat mitra
+per triwulan
+secara manual;
 stop
 @enduml

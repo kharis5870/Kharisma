@@ -1,0 +1,43 @@
+@startuml usecase-datamaster
+' Use Case Diagram bagian 3/3: data master.
+'
+' Lihat 01a-usecase-kegiatan.puml untuk alasan pemecahan dan catatan aktor.
+!include _gaya.iuml
+left to right direction
+
+actor "Admin" as AD
+
+rectangle "SIKAMI — Data Master" {
+
+  package "Data Master" {
+    usecase "Mengelola Pengguna" as UC_USER
+    usecase "Mengelola Ketua Tim" as UC_KT
+    usecase "Menyalin Kepengurusan Ketua Tim\nke Tahun Berikutnya" as UC_SALINKT
+    usecase "Mengganti Nama Tim" as UC_GANTITIM
+    usecase "Mengelola Data Mitra" as UC_MITRA
+    usecase "Mengimpor Data Mitra\ndari SOBAT" as UC_IMPOR
+    usecase "Menonaktifkan /\nMengaktifkan Mitra" as UC_NONAKTIF
+    usecase "Mengarsipkan /\nMenghapus Kegiatan" as UC_ARSIP
+  }
+}
+
+AD --> UC_USER
+AD --> UC_KT
+AD --> UC_SALINKT
+AD --> UC_GANTITIM
+AD --> UC_MITRA
+AD --> UC_IMPOR
+AD --> UC_NONAKTIF
+AD --> UC_ARSIP
+
+UC_SALINKT ..> UC_KT : <<extend>>
+UC_GANTITIM ..> UC_KT : <<extend>>
+
+' Mengapung, bukan `note bottom` — lihat catatan di 01a-usecase-kegiatan.puml.
+note as CATATAN_PEWARISAN
+  Admin juga dapat menjalankan seluruh use case
+  Pegawai, Ketua Tim, PML, dan Tim Keuangan
+  pada kedua gambar sebelumnya.
+end note
+
+@enduml

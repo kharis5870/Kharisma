@@ -18,6 +18,14 @@ import { bacaSumberLayanan } from "./__uji__/bacaSumberLayanan";
  *                                  pekerjaan lagi.
  *   getPplAdminData   TIDAK      - Daftar PPL harus tetap memuat mereka,
  *                                  dengan penanda, bukan menghilangkannya.
+ *                                  Halaman itu juga dipakai sebagai pemilih
+ *                                  mitra saat alokasi baru, dan di sanalah
+ *                                  penyaringnya dipasang — di LAYAR, bukan di
+ *                                  kueri: `bolehDipilih` pada
+ *                                  client/pages/DaftarPPL.tsx mematikan kotak
+ *                                  centang mitra nonaktif beserta alasannya.
+ *                                  Memindahkannya ke kueri ini akan
+ *                                  menghilangkan mantan mitra dari daftar.
  *   honor / kontrak / penilaian  - menunjuk `ppl.ppl_master_id`, yaitu
  *                                  pekerjaan yang SUDAH terjadi; menyaringnya
  *                                  akan menghapus sejarah dari layar dan

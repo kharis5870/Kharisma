@@ -1,9 +1,22 @@
 ' Gaya bersama seluruh diagram PlantUML di folder ini.
 ' Diubah di sini = semua diagram ikut berubah, jadi tampilannya seragam di buku.
 
-' Graphviz tidak terpasang di laptop ini; Smetana adalah mesin tata letak
-' bawaan PlantUML sehingga diagram tetap bisa dirender tanpa instalasi apa pun.
-!pragma layout smetana
+' MESIN TATA LETAK: Graphviz (bawaan PlantUML), BUKAN Smetana.
+'
+' Catatan lama di sini menyatakan Graphviz tidak terpasang, dan itu sudah tidak
+' benar: `java -jar plantuml.jar -testdot` melaporkan dot 2.44.1 terpasang dan
+' berfungsi. Selama `!pragma layout smetana` masih aktif, PlantUML memakai mesin
+' cadangan yang tata letaknya lebih buruk — dan pada use case diagram ia
+' menghasilkan koordinat y NEGATIF, sehingga bagian atas gambar TERPOTONG.
+'
+' Diperiksa terhadap seluruh 24 diagram di folder ini: 18 diagram berukuran
+' sama persis (diagram aktivitas memang tidak memakai dot), 6 sisanya berubah
+' sedikit, dan tidak ada satu pun yang gagal dirender. Satu-satunya yang
+' sebelumnya terpotong — use case diagram — kini utuh.
+'
+' Bila suatu saat berpindah ke komputer tanpa Graphviz, kembalikan baris
+' `!pragma layout smetana` di sini; seluruh diagram tetap terender, hanya
+' tata letaknya lebih buruk.
 
 skinparam backgroundColor white
 skinparam shadowing false

@@ -18,7 +18,7 @@ rancangan antarmuka menjawab _seperti apa tampilannya_.
 | --------- | --------------------------- | ------------------------------------------------------- |
 | 4.2.1     | Proses Bisnis Sistem Usulan | Memakai diagram alur umum (`02-activity-proses-usulan`) |
 | 4.2.2     | Use Case Diagram            | Tabel definisi aktor dan deskripsi use case             |
-| **4.2.3** | **Activity Diagram**        | **Sepuluh diagram, isi dokumen ini**                    |
+| **4.2.3** | **Activity Diagram**        | **Sebelas diagram, isi dokumen ini**                    |
 | 4.2.4     | Rancangan Basis Data        | ERD dan struktur tabel                                  |
 | 4.2.5     | Rancangan Antarmuka         | Wireframe W-01 sampai W-17                              |
 

@@ -225,7 +225,7 @@ memakai komputer bersama.
 | :--- |
 | _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
-1. Buka **Dashboard**, lalu klik **Tambah Kegiatan**.
+1. Buka **Dashboard**, lalu klik **Kegiatan Baru** pada menu di sebelah kiri.
 2. Isi nama kegiatan, tim penanggung jawab, dan Ketua Tim-nya.
 3. Isi jadwal keempat tahap:
    - **Persiapan**
@@ -394,11 +394,13 @@ lain tidak tertimpa tanpa diketahui.
 | :--- |
 | _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
-1. Buka kegiatannya, lalu pilih **Lihat Dokumen**.
+1. Buka **Edit Kegiatan**, lalu pilih tab **Dokumen**.
 2. Sistem sudah menyiapkan daftar dokumen wajib tiap tahap (SK, Surat Tugas, KAK,
    Visum, BAST, laporan tahap). Dokumen lain dapat ditambahkan sendiri.
 3. Untuk setiap dokumen, tempelkan **tautan** ke berkasnya di penyimpanan
    instansi, lalu simpan.
+4. Untuk melihat ringkasan seluruh dokumennya, klik tombol **View Docs** pada
+   kartu kegiatan.
 
 Berkasnya sendiri **tidak diunggah ke SIKAMI**, hanya tautannya yang disimpan.
 Berkas aslinya tetap berada di penyimpanan resmi kantor.
@@ -418,9 +420,9 @@ Perbaiki tautannya, dan statusnya kembali menjadi Menunggu.
 | _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka **Dashboard**.
-2. Pada panel pembaruan progres, pilih kegiatan dan tahap yang ingin diperbarui.
-3. Sistem menampilkan **seluruh mitra yang Anda awasi**, dari kegiatan mana pun,
-   sehingga Anda tidak perlu membuka kegiatan satu per satu.
+2. Pada kartu kegiatannya, klik tombol **Update**, lalu pilih tahap yang ingin
+   diperbarui.
+3. Sistem menampilkan **mitra yang Anda awasi** di kegiatan tersebut.
 4. Isi jumlah dokumen pada tiap status, lalu simpan.
 
 Status yang dipakai berbeda menurut tahapnya:
@@ -458,8 +460,8 @@ harus dapat dicatat.
 | _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 1. Buka menu **Penilaian Mitra**.
-2. Pilih kegiatan dan tahapnya. Sistem hanya menampilkan mitra yang **Anda
-   awasi**.
+2. Pilih kegiatan dan tahapnya. Sistem menampilkan mitra yang **Anda awasi** di
+   baris paling atas.
 3. Beri nilai pada tiga aspek, masing-masing berupa bilangan bulat **1 sampai
    10**:
    - sikap dan perilaku;
@@ -648,6 +650,10 @@ sedang dipakai — jadi pastikan penyaringnya sudah benar sebelum mengunduh.
 Buka **Manajemen Admin > Manajemen Users**. Di sini Anda dapat menambah akun,
 mengubah nama, NIP, dan perannya, serta mengatur ulang kata sandinya.
 
+| **SS-27 — Formulir Tambah User beserta isian NIP** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
+
 **NIP boleh dikosongkan** dan dilengkapi kapan saja. NIP inilah yang dipakai bila
 akun tersebut ditetapkan sebagai ketua tim, dan begitu diisi langsung berlaku
 untuk seluruh tahun kepengurusan orang itu — tidak perlu diketik ulang tiap
@@ -676,6 +682,10 @@ yang menentukan siapa yang berhak menyunting suatu kegiatan dan siapa yang
 menerima notifikasi tenggat.
 
 #### Menambah ketua tim
+
+| **SS-25 — Modal Tambah Ketua Tim** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Isiannya hanya tiga: **tahun kepengurusan**, **akun pengguna**, dan **tim**.
 
@@ -709,6 +719,10 @@ Kepengurusan tahun-tahun lama sengaja tidak dihapus, karena kegiatan lama masih
 menunjuk kepadanya.
 
 #### Mengganti nama tim
+
+| **SS-26 — Modal Ganti Nama Tim** |
+| :--- |
+| _Tempel tangkapan layar di sini, lalu hapus baris ini._ |
 
 Bila sebuah tim berganti nama — misalnya "IPDS" menjadi "IPDTI & Analisis" —
 gunakan tombol **Ganti Nama Tim**. Pilih tim lama, ketik nama barunya, lalu

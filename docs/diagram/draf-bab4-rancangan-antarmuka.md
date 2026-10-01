@@ -88,7 +88,7 @@ pengguna tidak perlu menyesuaikan diri setiap berpindah halaman.
 
 ```
 +---------------------------------------------------------------------------+
-| [=] SIKAMI      [ Pencarian global............ ]   [tema] [lonceng] [akun] |  <- Header
+| [=] SIKAMI   Senin, 28 Sep 2026 . 08.15   [ Cari... Ctrl+K ] [lonceng][akun] |
 +--------+------------------------------------------------------------------+
 | Dasbor |                                                                   |
 | Daftar>|   JUDUL HALAMAN                                                   |
@@ -97,7 +97,9 @@ pengguna tidak perlu menyesuaikan diri setiap berpindah halaman.
 | Surat >|   +-----------------------------------------------------------+   |
 | Admin  |   |  Area isi halaman (kartu, tabel, formulir, grafik)        |   |
 |        |   +-----------------------------------------------------------+   |
-| [+ Input Kegiatan ]                                                        |
+| [+ Kegiatan Baru ]                                                         |
+| [ Mode Gelap ]                                                             |
+| [ Logout ]                                                                 |
 +--------+------------------------------------------------------------------+
 |                    Footer: nama instansi dan tahun                         |
 +---------------------------------------------------------------------------+
@@ -109,19 +111,28 @@ Bagian kerangka umum:
    Daftar PML), Manajemen Honor, Penilaian Mitra, Keuangan (berisi Generate Surat,
    Template Surat, dan Riwayat Penyuratan), serta Manajemen Admin. Menu Manajemen
    Admin hanya muncul bagi Admin. Bilah sisi dapat dikuncupkan menjadi ikon saja
-   agar area isi lebih lega. Di bagian bawah terdapat tombol **Input Kegiatan**
-   yang sengaja dibedakan warnanya karena merupakan aksi yang paling sering
-   dipakai.
-2. **Bilah atas (header).** Memuat kotak pencarian global, penukar tema terang dan
-   gelap, lonceng notifikasi beserta jumlah notifikasi yang belum dibaca, dan menu
-   akun berisi tautan Profil dan Keluar.
+   agar area isi lebih lega. Di bagian bawahnya berturut-turut terdapat tombol
+   **Kegiatan Baru** yang sengaja dibedakan warnanya karena merupakan aksi yang
+   paling sering dipakai, penukar tema terang dan gelap, lalu tombol **Logout**.
+2. **Bilah atas (header).** Hanya selebar sisa layar di kanan bilah sisi, bukan
+   selebar halaman. Memuat judul rute yang sedang dibuka beserta sapaan kepada
+   pengguna, penunjuk tanggal dan jam yang berjalan, kotak pencarian global yang
+   juga dapat dibuka dengan Ctrl+K, lonceng notifikasi beserta jumlah notifikasi
+   yang belum dibaca, pengaturan, dan tautan ke halaman Profil. Judul rute pada
+   bilah atas berbeda dari judul bagian di dalam area isi, dan keduanya tampil
+   bersamaan — misalnya rute "Dashboard" dengan bagian "Dashboard Monitoring".
 3. **Area isi.** Diawali judul halaman dan keterangan singkat, lalu kartu ringkasan
    (bila ada), penyaring data, dan isi utama berupa tabel, formulir, atau grafik.
-4. **Jendela sembul (modal).** Dipakai untuk aksi yang butuh ketelitian, misalnya
-   konfirmasi penghapusan, pengisian tautan dokumen, dan penilaian mitra. Jendela
-   sembul dipilih agar pengguna tidak kehilangan konteks halaman di belakangnya.
-5. **Pesan singkat (toast).** Muncul di sudut layar untuk memberi tahu hasil suatu
-   aksi, misalnya "Kegiatan berhasil disimpan", lalu hilang sendiri.
+4. **Footer.** Memuat nama instansi dan tahun, tampil di bawah area isi pada
+   seluruh halaman.
+
+Di luar keempat bagian tetap itu terdapat dua unsur yang muncul sesuai keadaan dan
+tidak menempati ruang tersendiri. **Jendela sembul (modal)** muncul di tengah layar
+dengan latar halaman digelapkan, dipakai untuk aksi yang menuntut ketelitian seperti
+konfirmasi penghapusan, pengisian tautan dokumen, dan penilaian mitra; bentuk ini
+dipilih agar pengguna tidak kehilangan konteks halaman di belakangnya. **Pesan
+singkat (toast)** muncul di sudut kanan bawah untuk memberi tahu hasil suatu aksi,
+misalnya "Kegiatan berhasil disimpan", lalu hilang sendiri.
 
 Tiga pola dipakai berulang pada hampir semua halaman dan tidak diulang
 penjelasannya pada rancangan berikutnya:
@@ -140,9 +151,10 @@ penjelasannya pada rancangan berikutnya:
 ```
 +------------------------------+-------------------------------+
 |                              |                               |
-|        Kharisma.             |   Masuk ke Sistem             |
-|   Sistem administrasi dan    |   Username [................] |
-|   pemantauan mitra statistik |   Password [..........] [mata]|
+|          SIKAMI              |   Masuk ke Sistem             |
+|  Sistem Informasi Administrasi|   Username [................] |
+|  dan Pemantauan Kegiatan     |   Password [..........] [mata]|
+|  Mitra Statistik             |                               |
 |                              |   ( pesan galat bila salah )  |
 |        [ ilustrasi ]         |   [        Masuk        ]     |
 |                              |                               |
@@ -216,6 +228,14 @@ simpan. Panel diletakkan di dasbor agar PML dapat memperbarui progres seluruh
 mitranya tanpa membuka halaman kegiatan satu per satu. Jumlah seluruh status tidak
 boleh melebihi beban kerja mitra, dan sistem menolak simpanan yang melanggar
 batasan itu.
+
+Panel ini juga dirancang **terkunci selama kegiatan masih berada pada tahap
+Persiapan**, dan baru terbuka sejak hari pertama masa pengumpulan data. Alasannya,
+pada tahap persiapan mitra belum bekerja sehingga angka apa pun yang masuk pasti
+keliru, dan angka keliru itu langsung terbawa ke persentase kegiatan, dasbor, dan
+rekapitulasi. Sesudah masa pengumpulan data berakhir, panel tidak ditutup kembali,
+karena pendataan kerap berlangsung melewati jadwal dan pekerjaan yang benar-benar
+terjadi tetap perlu dapat dicatat.
 
 Lapis keempat adalah delapan grafik ringkasan: sebaran kegiatan per status, jumlah
 kegiatan per tim, corong progres pendataan, corong progres pengolahan (berganti
@@ -661,16 +681,19 @@ _(dua gambar terpisah; jendela impor terlalu padat bila digabung ke satu gambar)
 | (Tab Manajemen PPL)  [ + Tambah Mitra ] [ Impor dari SOBAT ]               |
 +---------------------------------------------------------------------------+
 
-        +-------------------------------------------------------+
-        |  Impor Mitra dari Excel SOBAT                         |
-        |  Berkas Excel (.xlsx) [ pilih berkas ]                |
-        |  Baris judul kolom: [ 3 v ]                           |
-        |  Pemetaan kolom: Nama [B v] ID SOBAT [A v] ...        |
-        |  ------------------ Pratinjau -----------------       |
-        |  Tambah 12 | Perbarui 30 | Lewati 4 | Nonaktifkan 2   |
-        |  Budi S. (ID 1234)   -> [ tambah / perbarui / lewati ]|
-        |                      [ Batal ]  [ Terapkan Impor ]    |
-        +-------------------------------------------------------+
+        +----------------------------------------------------------+
+        |  Impor Mitra dari Berkas Excel                           |
+        |  (1) Pilih Berkas  (2) Petakan  [3] Tinjau  (4) Nonaktif |
+        |  ------------------------------------------------------- |
+        |  12 baru | 30 cocok | 4 perlu dipastikan | 2 bermasalah  |
+        |  Baris | Nama         | ID SOBAT | Status     | Tindakan |
+        |   4    | Ahmad Fauzi  | 1290     | Baru       | tambah v |
+        |   5    | Budi Santoso | 1234     | Cocok      | perbarui |
+        |   6    | Siti Aminah  |   -      | Perlu      | lewati v |
+        |        |              |          | dipastikan |          |
+        |   7    | Rudi Hartono | 1236     | Ganda      | terkunci |
+        |                        [ Batal ]  [ Terapkan Impor ]     |
+        +----------------------------------------------------------+
 ```
 
 Halaman ini hanya dapat diakses Admin dan dibagi menjadi tiga tab: pengguna, ketua
@@ -678,11 +701,31 @@ tim, dan mitra. Tab pengguna memuat pengelolaan akun beserta perannya dan penand
 PML. Tab ketua tim memuat penautan nama ketua tim dengan akun penggunanya. Tab mitra
 memuat profil mitra beserta wilayahnya.
 
-Bagian yang paling banyak dirancang adalah jendela **Impor Mitra dari Excel SOBAT**.
-Rancangannya dibuat bertahap: memilih berkas, menentukan baris judul kolom dan
-pemetaan kolom, lalu menampilkan pratinjau berisi ringkasan jumlah baris yang akan
-ditambah, diperbarui, dilewati, dan dinonaktifkan. Admin dapat mengubah tindakan
-setiap baris sebelum impor dijalankan.
+Bagian yang paling banyak dirancang adalah jendela **Impor Mitra dari Berkas
+Excel**. Rancangannya berupa runtutan empat langkah, bukan satu layar: memilih
+berkas, memetakan kolom, meninjau, lalu menentukan mitra yang dinonaktifkan.
+
+Langkah memetakan kolom **hanya muncul bila judul kolom pada berkas tidak
+dikenali**. Pada keadaan biasa langkah itu dilewati, karena kolom dicocokkan
+menurut nama judulnya, bukan urutannya, sehingga berkas boleh memiliki kolom
+tambahan maupun urutan yang berbeda. Pada langkah pertama juga tersedia unduhan
+templat Excel sebagai acuan bentuk berkas.
+
+Langkah meninjau menampilkan ringkasan jumlah baris menurut keadaannya — baru,
+cocok, perlu dipastikan, dan bermasalah — beserta tabel rinci tiap baris. Baris
+bertanda "perlu dipastikan" adalah baris yang hanya cocok namanya tanpa ID SOBAT;
+bawaannya dilewati dan hanya diubah menjadi perbarui bila Admin yakin itu orang
+yang sama. Baris yang ganda di dalam berkas atau tidak sah dikunci pada tindakan
+lewati sehingga tidak dapat ikut tersimpan.
+
+Wilayah mitra pada berkas ekspor yang dipakai satuan kerja dituliskan sebagai kode
+BPS, bukan nama. Karena itu sistem menyimpan kode kecamatan dan desa pada basis
+datanya sendiri, lalu memakai kode tersebut untuk mencocokkan wilayah tiap baris
+tanpa perlu diisikan Admin.
+
+Langkah terakhir menampilkan mitra yang terdaftar di sistem tetapi tidak ada di
+dalam berkas, masing-masing dengan kotak centang, agar Admin memilih sendiri mana
+yang memang sudah tidak menjadi mitra.
 
 Pratinjau tidak mengubah apa pun di basis data, dan impor dijalankan sebagai satu
 kesatuan sehingga kegagalan di tengah jalan tidak meninggalkan data setengah
@@ -697,11 +740,15 @@ Pencarian Global
 
 ```
 +-------------------------------+     +--------------------------------------+
-| Identitas Akun                |     | Notifikasi                      (5)  |
-|  Username     : andi          |     | [!] Dokumen ditolak: KAK Susenas     |
-|  Nama Lengkap : Andi Saputra  |     | [!] Tenggat Pencacahan H-2           |
-|  Peran        : PML           |     | [i] Progres belum diperbarui 3 hari  |
-|  (hanya dapat dibaca)         |     | [i] 4 dokumen menunggu persetujuan   |
+| Identitas Akun                |     | Notifikasi                      (6)  |
+|  Username     : andi          |     | -- Perlu diperbaiki --               |
+|  Nama Lengkap : Andi Saputra  |     | [!] Dokumen ditolak: KAK Susenas     |
+|  Peran        : PML           |     | [!] Isi surat berubah setelah terbit |
+|  (hanya dapat dibaca)         |     | -- Tenggat mendekat --               |
+|                               |     | [!] Tenggat Pencacahan H-2           |
+|                               |     | [!] Pencacahan belum ada progres     |
+|                               |     | -- Menunggu persetujuan --           |
+|                               |     | [i] 4 dokumen menunggu persetujuan   |
 +-------------------------------+     +--------------------------------------+
 | Ganti Kata Sandi              |
 |  Password Lama        [......]|     +--------------------------------------+
@@ -718,13 +765,24 @@ karena keduanya hanya boleh diubah Admin agar peran pengguna tidak dapat dinaikk
 sendiri. Setelah kata sandi berhasil diganti, seluruh sesi lama akun tersebut
 dicabut sehingga pengguna harus masuk kembali.
 
-Panel notifikasi muncul dari lonceng di bilah atas. Isinya berbeda menurut peran:
-Ketua Tim menerima pemberitahuan tenggat tahap, dokumen yang ditolak, progres yang
-tidak diperbarui, dan pengingat dari Tim Keuangan; Tim Keuangan menerima
-pemberitahuan dokumen yang menunggu persetujuan, dokumen yang diunggah ulang,
-dokumen yang menjadi tanggung jawabnya tetapi belum diisi, serta surat yang isinya
-berubah setelah terbit. Notifikasi dirancang hilang dengan sendirinya setelah
-penyebabnya diselesaikan, sehingga tidak ada daftar yang harus dibersihkan manual.
+Panel notifikasi muncul dari lonceng di bilah atas, dan isinya **dikelompokkan
+menurut tingkat kepentingan**, bukan ditampilkan sebagai satu daftar panjang:
+perlu diperbaiki, tenggat mendekat, perlu diisi, menunggu persetujuan, dan
+informasi. Pengelompokan ini dirancang agar hal yang mendesak tidak tenggelam di
+antara pemberitahuan biasa.
+
+Isinya berbeda menurut peran. Ketua Tim menerima pemberitahuan tenggat tahap,
+dokumen yang ditolak, progres yang tidak diperbarui, dan pengingat dari Tim
+Keuangan. Tim Keuangan menerima pemberitahuan dokumen yang menunggu persetujuan,
+dokumen yang diunggah ulang, dokumen yang menjadi tanggung jawabnya tetapi belum
+diisi, serta surat yang isinya berubah setelah terbit. PML menerima peringatan
+bila mitra yang diawasinya belum memiliki progres sama sekali sedangkan masa
+pengumpulan data hampir berakhir — penerimanya ditentukan dari catatan PML pada
+alokasi mitra, bukan dari peran akun, karena pegawai dengan peran apa pun dapat
+ditugasi mengawasi mitra.
+
+Notifikasi dirancang hilang dengan sendirinya setelah penyebabnya diselesaikan,
+sehingga tidak ada daftar yang harus dibersihkan manual.
 
 Pencarian global di bilah atas dirancang mencakup tiga jenis hasil sekaligus, yaitu
 kegiatan, mitra, dan halaman, agar pengguna dapat berpindah tanpa menelusuri menu

@@ -47,7 +47,6 @@ entity "template_surat" as template_surat {
   satker_alamat : text
   kota : varchar(100)
   pengadilan_negeri : varchar(255)
-  isi_pasal : longtext
   is_aktif : tinyint(1)
 }
 

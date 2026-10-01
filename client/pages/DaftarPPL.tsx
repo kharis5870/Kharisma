@@ -290,8 +290,27 @@ export default function DaftarPPL() {
   const totalPages = Math.ceil(filteredAndSortedData.length / rowsPerPage);
   useHalamanAman(currentPage, totalPages, setCurrentPage);
 
+  /**
+   * Mitra nonaktif TIDAK BOLEH dipilih untuk alokasi baru.
+   *
+   * Pemilih mitra yang satu lagi — dropdown di kartu alokasi — memakai
+   * `getAllMasterPPL` yang menyaring `aktif = 1`, sehingga mantan mitra memang
+   * tidak pernah ditawarkan di sana. Halaman ini memakai `getPplAdminData` yang
+   * SENGAJA tidak menyaring, karena Daftar PPL harus tetap memuat mantan mitra
+   * agar riwayatnya terlihat. Akibatnya kedua pemilih sempat tidak sepakat:
+   * lewat halaman ini, mitra yang sudah dinonaktifkan masih bisa dicentang dan
+   * masuk ke kegiatan baru.
+   *
+   * Penyaringnya dipasang di sini, bukan di kueri, supaya keduanya tetap benar:
+   * barisnya tetap tampil beserta penandanya, hanya tidak dapat dipilih.
+   */
+  const bolehDipilih = (ppl: PPLAdminData) =>
+    ppl.aktif !== false && !existingPplIds.includes(ppl.id);
+
   const handleSelectPPL = (pplId: string) => {
-    if (!selectionMode || existingPplIds.includes(pplId)) return;
+    if (!selectionMode) return;
+    const ppl = pplList.find(p => p.id === pplId);
+    if (!ppl || !bolehDipilih(ppl)) return;
     setSelectedPPLs(prev => prev.includes(pplId) ? prev.filter(id => id !== pplId) : [...prev, pplId]);
   };
   
@@ -599,14 +618,16 @@ export default function DaftarPPL() {
             paginatedData.map((ppl, index) => {
                 const isActive = ppl.totalKegiatan > 0;
                 const isAlreadyAdded = existingPplIds.includes(ppl.id);
+                const mitraNonaktif = ppl.aktif === false;
+                const terkunci = isAlreadyAdded || mitraNonaktif;
                 const isSelected = selectedPPLs.includes(ppl.id);
                 return (
-                    <TableRow 
-                        key={ppl.id} 
+                    <TableRow
+                        key={ppl.id}
                         data-state={isSelected && "selected"}
                         className={cn(
-                            isAlreadyAdded && "bg-muted text-muted-foreground cursor-not-allowed",
-                            selectionMode && !isAlreadyAdded && "cursor-pointer",
+                            terkunci && "bg-muted text-muted-foreground cursor-not-allowed",
+                            selectionMode && !terkunci && "cursor-pointer",
                             "scroll-mt-24",
                             pplDisorot === ppl.id && "ring-2 ring-inset ring-blue-400 dark:ring-blue-500"
                         )}
@@ -617,7 +638,10 @@ export default function DaftarPPL() {
                             <TableCell>
                                 {/* Mitra yang SUDAH ada di kegiatan ini tampil tercentang
                                     dan terkunci. Sebelumnya kotaknya kosong dan mati tanpa
-                                    keterangan, sehingga terlihat seperti kegagalan memilih. */}
+                                    keterangan, sehingga terlihat seperti kegagalan memilih.
+                                    Mitra NONAKTIF juga terkunci, tetapi kotaknya kosong —
+                                    ia memang belum dipilih, dan alasannya disebut di
+                                    keterangan supaya tidak terbaca sebagai kegagalan. */}
                                 {isAlreadyAdded ? (
                                     <Tooltip>
                                         <TooltipTrigger asChild>
@@ -627,6 +651,18 @@ export default function DaftarPPL() {
                                         </TooltipTrigger>
                                         <TooltipContent>PPL sudah ditambahkan ke kegiatan ini</TooltipContent>
                                     </Tooltip>
+                                ) : mitraNonaktif ? (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="inline-flex">
+                                                <Checkbox disabled />
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            Mitra ini sudah nonaktif, jadi tidak dapat dialokasikan
+                                            ke kegiatan baru. Alokasi lamanya tetap tersimpan.
+                                        </TooltipContent>
+                                    </Tooltip>
                                 ) : (
                                     <Checkbox checked={isSelected} />
                                 )}
@@ -635,7 +671,17 @@ export default function DaftarPPL() {
                         {/* ✔️ No. juga dibuat terpusat */}
                         <TableCell className="text-center">{(currentPage - 1) * rowsPerPage + index + 1}</TableCell>
                         <TableCell className="font-mono">{ppl.id}</TableCell>
-                        <TableCell className="font-medium">{ppl.namaPPL}</TableCell>
+                        {/* Penanda "Nonaktif" mengikuti Manajemen Admin, dan sengaja
+                            ditempel di kolom Nama — BUKAN di kolom Status. Kolom Status
+                            di tabel ini menyatakan ada-tidaknya kegiatan, bukan status
+                            keaktifan mitra; menaruh keduanya di satu kolom akan membuat
+                            dua arti "nonaktif" bertabrakan. */}
+                        <TableCell className="font-medium">
+                            {ppl.namaPPL}
+                            {mitraNonaktif && (
+                                <Badge variant="outline" className="ml-2 text-xs font-normal">Nonaktif</Badge>
+                            )}
+                        </TableCell>
                         <TableCell>
                 <Badge className={cn("font-semibold", GAYA_POSISI_PPL[ppl.posisi] ?? NADA_STATUS.netral)}>
                     {ppl.posisi}

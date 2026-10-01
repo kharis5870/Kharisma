@@ -1,0 +1,66 @@
+@startuml activity-impor-alokasi
+' Rincian use case "Mengimpor Alokasi Mitra dari Excel".
+' Aturan pencocokan sesuai shared/imporAlokasi.ts.
+'
+' Tidak ada lajur "Server": seluruh pembacaan dan pencocokan berkas terjadi di
+' peramban, dan hasilnya masuk ke formulir yang sedang dibuka. Data baru
+' tersimpan ketika kegiatannya disimpan, lewat alur simpan kegiatan yang sudah
+' ada — itulah sebabnya impor ini tidak memiliki endpoint tersendiri.
+!include _gaya.iuml
+
+|Ketua Tim|
+start
+:Membuka tab Alokasi PPL pada
+formulir kegiatan;
+:Mengunduh templat Excel
+(opsional);
+:Mengisi berkas: ID SOBAT, nama mitra,
+tahap, PML, dan beban kerja;
+:Mengunggah berkas;
+
+|Sistem|
+:Memilih lembar kerja dengan
+kolom dikenali terbanyak;
+:Mencari baris judul kolom;
+if (Judul kolom dikenali?) then (tidak)
+  |Ketua Tim|
+  :Menunjuk sendiri baris judul
+  dan isi tiap kolom;
+  |Sistem|
+else (ya)
+endif
+
+partition "Pencocokan tiap baris" {
+  :Mencocokkan mitra lewat ID SOBAT,
+  lalu lewat nama;
+  :Mencocokkan PML lewat nama,
+  termasuk nama panggilan;
+  :Menandai baris kembar dan mitra
+  yang sudah dialokasikan;
+  :Menghitung honor = beban kerja
+  x harga satuan tahap;
+}
+:Menampilkan pratinjau: baris siap,
+perlu diperiksa, dan tidak bisa dipakai;
+
+|Ketua Tim|
+if (Hasil pratinjau sesuai?) then (tidak)
+  :Memperbaiki berkas,
+  lalu mengimpor ulang;
+  stop
+else (ya)
+endif
+:Menekan "Masukkan Alokasi";
+
+|Sistem|
+:Menambahkan baris yang lolos ke
+formulir, per tahapnya;
+:Membuka tab tahap dengan alokasi
+terbanyak;
+
+|Ketua Tim|
+:Melengkapi PML yang belum terisi,
+lalu menyimpan kegiatan;
+stop
+
+@enduml

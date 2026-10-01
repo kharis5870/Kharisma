@@ -2,6 +2,10 @@
 ' Rincian use case "Menilai Kinerja Mitra" dan "Melihat Rekap & Peringkat Penilaian".
 ' Rumus peringkat sesuai penilaianService.getRekapPenilaian:
 '   nilai akhir = rata-rata nilai + 0,01 × jumlah kegiatan (per tahap) pada triwulan itu.
+'
+' Batas komentar dan rumus bintang mengikuti shared/mutuPenilaian.ts:
+'   PANJANG_MIN_KOMENTAR = 20 (dihitung setelah spasi berlebih dibuang);
+'   bintang = floor(rata-rata / 2), dibatasi minimal 1 dan maksimal 5.
 !include _gaya.iuml
 
 |PML|
@@ -17,6 +21,7 @@ dibebankan pada triwulan tersebut;
 :Memilih mitra yang diawasinya;
 :Mengisi nilai Sikap & Perilaku, Kualitas
 Pekerjaan, dan Ketepatan Waktu (1–10);
+:Menulis komentar penilaian;
 
 |Sistem|
 if (Pengguna adalah PML mitra\ntersebut atau admin?) then (tidak)
@@ -29,7 +34,13 @@ if (Setiap nilai bilangan bulat 1–10?) then (tidak)
   stop
 else (ya)
 endif
+if (Komentar minimal 20 karakter?) then (tidak)
+  :Menampilkan pesan galat;
+  stop
+else (ya)
+endif
 :Menghitung rata-rata tiga aspek;
+:Menentukan bintang 1–5 dari rata-rata;
 :Menyimpan penilaian, dengan kegiatan dan
 penilai diambil dari data server;
 

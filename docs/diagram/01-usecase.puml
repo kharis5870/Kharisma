@@ -40,6 +40,7 @@ rectangle "Sistem Informasi SIKAMI" {
 
   package "Operasional Kegiatan" {
     usecase "Menyunting Kegiatan &\nAlokasi Mitra" as UC_SUNTING
+    usecase "Mengimpor Alokasi Mitra\ndari Excel" as UC_IMPORALOKASI
     usecase "Validasi Batas\nHonor (SBML)" as UC_SBM
     usecase "Konfirmasi Melebihi\nBatas SBML" as UC_KONF
     usecase "Mengelola Dokumen\nKegiatan" as UC_DOK
@@ -65,6 +66,8 @@ rectangle "Sistem Informasi SIKAMI" {
   package "Data Master" {
     usecase "Mengelola Pengguna" as UC_USER
     usecase "Mengelola Ketua Tim" as UC_KT
+    usecase "Menyalin Kepengurusan Ketua Tim\nke Tahun Berikutnya" as UC_SALINKT
+    usecase "Mengganti Nama Tim" as UC_GANTITIM
     usecase "Mengelola Data Mitra" as UC_MITRA
     usecase "Mengimpor Data Mitra\ndari SOBAT" as UC_IMPOR
     usecase "Menonaktifkan /\nMengaktifkan Mitra" as UC_NONAKTIF
@@ -84,6 +87,7 @@ P --> UC_PROFIL
 
 KT --> UC_SUNTING
 KT --> UC_DOK
+KT --> UC_IMPORALOKASI
 
 PML --> UC_PROGRES
 PML --> UC_NILAI
@@ -102,6 +106,8 @@ TK --> UC_NOMOR
 
 AD --> UC_USER
 AD --> UC_KT
+AD --> UC_SALINKT
+AD --> UC_GANTITIM
 AD --> UC_MITRA
 AD --> UC_IMPOR
 AD --> UC_NONAKTIF
@@ -112,6 +118,10 @@ UC_SUNTING ..> UC_SBM : <<include>>
 UC_KONF ..> UC_SBM : <<extend>>
 UC_URUNGKAN ..> UC_BUAT : <<extend>>
 UC_TOLAK ..> UC_VERIF : <<extend>>
+UC_IMPORALOKASI ..> UC_BUAT : <<extend>>
+UC_IMPORALOKASI ..> UC_SUNTING : <<extend>>
+UC_SALINKT ..> UC_KT : <<extend>>
+UC_GANTITIM ..> UC_KT : <<extend>>
 
 note right of AD
   Admin juga dapat menjalankan
