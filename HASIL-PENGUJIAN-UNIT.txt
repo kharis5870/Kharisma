@@ -1,0 +1,221 @@
+========================================================================
+HASIL PENGUJIAN UNIT — SISTEM KHARISMA
+========================================================================
+Tanggal pelaksanaan : 5 Oktober 2026
+Perintah dijalankan : pnpm test
+                      (terdaftar di package.json -> scripts.test,
+                       yang menjalankan: vitest --run)
+Kerangka uji        : Vitest v3.2.4
+Berkas konfigurasi  : tidak ada vitest.config.* terpisah; Vitest memakai
+                      vite.config.ts (alias @ -> client/, @shared -> shared/)
+Direktori kerja     : C:/DATA KHARIS/TUGAS/stis/Semester 7/Magang/Kharisma
+
+========================================================================
+KELUARAN RINGKASAN AKHIR (apa adanya)
+========================================================================
+ Test Files  75 passed (75)
+      Tests  745 passed (745)
+   Start at  18:37:12
+   Duration  55.99s (transform 1.98s, setup 0ms, collect 103.27s,
+             tests 3.16s, environment 34ms, prepare 24.23s)
+
+========================================================================
+REKAPITULASI
+========================================================================
+Berkas uji : 75 lulus / 0 gagal / 75 total
+Kasus uji  : 745 lulus / 0 gagal / 0 dilewati / 745 total
+Durasi     : 55,99 detik
+
+========================================================================
+DAFTAR BERKAS UJI DAN JUMLAH KASUS UJI
+========================================================================
+
+--- SISI KLIEN: client/lib/ (43 berkas, 527 kasus uji) ---
+  34  client/lib/imporAlokasi.spec.ts
+  30  client/lib/imporMitra.spec.ts
+  27  client/lib/pembebananHonor.spec.ts
+  24  client/lib/terapkanImporMitra.spec.ts
+  21  client/lib/progressMitra.spec.ts
+  20  client/lib/tautanDokumen.spec.ts
+  19  client/lib/tahunKegiatan.spec.ts
+  17  client/lib/daftarTim.spec.ts
+  17  client/lib/hakKegiatan.spec.ts
+  16  client/lib/penomoranSurat.spec.ts
+  16  client/lib/ketuaTimTahun.spec.ts
+  15  client/lib/kontrakPdf.spec.ts
+  15  client/lib/nomorSurat.spec.ts
+  13  client/lib/honorPeriode.spec.ts
+  13  client/lib/bastPdf.spec.ts
+  13  client/lib/bintangPenilaian.spec.ts
+  12  client/lib/aturUlangNomor.spec.ts
+  12  client/lib/idOtomatis.spec.ts
+  12  client/lib/hakDokumen.spec.ts
+  11  client/lib/terbilang.spec.ts
+  11  client/lib/polaNomorSurat.spec.ts
+  11  client/lib/komentarPenilaian.spec.ts
+  11  client/lib/periodePreset.spec.ts
+  11  client/lib/honorPPL.spec.ts
+  10  client/lib/progresBelumDibuka.spec.ts
+  10  client/lib/cariSurat.spec.ts
+   9  client/lib/angka.spec.ts
+   9  client/lib/ketuaTim.spec.ts
+   9  client/lib/mutuPenilaian.spec.ts
+   8  client/lib/kelengkapanAlokasi.spec.ts
+   7  client/lib/urutSurat.spec.ts
+   7  client/lib/pembebananBelumLengkap.spec.ts
+   7  client/lib/pesanGalatSql.spec.ts
+   7  client/lib/skalaLima.spec.ts
+   7  client/lib/halaman.spec.ts
+   6  client/lib/labelRentangSingkat.spec.ts
+   5  client/lib/exportUtils.spec.ts
+   5  client/lib/fontKontrak.spec.ts
+   5  client/lib/rentangHonorBawaan.spec.ts
+   5  client/lib/utils.spec.ts
+   4  client/lib/bacaBerkasMitra.spec.ts
+   4  client/lib/aturanPassword.spec.ts
+   2  client/lib/nomorAwal.spec.ts
+
+--- SISI KLIEN: client/components/ (5 berkas, 35 kasus uji) ---
+   9  client/components/ui/calendar.spec.tsx
+   8  client/components/ui/month-picker.spec.ts
+   6  client/components/ui/date-range-picker.spec.ts
+   6  client/components/SuccessModal.spec.tsx
+   6  client/components/labelSidebar.spec.ts
+
+--- SISI KLIEN: client/hooks/ (1 berkas, 8 kasus uji) ---
+   8  client/hooks/useHalamanAman.spec.ts
+
+--- SISI KLIEN: client/pages/ (4 berkas, 24 kasus uji) ---
+  10  client/pages/tataLetakRiwayatSurat.spec.ts
+   7  client/pages/stepperProgress.spec.ts
+   4  client/pages/periodeSuratPerBulan.spec.ts
+   3  client/pages/hidrasiEditKegiatan.spec.ts
+
+--- SISI SERVER: server/services/ (16 berkas, 107 kasus uji) ---
+  12  server/services/progresBersamaan.spec.ts
+  10  server/services/kepengurusanKetuaTim.spec.ts
+   9  server/services/mitraTanpaProgres.spec.ts
+   8  server/services/rentangHonorSql.spec.ts
+   8  server/services/filterPeriodeDaftar.spec.ts
+   7  server/services/mitraNonaktif.spec.ts
+   7  server/services/pengingatDokumen.spec.ts
+   7  server/services/peringatanSuratBerubah.spec.ts
+   6  server/services/pecahSuratPk.spec.ts
+   6  server/services/kunciNomorSurat.spec.ts
+   6  server/services/hapusKetuaTim.spec.ts
+   5  server/services/versiKegiatan.spec.ts
+   4  server/services/filterArsip.spec.ts
+   4  server/services/statusSuratAktif.spec.ts
+   4  server/services/triwulanPenilaian.spec.ts
+   4  server/services/progresMandek.spec.ts
+
+--- SISI SERVER: lain-lain (6 berkas, 44 kasus uji) ---
+  12  server/pengirimanProduksi.spec.ts
+   9  server/auth/token.spec.ts
+   9  server/routes/utilRoute.spec.ts
+   6  server/auth/tokenVersi.spec.ts
+   5  server/integrasi/sumberProgress.spec.ts
+   3  server/routes/identitasToken.spec.ts
+
+TOTAL: 75 berkas uji, 745 kasus uji
+
+========================================================================
+CATATAN
+========================================================================
+Pada berkas client/components/ui/calendar.spec.tsx muncul peringatan
+"useLayoutEffect does nothing on the server" dari pustaka react-day-picker.
+Peringatan ini berasal dari lingkungan render uji (server-side render),
+BUKAN kegagalan uji. Seluruh 9 kasus uji pada berkas tersebut lulus.
+
+Tidak ada kasus uji yang gagal dan tidak ada kasus uji yang dilewati
+(skipped).
+
+========================================================================
+CAKUPAN PENGUJIAN — APA YANG DIUJI DAN APA YANG TIDAK
+========================================================================
+
+A. YANG TERCAKUP
+----------------
+1. Logika murni sisi klien (client/lib/, 43 berkas — bagian terbesar):
+   - Penomoran surat: nomorSurat, polaNomorSurat, penomoranSurat,
+     nomorAwal, aturUlangNomor, urutSurat, cariSurat
+   - Honor dan pembebanan: honorPPL, honorPeriode, pembebananHonor,
+     pembebananBelumLengkap, rentangHonorBawaan, labelRentangSingkat
+   - Impor berkas: imporMitra, terapkanImporMitra, bacaBerkasMitra,
+     imporAlokasi, kelengkapanAlokasi
+   - Pembuatan dokumen PDF: kontrakPdf, bastPdf, fontKontrak, exportUtils
+   - Hak akses (modul shared/hakKegiatan): hakKegiatan, hakDokumen
+   - Penilaian mitra: bintangPenilaian, mutuPenilaian, skalaLima,
+     komentarPenilaian
+   - Progres: progressMitra, progresBelumDibuka
+   - Utilitas: angka, terbilang, utils, halaman, idOtomatis,
+     aturanPassword, pesanGalatSql, tautanDokumen, daftarTim, ketuaTim,
+     ketuaTimTahun, tahunKegiatan, periodePreset
+
+2. Komponen antarmuka (5 berkas): calendar, month-picker,
+   date-range-picker, SuccessModal, labelSidebar
+
+3. Hook (1 berkas): useHalamanAman (pengaman nomor halaman)
+
+4. Logika halaman (4 berkas): hidrasiEditKegiatan, stepperProgress,
+   periodeSuratPerBulan, tataLetakRiwayatSurat
+
+5. Sisi server (22 berkas): token sesi dan versinya, util route,
+   sumber data progres, serta pengunci perilaku pada 16 layanan
+   (filter arsip, periode, ketua tim, kunci nomor surat, mitra nonaktif,
+   pecah Surat PK lintas bulan, pengingat dokumen, progres bersamaan,
+   progres mandek, status surat aktif, triwulan penilaian, versi kegiatan)
+
+B. CATATAN PENTING TENTANG SIFAT PENGUJIAN
+-------------------------------------------
+32 dari 75 berkas uji TIDAK menguji perilaku fungsi secara langsung,
+melainkan memeriksa TEKS KODE SUMBER dengan pencocokan pola (regex)
+setelah komentar dibuang. Pendekatan ini dipakai pada hal-hal yang
+bergantung pada database — repositori ini memang tidak menjalankan
+database saat pengujian, sehingga perilaku kueri SQL tidak dapat
+dieksekusi dan hanya dapat "dikunci" lewat bentuk kodenya.
+
+Rinciannya:
+  - Sisi server : 19 dari 22 berkas uji memakai cara teks sumber.
+                  Hanya 3 yang menguji perilaku sungguhan
+                  (server/auth/token.spec.ts,
+                   server/routes/utilRoute.spec.ts,
+                   server/integrasi/sumberProgress.spec.ts)
+  - Sisi klien   : 13 dari 53 berkas uji memakai cara teks sumber;
+                  40 sisanya menguji perilaku fungsi sungguhan
+
+Konsekuensinya: uji teks sumber dapat mendeteksi bila sebuah perbaikan
+TERHAPUS dari kode (regresi), tetapi TIDAK membuktikan bahwa kode itu
+berjalan benar saat dijalankan.
+
+C. YANG TIDAK TERCAKUP
+----------------------
+1. Tidak ada pengujian integrasi maupun ujung-ke-ujung (end-to-end).
+   Tidak ada supertest atau pemanggilan HTTP ke endpoint Express.
+2. Tidak ada pengujian yang menyentuh database. Tidak ada MySQL/MariaDB
+   yang dijalankan selama pengujian; tidak ada kueri SQL yang benar-benar
+   dieksekusi dan diverifikasi hasilnya.
+3. Lapisan layanan server tidak diuji perilakunya. Dari 28 berkas di
+   server/services/, hanya 1 (rentangHonorSql) punya berkas uji bernama
+   sama. Yang tidak memiliki uji perilaku antara lain:
+   kegiatanSimpan, pembebananService, penilaianService, honorService,
+   riwayatService, kontrakService, notifikasiService, authService,
+   adminService, imporMitraService, pplService, pmlService,
+   settingsService, ketuaTimService, kegiatanProgres, kegiatanDokumen,
+   kegiatanBaca, kegiatanSiklus.
+4. Middleware otorisasi tidak diuji sebagai middleware. Berkas
+   server/auth/middleware.ts (wajibLogin, wajibPeran, wajibAdmin) dan
+   server/auth/kepemilikan.ts (wajibPemilikKegiatan, wajibPmlMitra,
+   wajibPenilaiMitra) tidak punya berkas uji. Yang diuji adalah aturan
+   murni di shared/hakKegiatan.ts lewat client/lib/hakKegiatan.spec.ts
+   (17 kasus uji) — yaitu fungsi keputusannya, bukan penerapannya
+   sebagai penjaga route.
+5. Perenderan dan interaksi halaman React tidak diuji. Dari puluhan
+   halaman di client/pages/, hanya 4 berkas logika pendukungnya yang
+   diuji. Halaman besar seperti InputKegiatan, EditActivity,
+   ManajemenHonor, PenilaianMitra tidak punya uji perenderan.
+6. Tidak ada pengukuran cakupan kode (code coverage). Tidak ada
+   konfigurasi coverage di vite.config.ts dan tidak ada skrip
+   coverage di package.json, sehingga persentase baris kode terliput
+   tidak dapat dilaporkan.
+7. Tidak ada pengujian beban maupun pengujian keamanan otomatis.
